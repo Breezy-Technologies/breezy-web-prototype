@@ -210,7 +210,7 @@ export function listingDetail(l: Listing): ListingDetail {
     apn: digits(10), zone: pick(["RA", "RE", "RS", "R1"]) + digits(4), mls: digits(14), source: "CRMLS",
     listedOn: md(listed), listedDate: `${md(listed)} ${listed.getUTCFullYear()}`,
     agent, brokerage,
-    desc, descShort: desc.slice(0, cutAt) + "…",
+    desc, descShort: desc.slice(0, cutAt).replace(/[,.;:]$/, "") + "…",
     recYears: [...byYear.entries()].sort((a, b) => +b[0] - +a[0]).map(([year, events]) => ({ year, events })),
     tax: [
       ["2026 assessed value", fullPrice(assessed)], ["2026 property tax", fullPrice(assessed * 0.012)],

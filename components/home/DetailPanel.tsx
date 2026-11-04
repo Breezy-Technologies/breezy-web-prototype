@@ -438,6 +438,8 @@ export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShar
           </button>
         )}
       </div>
+      {/* Soft fade where the scroll content meets the footer */}
+      <div style={css("position:absolute;left:0;right:0;bottom:80px;z-index:8;height:72px;pointer-events:none;background:linear-gradient(to bottom,rgba(253,252,252,0) 0%,rgba(253,252,252,.8) 55%,rgb(253,252,252) 100%)")} />
     </div>
   );
 }
