@@ -1,10 +1,12 @@
 "use client";
 import { useRef, useState } from "react";
 import { Listing, fullPrice, shortPrice } from "@/lib/fake";
+import { BellButton } from "./Saved";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
 
-export function DetailPanel({ l, onClose, onGetComps }: { l: Listing; onClose: () => void; onGetComps: () => void }) {
+// Footer bell: `onBell` opens the Alerts panel; with alerts set it turns green with the count.
+export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell }: { l: Listing; onClose: () => void; onGetComps: () => void; alertN?: number; onBell?: () => void }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Summary");
   const [revealed, setRevealed] = useState(false);
   const [gi, setGi] = useState(0);
@@ -99,7 +101,7 @@ export function DetailPanel({ l, onClose, onGetComps }: { l: Listing; onClose: (
         )}
       </div>
       <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: 16, boxShadow: "inset 0 1px 0 rgb(245,240,238)" }}>
-        <button className="btn-soft" title="Set alert" style={{ width: 48, padding: 0 }}><i className="ph-bold ph-bell" /></button>
+        <BellButton n={alertN} onClick={() => onBell?.()} />
         <button className="btn-soft" title="Share property" style={{ width: 48, padding: 0 }}><i className="ph-bold ph-share-network" /></button>
         {revealed ? <>
           <button className="btn-dark" style={{ flex: 1 }}><i className="ph-bold ph-phone" />Call owner</button>

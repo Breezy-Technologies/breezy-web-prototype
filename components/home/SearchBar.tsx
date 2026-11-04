@@ -1,10 +1,17 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Place, searchPlaces } from "@/lib/places";
+import { SavedSearch } from "@/components/SavedState";
+import { ActiveSearchHeader } from "./Saved";
 
 // Top-left search. Shows the selected property's address with an × when the
-// detail panel is open; clearing it deselects the property.
-export function SearchBar({ value, onClear, onPick, near }: { value: string; onClear: () => void; onPick: (p: Place) => void; near?: [number, number] }) {
+// detail panel is open; clearing it deselects the property. With an active
+// saved search (and no property open) it shows the search header instead
+// (`hasActiveS`: avatar, name, "For …"; click = `onManageSearch`, × = `onClearActive`).
+export function SearchBar({ value, onClear, onPick, near, active, onManage, onClearActive }: {
+  value: string; onClear: () => void; onPick: (p: Place) => void; near?: [number, number];
+  active?: SavedSearch | null; onManage?: () => void; onClearActive?: () => void;
+}) {
   const [q, setQ] = useState("");
   const [focus, setFocus] = useState(false);
   const [res, setRes] = useState<Place[]>([]);
@@ -15,6 +22,13 @@ export function SearchBar({ value, onClear, onPick, near }: { value: string; onC
     t.current = setTimeout(() => searchPlaces(q, near).then(setRes), 180);
   }, [q, near]);
   const shown = focus ? q : value;
+  if (active && !focus) return (
+    <div style={{ position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, height: 56, boxSizing: "border-box", padding: "12px 16px", borderRadius: 9999, background: "var(--paper)", boxShadow: "0 0 0 .5px rgba(13,12,12,.08),0 6px 18px rgba(40,26,20,.08)" }}>
+        <ActiveSearchHeader s={active} onManage={() => onManage?.()} onClear={() => onClearActive?.()} />
+      </div>
+    </div>
+  );
   return (
     <div style={{ position: "relative" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, height: 56, padding: "0 12px 0 20px", borderRadius: 9999, background: "var(--paper)", boxShadow: "0 0 0 .5px rgba(13,12,12,.08),0 6px 18px rgba(40,26,20,.08)" }}>
