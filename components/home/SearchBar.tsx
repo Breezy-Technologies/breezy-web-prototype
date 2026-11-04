@@ -99,8 +99,9 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
 
   const remember = (list: Area[]) => {
     setRecent(r => {
-      const now = Date.now();
-      const next = [...list.filter(a => a.label !== CURRENT_LOCATION).map(a => ({ label: a.label, place: a.place, t: now })).reverse(), ...r.filter(x => !list.some(a => a.label === x.label))].slice(0, 3);
+      const now = Date.now(), nm = (s: string) => s.split(",")[0];
+      // One entry per place name, so "Silver Lake, Los Angeles, California" replaces the "Silver Lake, CA" seed.
+      const next = [...list.filter(a => a.label !== CURRENT_LOCATION).map(a => ({ label: a.label, place: a.place, t: now })).reverse(), ...r.filter(x => !list.some(a => nm(a.label) === nm(x.label)))].slice(0, 3);
       try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch {}
       return next;
     });

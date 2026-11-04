@@ -104,7 +104,8 @@ export async function placeBoundary(p: Place): Promise<Ring[] | null> {
       if (j.rings && j.rings.length) return [...(j.rings as Ring[]).map(rg => clockwise(closeRing(rg))), ...((j.holes || []) as Ring[]).map(rg => anticlockwise(closeRing(rg)))];
     }
   } catch {}
-  return p.rings || null;
+  // Census has no neighbourhoods: reuse the gazetteer outline for a live result of the same place (e.g. Silver Lake).
+  return p.rings || GAZETTEER.find(g => g.name === p.name && g.kind === p.kind)?.rings || null;
 }
 
 // Breezy's data coverage (canvas `_unsupQ`: LA / California). California plus
