@@ -54,10 +54,13 @@ export default function Onboarding() {
   }, [app.listings, app.place]);
 
   // ---- camera per step ----
+  // Frame the opportunity pins tightly with a light margin (review feedback);
+  // a big area like Dallas would otherwise leave the pins as a small cluster.
   const fitArea = (padLeft = PAD + PANEL + 40, duration = 1200) => {
     if (!map) return;
-    const bb = app.rings && app.rings.length ? ringBBox(app.rings) : app.place.bbox;
-    if (bb) map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { left: padLeft, right: 80, top: 90, bottom: 60 }, duration, maxZoom: 14.2 });
+    const pts = opps.map(l => [l.lng, l.lat] as [number, number]);
+    const bb = pts.length ? ringBBox([pts]) : app.rings && app.rings.length ? ringBBox(app.rings) : app.place.bbox;
+    if (bb) map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { left: padLeft, right: 70, top: 90, bottom: 50 }, duration, maxZoom: 15.2 });
     else map.flyTo({ center: app.place.center, zoom: 13.4, duration });
   };
   const freeL = (k: "comps" | "ub" | "roi"): Listing => {
@@ -78,6 +81,7 @@ export default function Onboarding() {
   // ---- radar reveal ----
   const [rN, setRN] = useState(0);
   const [rSel, setRSel] = useState<Listing | null>(null);
+  const [rHover, setRHover] = useState<OppType | null>(null);
   useEffect(() => {
     if (step !== "radar") return;
     setRN(0); setRSel(null);
@@ -121,7 +125,7 @@ export default function Onboarding() {
 
       {step === "radar" && <>
         <RadarSweep active={rN < opps.length} />
-        <OppPins items={opps} shown={(_, i) => i < rN} selId={rSel?.id} onPick={setRSel} />
+        <OppPins items={opps} shown={(_, i) => i < rN} lit={l => !rHover || l.opp === rHover} selId={rSel?.id} onPick={setRSel} />
         <div style={panel}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ font: "700 13px/16px var(--font-sans)", color: "var(--clay-dark)" }}>{app.place.label}</span>
@@ -139,7 +143,8 @@ export default function Onboarding() {
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             {OPP_TYPES.map(t => (
-              <div key={t} style={{ display: "flex", alignItems: "center", gap: 12, height: 44, boxShadow: "inset 0 -1px 0 rgba(13,12,12,.06)" }}>
+              <div key={t} onMouseEnter={() => setRHover(t)} onMouseLeave={() => setRHover(h => (h === t ? null : h))} className="hover-row"
+                style={{ display: "flex", alignItems: "center", gap: 12, height: 44, margin: "0 -8px", padding: "0 8px", borderRadius: 10, cursor: "default", boxShadow: "inset 0 -1px 0 rgba(13,12,12,.06)" }}>
                 <span style={{ width: 28, height: 28, borderRadius: 9999, background: "rgb(255,209,41)", boxShadow: `0 0 0 2.5px rgb(${OPP[t].col})`, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ph-bold ph-${OPP[t].ic}`} style={{ fontSize: 15 }} /></span>
                 <span style={{ flex: 1, font: "400 15px/20px var(--font-sans)" }}>{OPP[t].pl}</span>
                 <span style={{ font: "700 17px/20px var(--font-sans)", fontVariantNumeric: "tabular-nums" }}>{counts[t] || 0}</span>
@@ -252,7 +257,7 @@ function Where({ onPick }: { onPick: (p: Place) => void }) {
   const [busy, setBusy] = useState(false);
   const t = useRef<any>(null);
   useEffect(() => { clearTimeout(t.current); if (!q.trim()) { setRes([]); return; } t.current = setTimeout(() => searchPlaces(q).then(setRes), 180); }, [q]);
-  const chips = ["sl", "bh", "90210", "weho"].map(id => GAZETTEER.find(p => p.id === id)!);
+  const chips = ["sl", "bh", "90210", "weho", "dallas"].map(id => GAZETTEER.find(p => p.id === id)!);
   return (
     <div style={{ ...panel, justifyContent: "center", gap: 22 }}>
       <span style={{ display: "flex", alignItems: "center", gap: 10, position: "absolute", top: 32, left: 32 }}>

@@ -77,6 +77,8 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
           <polygon points={pts} fill={topC} stroke={edgeC} strokeWidth={sat ? 2.5 : 1.6} strokeLinejoin="round" />
           {num && <text x={cx} y={ccy} textAnchor="middle" dominantBaseline="central" fontFamily="Akkurat LL, sans-serif" fontWeight={700} fontSize={fs} fill="rgb(18,18,18)" stroke="rgba(255,255,255,.95)" strokeWidth={3} paintOrder="stroke">{num}</text>}
         </g>
+        {/* The parcel's real outline on the ground stays visible above the lifted slab (review feedback). */}
+        <polygon points={pts} fill="none" stroke={sat ? "rgba(255,209,41,.9)" : "rgba(18,18,18,.6)"} strokeWidth={1.2} strokeDasharray="4 3" strokeLinejoin="round" style={{ animation: "fadeIn .3s ease both" }} />
       </svg>
       {showCard && (
         <div style={{ position: "absolute", left: Math.max(146, Math.min(W - 146, cx)), top: below ? bot + 16 : Math.max(124 + CH, top - 12), transform: `translate(-50%,${below ? "0" : "-100%"})`, width: 268, display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 18, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.2),0 0 0 .5px rgba(13,12,12,.08)", zIndex: 60, pointerEvents: "none", animation: "hvPop .2s cubic-bezier(.2,.8,.2,1) both" }}>

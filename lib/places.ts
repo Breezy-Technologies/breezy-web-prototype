@@ -1,5 +1,5 @@
 import { config, isLiveMap } from "./config";
-import { BBox, LngLat, Ring, clockwise, closeRing, ringBBox } from "./geo";
+import { BBox, LngLat, Ring, anticlockwise, clockwise, closeRing, ringBBox } from "./geo";
 
 export type PlaceKind = "place" | "postcode" | "region" | "district" | "neighborhood" | "locality" | "address";
 
@@ -35,6 +35,8 @@ export const GAZETTEER: Place[] = [
   mk("pas", "Pasadena", "Pasadena, CA", "City", "place", [-118.1445, 34.1478], undefined, [-118.2, 34.11, -118.06, 34.25]),
   mk("cc", "Culver City", "Culver City, CA", "City", "place", [-118.3965, 34.0211], undefined, [-118.43, 33.98, -118.37, 34.04]),
   mk("ca", "California", "California", "State", "region", [-119.4179, 36.7783], undefined, [-124.48, 32.53, -114.13, 42.01]),
+  // Dallas: where the Regrid trial has parcel coverage. Outline comes live from Census.
+  mk("dallas", "Dallas", "Dallas, TX", "City", "place", [-96.797, 32.7767], undefined, [-97.0, 32.62, -96.55, 33.02]),
 ];
 
 export const DEFAULT_PLACE = GAZETTEER[3]; // Silver Lake — the onboarding default
@@ -90,7 +92,9 @@ export async function placeBoundary(p: Place): Promise<Ring[] | null> {
     const r = await fetch(u);
     if (r.ok) {
       const j = await r.json();
-      if (j.rings && j.rings.length) return (j.rings as Ring[]).map(rg => clockwise(closeRing(rg)));
+      // Outer rings clockwise, enclave holes anticlockwise: the inner glow then
+      // always lands on the area side of the line.
+      if (j.rings && j.rings.length) return [...(j.rings as Ring[]).map(rg => clockwise(closeRing(rg))), ...((j.holes || []) as Ring[]).map(rg => anticlockwise(closeRing(rg)))];
     }
   } catch {}
   return p.rings || null;

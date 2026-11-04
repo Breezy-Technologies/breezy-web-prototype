@@ -18,8 +18,9 @@ export function pointInRing([x, y]: LngLat, ring: Ring): boolean {
   return inside;
 }
 
+// Even-odd: a point inside an outer ring and a hole (an enclave) is outside.
 export function pointInRings(p: LngLat, rings: Ring[]): boolean {
-  return rings.some(r => pointInRing(p, r));
+  return rings.filter(r => pointInRing(p, r)).length % 2 === 1;
 }
 
 // Signed area in degrees² — used to force a clockwise ring so a positive Mapbox
@@ -31,8 +32,17 @@ export function signedArea(ring: Ring): number {
 }
 
 export function clockwise(ring: Ring): Ring {
-  // Positive = clockwise for this formula with lng/lat axes.
-  return signedArea(ring) > 0 ? ring : ring.slice().reverse();
+  // With this formula and lng/lat axes (north up), a visually clockwise ring
+  // has a NEGATIVE area (an anticlockwise unit square gives +1). Census/GeoJSON
+  // outer rings come back anticlockwise, so they get reversed here; otherwise
+  // the positive line-offset puts the glow outside the area.
+  return signedArea(ring) < 0 ? ring : ring.slice().reverse();
+}
+
+// Holes wind the other way, so the same positive line-offset keeps the glow
+// on the area side (outside the enclave).
+export function anticlockwise(ring: Ring): Ring {
+  return clockwise(ring).slice().reverse();
 }
 
 export function closeRing(r: Ring): Ring {

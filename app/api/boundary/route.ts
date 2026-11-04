@@ -14,7 +14,7 @@ const LAYER_NAMES: Record<string, string[]> = {
 };
 
 let layerCache: { id: number; name: string }[] | null = null;
-const resultCache = new Map<string, number[][][]>();
+const resultCache = new Map<string, { rings: number[][][]; holes: number[][][] }>();
 
 async function layers() {
   if (layerCache) return layerCache;
@@ -32,6 +32,13 @@ function outerRings(geom: any): number[][][] {
   return [];
 }
 
+// Interior rings: enclaves such as Highland Park / University Park inside Dallas.
+function holeRings(geom: any): number[][][] {
+  if (!geom) return [];
+  const polys: number[][][][] = geom.type === "Polygon" ? [geom.coordinates] : geom.type === "MultiPolygon" ? geom.coordinates : [];
+  return polys.flatMap(p => p.slice(1));
+}
+
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const kind = sp.get("kind") || "place";
@@ -39,7 +46,7 @@ export async function GET(req: NextRequest) {
   const names = LAYER_NAMES[kind];
   if (!names || !isFinite(lng) || !isFinite(lat)) return NextResponse.json({ rings: [] }, { status: 404 });
   const key = `${kind}:${lng.toFixed(4)},${lat.toFixed(4)}`;
-  if (resultCache.has(key)) return NextResponse.json({ rings: resultCache.get(key), cached: true });
+  if (resultCache.has(key)) return NextResponse.json({ ...resultCache.get(key), cached: true });
   try {
     const all = await layers();
     for (const want of names) {
@@ -60,10 +67,10 @@ export async function GET(req: NextRequest) {
       if (!r.ok) continue;
       const j = await r.json();
       const f = (j.features || [])[0];
-      const rings = outerRings(f && f.geometry);
+      const rings = outerRings(f && f.geometry), holes = holeRings(f && f.geometry);
       if (rings.length) {
-        resultCache.set(key, rings);
-        return NextResponse.json({ rings, name: f.properties?.NAME, layer: layer.name });
+        resultCache.set(key, { rings, holes });
+        return NextResponse.json({ rings, holes, name: f.properties?.NAME, layer: layer.name });
       }
     }
     return NextResponse.json({ rings: [] }, { status: 404 });
