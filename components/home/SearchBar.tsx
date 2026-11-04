@@ -95,7 +95,7 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
   const exit = () => { input.current?.blur(); setAddMode(false); onSearching(false); };
   useEffect(() => { if (searching && document.activeElement !== input.current) setTimeout(() => input.current?.focus({ preventScroll: true }), 60); }, [searching]);
   // "Try another area" (`onTryArea`) opens the search step from outside with an empty query.
-  useEffect(() => { if (searching && !input.current?.matches(":focus")) { setCities([]); setSq(""); setAddMode(false); } }, [searching]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (searching && !input.current?.matches(":focus")) { setCities([]); setSq(""); setAddMode(false); setRes(null); } }, [searching]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const remember = (list: Area[]) => {
     setRecent(r => {
@@ -154,7 +154,9 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
   );
 
   const chips = searching && addMode ? cities : [];
-  const list = sHasQ && res ? res.list : [];
+  // While the next answer is on its way, keep the last list only if the query just narrowed it (typing ahead).
+  const fresh = !!res && q.toLowerCase().startsWith(res.q.toLowerCase());
+  const list = sHasQ && fresh ? res!.list : [];
   const hasQuery = searching || !!value;
   const hl = (label: string) => {
     const i = label.toLowerCase().indexOf(q.toLowerCase());
@@ -237,7 +239,7 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
           {sHasQ && (
             <>
               <div style={css("height:32px;display:flex;align-items:center;padding:8px 24px")}>
-                <span style={css("flex:1;font:400 12px/16px var(--font-sans);color:rgb(77,71,69)")}>{res && res.q === q && !res.list.length ? "No matches" : res ? "Results suggested" : "Searching…"}</span>
+                <span style={css("flex:1;font:400 12px/16px var(--font-sans);color:rgb(77,71,69)")}>{res && res.q === q && !res.list.length ? "No matches" : fresh ? "Results suggested" : "Searching…"}</span>
               </div>
               <div style={css("display:flex;flex-direction:column;gap:4px;padding:12px")}>
                 {list.map(r => (
