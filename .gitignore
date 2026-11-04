@@ -13,3 +13,6 @@ breezy-design-reference.zip
 
 # Design reference local config (holds the Mapbox token)
 design-reference/project/local-config.js
+
+# Sub-agent git worktrees (Claude Code)
+.claude/worktrees/
