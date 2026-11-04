@@ -53,6 +53,8 @@ function offlineSearch(q: string): Place[] {
 }
 
 const SUB: Record<string, string> = { place: "City", postcode: "ZIP", region: "State", district: "County", neighborhood: "Neighborhood", locality: "Area", address: "Address" };
+// Labels without the trailing ", United States" (search is US only), closer to the canvas.
+const usLabel = (s: string) => s.replace(/,\s*United States$/, "");
 
 // Mapbox Geocoding v6 forward search (US only), falling back to the gazetteer.
 export async function searchPlaces(q: string, near?: LngLat): Promise<Place[]> {
@@ -66,7 +68,8 @@ export async function searchPlaces(q: string, near?: LngLat): Promise<Place[]> {
     u.searchParams.set("limit", "6");
     u.searchParams.set("types", "region,district,place,locality,neighborhood,postcode,address");
     if (near) u.searchParams.set("proximity", near.join(","));
-    const r = await fetch(u.toString());
+    // Give up after 8 s (flaky networks) and use the offline gazetteer instead.
+    const r = await fetch(u.toString(), { signal: AbortSignal.timeout(8000) });
     if (!r.ok) throw new Error(String(r.status));
     const j = await r.json();
     const res: Place[] = (j.features || []).map((f: any) => {
@@ -75,7 +78,7 @@ export async function searchPlaces(q: string, near?: LngLat): Promise<Place[]> {
       return {
         id: f.id || p.mapbox_id,
         name: p.name,
-        label: p.full_address || [p.name, p.place_formatted].filter(Boolean).join(", "),
+        label: usLabel(p.full_address || [p.name, p.place_formatted].filter(Boolean).join(", ")),
         sub: SUB[kind] || "Place",
         kind,
         center: f.geometry.coordinates as LngLat,
@@ -128,12 +131,12 @@ export async function reversePlace(c: LngLat): Promise<Place> {
     u.searchParams.set("access_token", config.mapboxToken);
     u.searchParams.set("types", "neighborhood,locality,place");
     u.searchParams.set("limit", "1");
-    const r = await fetch(u.toString());
+    const r = await fetch(u.toString(), { signal: AbortSignal.timeout(8000) });
     if (!r.ok) throw new Error(String(r.status));
     const f = (await r.json()).features?.[0];
     if (!f) return nearest();
     const p = f.properties || {}, kind = (p.feature_type || "place") as PlaceKind;
-    return { id: f.id || p.mapbox_id, name: p.name, label: p.full_address || [p.name, p.place_formatted].filter(Boolean).join(", "), sub: SUB[kind] || "Place", kind, center: c, bbox: p.bbox as BBox | undefined };
+    return { id: f.id || p.mapbox_id, name: p.name, label: usLabel(p.full_address || [p.name, p.place_formatted].filter(Boolean).join(", ")), sub: SUB[kind] || "Place", kind, center: c, bbox: p.bbox as BBox | undefined };
   } catch {
     return nearest();
   }
