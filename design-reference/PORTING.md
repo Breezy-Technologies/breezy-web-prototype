@@ -23,10 +23,14 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 - ⬜ Thumbnail hover preview — `onThHoverOpen`, `onThHoverKeep`, `thGal.next/prev`. This is the hover card for the small dot pins on the map, not the lists; port it with the price pins.
 - Note: "For you" keeps the V5 onboarding hand-off list (the canvas compact card shows nothing under that tab) and stays the default tab, so the onboarding flow lands on the matches.
 
-### Filters
-- ⬜ Filter bar dropdowns: All filters, ROI, Build potential, Status & price, Type — `onOpenPanel`, `onPanelClose`, `onPanelApply`, `onFilterReset`, `onDdClose`, `ddClear`, `fs.*.toggle`, `fd.inc/dec`, `rt.pick`, `rc.pick`, `rz.pick`, `op.pick`, `ds.toggle`, `pr.toggle`, `sp.toggle`, `sp.focus`, `onSpCollapse`
-- ⬜ Active filter chips — `ch.remove`, `onClearActive`
-- ⬜ Results sort — `onSortToggle`, `onSortClose`, `o.pick`
+### Filters — `components/home/Filters.tsx`, `lib/filters.ts`
+- ✅ Filter bar dropdowns: All filters, ROI, Build potential, Status & price, Type — `onOpenPanel`, `onPanelClose`, `onPanelApply`, `onFilterReset`, `onDdClose`, `ddClear`, `fs.*.toggle`, `fd.inc/dec`, `o.pick`, `ds.toggle`, `tc.pick`, `t.toggle`, `c.toggle`, `pr.toggle`, `sp.toggle`, `onSpCollapse`. Also the status rules toast (`stToast`: active/pending vs sold/expired/withdrawn), DOM / "within" tags, lot unit switch (`u.pick`), the "All filters" n badge, extra chips for beds/baths/size/lot/style/features, and the bar's scroll arrows (`onPillLeft/Right`). Filters run on the fake listings and drive the price pins, the results list and its count; applying the panel from Home opens Results, as in the canvas.
+- Note: `rt.pick`, `rc.pick`, `rz.pick`, `op.pick` and `sp.focus` were listed here but aren't filter handlers in the canvas: `rt.pick` is the report tabs (Comps result), `rc.pick` recent searches (Home full view / suggestions), `rz.pick` the ROI-flow size picker, `op.pick` alert-rule options (Alerts panel) and `sp.focus` the saved-property preview button. Left for those areas. The filter equivalents ported here are `o.pick` (ROI / build potential options), `tc.pick` (tags), `t.toggle`, `c.toggle` and `u.pick`.
+- Note: the canvas filters only by the Active price slider; here each status row's slider filters listings of that status, and the tags filter by days on market. The fake data maps "Off market" to Expired (or Withdrawn for withdrawn opportunities). Defaults are the canvas defaults (Active + Single family), so fewer pins show by default than before.
+- 🟡 "Add feature" button is visual only (no handler in the canvas either).
+- ✅ Active filter chips: a set filter turns its bar chip into a check + value label with a dark ring ("ROI 60%+", "Recently sold", "Condo +1"); per-dimension Clear in each dropdown; Clear all / Reset filters.
+- ⬜ `ch.remove`, `onClearActive`: these are the multi-area chips and the active saved-search header inside the search field, not filter chips. They belong to Area search and Saved searches.
+- ✅ Results sort — `onSortToggle`, `onSortClose`, `o.pick` (Most relevant, DOM newest/oldest, price high/low), plus the "No matches found" state with `onShowNearest` and `onFilterReset`.
 
 ### Saved searches & alerts
 - ⬜ Save search sheet (name, notify, assign contact) — `onSsSave`, `onSsClose`, `onSsNotify`, `onSsRemove`, `onSsSearchContact`, `onSsNewContact`, `sn.pick`

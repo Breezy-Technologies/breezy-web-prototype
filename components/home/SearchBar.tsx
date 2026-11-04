@@ -50,16 +50,3 @@ export function SearchBar({ value, onClear, onPick, near }: { value: string; onC
     </div>
   );
 }
-
-export function FilterChips({ left }: { left: number }) {
-  const chips: [string, string, boolean][] = [["All filters", "ph-sliders-horizontal", false], ["ROI", "", true], ["Build potential", "", true], ["Status & price", "", true], ["Type", "", true]];
-  return (
-    <div className="no-scrollbar" style={{ position: "absolute", left, right: 20, top: 20, zIndex: 40, display: "flex", gap: 8, overflowX: "auto" }}>
-      {chips.map(([lb, ic, caret]) => (
-        <button key={lb} style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", border: "none", borderRadius: 9999, background: "var(--paper)", boxShadow: "0 0 0 .5px rgba(13,12,12,.1),0 4px 12px rgba(40,26,20,.08)", font: "400 15px/20px var(--font-sans)", cursor: "pointer" }}>
-          {ic && <i className={`ph-bold ${ic}`} />}{lb}{caret && <i className="ph-fill ph-caret-down" style={{ fontSize: 14 }} />}
-        </button>
-      ))}
-    </div>
-  );
-}

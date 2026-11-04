@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useMapCtx } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
 import { SideNav, NAV_W } from "@/components/home/SideNav";
-import { SearchBar, FilterChips } from "@/components/home/SearchBar";
-import { ResultsPanel } from "@/components/home/LeftPanel";
+import { SearchBar } from "@/components/home/SearchBar";
+import { ResultsPanel, SortMenu } from "@/components/home/LeftPanel";
+import { AllFiltersPanel, FilterBar, FilterDropdown, useFilterState } from "@/components/home/Filters";
 import { HomeCard } from "@/components/home/HomeCard";
 import { Toast, useToast } from "@/components/home/Toast";
 import { PricePins } from "@/components/home/PricePins";
@@ -15,6 +16,7 @@ import { DetailPanel } from "@/components/home/DetailPanel";
 import { MapControls } from "@/components/home/MapControls";
 import { CompsFlow } from "@/components/home/CompsFlow";
 import { Listing } from "@/lib/fake";
+import { SortKey, homeOk, sortListings } from "@/lib/filters";
 import { Place, searchPlaces } from "@/lib/places";
 import { ringBBox } from "@/lib/geo";
 
@@ -37,6 +39,12 @@ export default function HomeWeb() {
   const [badgeSeen, setBadgeSeen] = useState<Set<number>>(new Set());
   const hoverListing = (id: number | null) => { setHoverId(id); if (id != null) setBadgeSeen(s => s.has(id) ? s : new Set(s).add(id)); };
   const navW = navX ? NAV_W.expanded : NAV_W.collapsed;
+  // Filters: the bar, dropdowns and "All filters" panel filter what the pins and results show.
+  const fs = useFilterState();
+  const shown = useMemo(() => listings.filter(l => homeOk(l, fs.f)), [listings, fs.f]);
+  const [sortBy, setSortBy] = useState<SortKey>("rel");
+  const [sortOpen, setSortOpen] = useState(false);
+  const results = useMemo(() => sortListings(shown, sortBy), [shown, sortBy]);
 
   useEffect(() => { setInset({ left: navW, top: 0, radius: 36 }); }, [navW, setInset]);
   useEffect(() => { if (ready) setHeat("roi"); }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -74,10 +82,11 @@ export default function HomeWeb() {
   const pickPlace = async (p: Place) => { closeDetail(); setView("results"); await choosePlace(p); };
 
   const detailOpen = !!sel;
+  const layerOn = view === "results" && !!fs.fd && !fs.panelOut;
   return (
     <>
       <SideNav expanded={navX} onToggle={() => setNavX(v => !v)} userName={user.name.split(" ")[0]} onPick={k => { if (k === "Map") { closeDetail(); setView("home"); } }} />
-      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1)" }}>
+      <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none" }}>
           <div style={{ pointerEvents: "auto" }}>
             <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : view === "results" ? place.label : ""} near={place.center}
@@ -86,14 +95,25 @@ export default function HomeWeb() {
           {view === "home"
             ? <HomeCard name={user.name} forYou={forYou} saved={listings} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
                 onSearch={async q => { const r = await searchPlaces(q); if (r[0]) pickPlace(r[0]); else showToast("No results for " + q, "info"); }} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()} />
-            : <ResultsPanel title="Results" meta={`${listings.length} homes · ${place.label}`} listings={listings} onOpen={openListing} onHover={setHoverId} />}
+            : (
+              // The results column steps back (scale + dim) while the "All filters" sheet sits on top of it.
+              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: layerOn ? "scale(.94)" : "none", filter: layerOn ? "brightness(.955)" : "none" }}>
+                <ResultsPanel title="Results" meta={`${shown.length} ${shown.length === 1 ? "home" : "homes"} · ${place.label}`} listings={results} onOpen={openListing} onHover={setHoverId}
+                  sortOpen={sortOpen} onSortToggle={() => { setSortOpen(o => !o); fs.setDd(null); }}
+                  onShowNearest={() => { fs.reset(); showToast("Showing nearest properties"); }} onResetFilters={fs.reset} />
+              </div>
+            )}
+          {layerOn && <div onClick={fs.closePanel} title="Back to results" style={{ position: "absolute", left: 0, right: 0, top: 64, bottom: 0, zIndex: 3, pointerEvents: "auto", cursor: "pointer" }} />}
         </div>
         {detailOpen && (
           <div style={{ position: "absolute", left: GAP + COL + GAP, top: GAP, bottom: GAP }}>
             <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => setComps(sel!)} />
           </div>
         )}
-        {!detailOpen && <FilterChips left={GAP + COL + GAP + 8} />}
+        <FilterBar fs={fs} left={detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} />
+        <FilterDropdown fs={fs} listings={listings} />
+        <AllFiltersPanel fs={fs} top={view === "results" ? 88 : 76} listings={listings} onApply={() => { if (view === "home") { closeDetail(); setView("results"); } }} />
+        {sortOpen && view === "results" && <SortMenu value={sortBy} onPick={k => { setSortBy(k); setSortOpen(false); }} onClose={() => setSortOpen(false)} left={GAP + COL - 49} top={72} />}
         <div style={{ pointerEvents: "auto" }}><MapControls onLocate={() => fit(GAP + COL + GAP)} /></div>
         {offline && (
           <span style={{ position: "absolute", right: 120, bottom: 22, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 12px/28px var(--font-sans)", color: "var(--fg-2)", pointerEvents: "auto" }} title="Add NEXT_PUBLIC_MAPBOX_TOKEN to load live Mapbox tiles">
@@ -107,7 +127,7 @@ export default function HomeWeb() {
         )}
       </div>
 
-      <PricePins listings={listings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
+      <PricePins listings={shown} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
         onHover={id => { clearTimeout(keepT.current); if (id == null) keepT.current = setTimeout(() => setHoverId(null), 160); else setHoverId(id); }} />
       {hover && hoverId !== selId && (
         <HoverCard l={hover} onKeep={() => clearTimeout(keepT.current)} onLeave={() => { keepT.current = setTimeout(() => setHoverId(null), 160); }} onOpen={() => openListing(hover.id)} />

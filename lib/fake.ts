@@ -37,7 +37,15 @@ export type Listing = {
   ub: number; // % underbuilt
   dom: number;
   isNew: boolean;
+  // Filter attributes (fake): property type, style and features, as used by the filter bar.
+  ptype: string;
+  pstyle: string;
+  feats: string[];
 };
+
+const PTYPES: [string, number][] = [["Single family", 0.7], ["Condo", 0.1], ["Townhouse", 0.07], ["Multi family", 0.06], ["Duplex", 0.05], ["Lot", 0.02]];
+const PSTYLES = ["Contemporary", "Traditional", "Regional", "Mediterranean", "Mid century"];
+const PFEATS = ["Pool", "ADU potential", "City view", "Garage", "Landscaped garden", "Solar"];
 
 const STREETS = ["N Alpine Dr", "N Rexford Dr", "Carmelita Ave", "N Elm Dr", "S Maple Dr", "Lomitas Ave", "S Oakhurst Dr", "N Beverly Dr", "S Wetherly Dr", "Elevado Ave", "S Almont Dr", "N Doheny Dr", "Clifton Way", "Gregory Way", "Whittier Dr", "Lake View Ave", "Micheltorena St", "Descanso Dr", "Griffith Park Blvd", "Sunset Dr", "Redcliff St", "Effie St", "Maltman Ave", "Hyperion Ave"];
 const OWNERS: [string, string][] = [["Harbor Lane Holdings LLC", "Investor · LLC · owner since 2019"], ["Dana Whitfield", "Owner-occupant · since 2008"], ["Romelu Bayo", "Owner-occupant · since 2014"], ["Linden Family Trust", "Trust · since 2001"], ["Marisol Ortega", "Absentee owner · since 2016"], ["Kestrel Capital LP", "Investor · LP · since 2021"], ["Peter & Amy Chao", "Owner-occupants · since 1998"], ["Nadia Farouk", "Owner-occupant · since 2011"]];
@@ -66,6 +74,8 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
   const span = Math.min(0.06, e - w), spanY = Math.min(0.045, nn - s);
   const out: Listing[] = [];
   const level = priceLevel(center);
+  // separate stream so adding filter attributes doesn't reshuffle the existing fake data
+  const R2 = rng(hashStr(key + ":attrs"));
   let guard = 0;
   while (out.length < n && guard++ < n * 40) {
     const lng = center[0] + (R() - 0.5) * span, lat = center[1] + (R() - 0.5) * spanY;
@@ -101,10 +111,15 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
         mail: `PO Box ${1000 + Math.floor(R() * 8999)}, Los Angeles`,
       },
       qe: { value: qeV, lo: qeV * 0.93, hi: qeV * 1.08 },
-      roi: Math.round(18 + R() * 50),
+      roi: Math.round(24 + R() * 66), // spans the ROI filter options (50–80%+)
       ub: Math.round(20 + R() * 70),
       dom: Math.round(4 + R() * 200),
       isNew: R() < 0.2,
+      ...(() => {
+        let t = R2(), ptype = PTYPES[0][0];
+        for (const [k, w] of PTYPES) { if (t < w) { ptype = k; break; } t -= w; }
+        return { ptype, pstyle: PSTYLES[Math.floor(R2() * PSTYLES.length)], feats: PFEATS.filter(() => R2() < 0.35) };
+      })(),
     });
   }
   return out;

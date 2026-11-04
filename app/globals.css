@@ -65,3 +65,19 @@ input { font-family: inherit; }
 .copy-line .copy-ic { opacity: 0; transition: opacity .15s }
 .copy-line:hover .copy-ic { opacity: 1 }
 @keyframes activePing { 0% { transform: scale(1); opacity: .7 } 80%, 100% { transform: scale(2.6); opacity: 0 } }
+
+/* Filters (ported from the canvas Home Web.dc.html) */
+@keyframes bzSheetIn { from { opacity: 0; transform: translateY(36px) } to { opacity: 1; transform: none } }
+@keyframes bzSheetOut { from { opacity: 1; transform: none } to { opacity: 0; transform: translateY(28px) } }
+.fb-pill:hover { background: rgb(243, 241, 240) !important }
+.fb-ghost:hover { background: rgba(13, 12, 12, .05) !important }
+.fb-opt:hover { background: rgba(13, 12, 12, .04) !important }
+.fb-clear:hover { opacity: .6 }
+.fb-cta:hover { background: rgb(40, 36, 34) !important }
+.fb-cta:active { transform: scale(.98) }
+.fb-dark:hover { background: rgb(45, 40, 38) !important }
+.fb-dark:active { transform: scale(.99) }
+.fb-add:hover { background: rgb(248, 246, 244) !important }
+.fb-sort:hover { background: rgba(13, 12, 12, .1) !important }
+.fb-grey:hover { background: rgb(222, 222, 222) !important }
+.fb-grey:active, .fb-cta2:active { transform: scale(.98) }
