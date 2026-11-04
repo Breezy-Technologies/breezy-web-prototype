@@ -8,7 +8,7 @@
 import { useRef, useState } from "react";
 import { Listing, fullPrice } from "@/lib/fake";
 import { CLIENT_PHOTOS, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
-import { ListingCard } from "./LeftPanel";
+import { ForYouFeed } from "./ForYouFeed";
 
 type Tab = "For you" | "Searches" | "Properties";
 type Sort = "Default" | "Newest" | "Oldest";
@@ -164,7 +164,8 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
     </div>
   );
   const propList = (rows: PropItem[], live: boolean) => rows.map(x => <PropRow key={x.key} x={x} hover={live && hover === x.key} onEnter={enter(x.key)} onLeave={leave(x.key)} onOpen={() => openProp(x)} onDel={() => askDel(x.key, x.l.addr)} />);
-  const forYouList = forYou.map(l => <ListingCard key={l.id} l={l} fresh={l.isNew && !seen.has(l.id)} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />);
+  // V5 "For you" feed: filter by opportunity signal, larger cards with the signal badge.
+  const forYouList = <ForYouFeed items={forYou} seen={seen} onOpen={onOpen} onHover={onHover} />;
   const hello = (
     <>
       <span style={{ font: "300 26px/1.26 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>Hello {name.split(" ")[0]}</span>
@@ -185,7 +186,6 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
           </div>
           <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: tab === "For you" ? "0 16px 16px" : "0 24px" }}>
             {tab === "For you" && <>
-              <span style={{ font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{forYou.length} opportunities matched to your picks</span>
               {forYouList}
             </>}
             {tab === "Searches" && <>

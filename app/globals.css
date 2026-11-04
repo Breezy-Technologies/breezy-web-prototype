@@ -98,3 +98,7 @@ input { font-family: inherit; }
 .sh-add:hover { background: rgba(13, 12, 12, .12) !important }
 .sh-pv:hover { background: rgb(245, 240, 238) !important }
 .sh-row:hover { background: rgba(13, 12, 12, .03) !important }
+
+/* For you feed (V5 canvas) */
+.fy-card:hover { background: rgb(245, 243, 243) }
+.fy-row:hover { background: rgba(13, 12, 12, .04) }
