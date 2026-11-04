@@ -295,7 +295,10 @@ export function FilterBar({ fs, left, hidden }: { fs: FilterState; left: number;
   };
   const extraKeys = (["beds", "baths", "size", "lot", "styles", "feats"] as DdKey[]).filter(k => dims[k].on);
   const shown: DdKey[] = ["roi", "ub", "status", "price", "types", ...extraKeys.slice(0, 2)];
-  const badge = (Object.keys(dims) as DdKey[]).filter(k => dims[k].on && !shown.includes(k)).length;
+  // "All filters" badge = how many filters are active in total (review feedback; the
+  // canvas only counted ones without a chip). Price is part of the status filter,
+  // so it isn't counted twice.
+  const badge = (Object.keys(dims) as DdKey[]).filter(k => dims[k].on && !(k === "price" && dims.status.on)).length;
   const chips = [
     ...extraKeys.slice(0, 2).map(key => ({ key, label: dims[key].label, on: true, icon: "" })),
     ...(["roi", "ub", "status", "types"] as DdKey[]).map(key => ({ key, label: dims[key].on ? dims[key].label : NAMES[key]!, on: dims[key].on, icon: BAR_ICONS[key]! })),
