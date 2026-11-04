@@ -102,3 +102,15 @@ input { font-family: inherit; }
 /* For you feed (V5 canvas) */
 .fy-card:hover { background: rgb(245, 243, 243) }
 .fy-row:hover { background: rgba(13, 12, 12, .04) }
+
+/* Property detail panel (canvas Home Web.dc.html, detail column) */
+.dt-white:hover { background: rgb(255, 255, 255) !important }
+.dt-round:hover { background: rgba(13, 12, 12, .1) !important }
+.dt-tile:hover { background: rgb(238, 230, 227) !important }
+.dt-tile:active, .dt-press:active { transform: scale(.98) }
+.dt-ghost:hover { background: rgba(13, 12, 12, .06) !important }
+.dt-green:hover { background: rgba(49, 140, 96, .08) !important }
+.dt-more:hover { opacity: .7 }
+.dt-src:hover { background: rgb(248, 245, 244) !important }
+.dt-add:hover { background: rgb(232, 229, 228) !important }
+.dt-contact:hover { background: rgba(13, 12, 12, .05) !important }
