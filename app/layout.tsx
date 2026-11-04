@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { MapProvider } from "@/components/map/MapProvider";
 import { AppStateProvider } from "@/components/AppState";
+import { SavedProvider } from "@/components/SavedState";
 
 export const metadata: Metadata = {
   title: "Breezy · Web prototype",
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AppStateProvider>
-          <MapProvider>{children}</MapProvider>
+          <SavedProvider>
+            <MapProvider>{children}</MapProvider>
+          </SavedProvider>
         </AppStateProvider>
       </body>
     </html>

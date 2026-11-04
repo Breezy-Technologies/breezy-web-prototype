@@ -2,25 +2,17 @@
 // Home panel (For you / Searches / Properties), ported from the canvas
 // `Home Web.dc.html`: template around the `hcCard` / `hcFull` blocks and the
 // logic in `_hcVals` (t.pick, ss.*, pp.*, onHcViewAll, onHcBack,
-// onHcSortToggle, onHcDel*, onHcStart).
+// onHcSortToggle, onHcDel*, onHcStart). Saved searches and saved properties
+// come from the shared store (`components/SavedState.tsx`), so saving a search
+// or a home elsewhere lands here.
 import { useRef, useState } from "react";
 import { Listing, fullPrice } from "@/lib/fake";
+import { CLIENT_PHOTOS, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
 import { ListingCard } from "./LeftPanel";
 
 type Tab = "For you" | "Searches" | "Properties";
 type Sort = "Default" | "Newest" | "Oldest";
 
-type SavedSearch = { id: string; name: string; clients: string[]; newN: number; th: number[]; params: string[]; sq: string; when: string };
-
-// `_defSearches` + `_hcExtra` from the canvas.
-const SEARCHES: SavedSearch[] = [
-  { id: "bev", name: "Condo in Bev Hills", clients: ["Steve Hall"], newN: 3, th: [0, 1, 2], params: ["Active", "Condo", "Up to $5m", "Beverly Hills"], sq: "Beverly Hills, CA", when: "Today" },
-  { id: "studio", name: "My search in Studio City", clients: ["Sarah Holmes"], newN: 0, th: [3, 4, 5], params: ["Active", "Single family", "Up to $3m", "Studio City"], sq: "Studio City, CA", when: "Today" },
-  { id: "x-kill", name: "LA Kill List", clients: ["Heyley Ross", "Alex Kim"], newN: 2, th: [6, 7, 8], params: ["Active", "Multifamily", "Up to $5m", "Los Feliz"], sq: "Los Feliz, CA", when: "Yesterday" },
-  { id: "x-conv", name: "My search in Echo Park", clients: [], newN: 0, th: [9, 10, 11], params: ["Active", "Single family", "Up to $2m", "Echo Park"], sq: "Echo Park, CA", when: "Mon" },
-  { id: "x-ub", name: "Underbuilt lots in Silver Lake", clients: ["Jen Smith", "Guy Hawkins"], newN: 5, th: [1, 4, 7], params: ["Active", "Lots", "Up to $3m", "Silver Lake"], sq: "Silver Lake, CA", when: "Last week" },
-];
-const CLIENT_PHOTOS: Record<string, string> = { "Steve Hall": "/photos/avatar-client.jpg" };
 const PROP_STATUS = ["Increased 1% to $1M", "Price dropped 3%", "New photos added", "Back on market", "Open house Sat", "Price dropped 5%"];
 const PROP_WHEN = ["Today", "Today", "Yesterday", "Mon", "Last week", "Last week"];
 const THUMB = ["a", "b", "e", "c", "f", "h", "d", "g"].map(c => `/photos/prop-${c}.jpg`); // `_bhInfo[i].ph[0]`
@@ -29,8 +21,6 @@ const RANK: Record<string, number> = { Today: 0, Yesterday: 1, Mon: 2, "Last wee
 const INK = "rgb(18,18,18)";
 const card: React.CSSProperties = { display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 24, background: "rgb(253,252,252)", boxShadow: "inset 0 0 0 1px rgb(245,240,238),0 14px 36px rgba(40,26,20,.1)", pointerEvents: "auto" };
 const roundBtn: React.CSSProperties = { flex: "none", width: 32, height: 32, border: "none", borderRadius: 9999, background: "rgba(18,18,18,.06)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
-const initials = (n: string) => n.split(" ").map(w => w[0]).join("").slice(0, 2);
-const forTxt = (cl: string[]) => cl.length ? "For " + (cl.length > 2 ? cl[0].split(" ")[0] + " +" + (cl.length - 1) : cl.map(n => cl.length > 1 ? n.split(" ")[0] : n).join(" & ")) : "Just for you";
 const mask = (u: string, size: number, color: string): React.CSSProperties => ({ flex: "none", width: size, height: size, background: color, WebkitMask: `url('${u}') center/contain no-repeat`, mask: `url('${u}') center/contain no-repeat` });
 
 function Bell() {
@@ -68,7 +58,7 @@ function SearchRow({ x, hover, full, onEnter, onLeave, onOpen, onDel }: { x: Sav
       return <span key={n} style={{ flex: "none", position: "relative", zIndex: 2 - k, marginLeft: k ? -12 : 0, width: sz, height: sz, borderRadius: 9999, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", font: "400 13px/16px var(--font-sans)", color: INK, boxShadow: "inset 0 0 0 .5px rgba(18,18,18,.06)" + (k ? ",0 0 0 2px rgb(253,252,252)" : ""), background: ph ? `url('${ph}') center/cover no-repeat` : ["rgb(238,206,186)", "rgb(214,226,220)"][k] }}>{ph ? "" : initials(n)}</span>;
     })
     : x.th.slice(0, 3).map((t, n) => (
-      <span key={n} style={{ flex: "none", position: "relative", zIndex: 3 - n, marginLeft: n ? -24 : 0, width: [48, 42, 34][n], height: [48, 42, 34][n], borderRadius: [8, 7, 6.33][n], boxShadow: n ? `0 0 0 ${[0, 2.188, 1.979][n]}px rgb(255,255,255)` : undefined, background: `rgb(241,231,228) url('${THUMB[t % THUMB.length]}') center/cover no-repeat` }} />
+      <span key={n} style={{ flex: "none", position: "relative", zIndex: 3 - n, marginLeft: n ? -24 : 0, width: [48, 42, 34][n], height: [48, 42, 34][n], borderRadius: [8, 7, 6.33][n], boxShadow: n ? `0 0 0 ${[0, 2.188, 1.979][n]}px rgb(255,255,255)` : undefined, background: `rgb(241,231,228) url('${x.photos?.[n] || THUMB[t % THUMB.length]}') center/cover no-repeat` }} />
     ));
   const tags = [
     { label: `${p[0] || "Active"}: ${p[2] || "Any price"}`, icon: "/ui/f-money.svg" },
@@ -108,9 +98,9 @@ function SearchRow({ x, hover, full, onEnter, onLeave, onOpen, onDel }: { x: Sav
   );
 }
 
-type SavedProp = { key: string; l: Listing; status: string; when: string };
+type PropItem = { key: string; l: Listing; status: string; when: string };
 
-function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: SavedProp; hover: boolean; onEnter: () => void; onLeave: () => void; onOpen: () => void; onDel: () => void }) {
+function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; hover: boolean; onEnter: () => void; onLeave: () => void; onOpen: () => void; onDel: () => void }) {
   const { l } = x;
   return (
     <div onClick={onOpen} onMouseEnter={onEnter} onMouseLeave={onLeave} className="hc-row" style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 8, margin: -8, borderRadius: 16, cursor: "pointer", transition: "background .16s" }}>
@@ -135,10 +125,11 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: SavedProp; 
   );
 }
 
-export function HomeCard({ name, forYou, saved, seen, onOpen, onHover, onSearch, onStart, toast }: {
-  name: string; forYou: Listing[]; saved: Listing[]; seen: Set<number>;
-  onOpen: (id: number) => void; onHover: (id: number | null) => void; onSearch: (q: string) => void; onStart: () => void; toast: (text: string) => void;
+export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast }: {
+  name: string; forYou: Listing[]; seen: Set<number>;
+  onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
+  const sv = useSaved();
   const [tab, setTab] = useState<Tab>("For you");
   const [full, setFull] = useState(false);
   const [fullTab, setFullTab] = useState<Tab>("Searches");
@@ -146,25 +137,24 @@ export function HomeCard({ name, forYou, saved, seen, onOpen, onHover, onSearch,
   const [sort, setSort] = useState<Sort>("Default");
   const [sortOpen, setSortOpen] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
-  const [del, setDel] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null);
-  const [opened, setOpened] = useState<string[]>([]);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const sorted = <T extends { when: string }>(a: T[]) => sort === "Default" ? a : a.slice().sort((x, y) => (RANK[x.when] - RANK[y.when]) * (sort === "Newest" ? 1 : -1));
-  // Opening or hovering a saved search marks its new matches as seen.
-  const searches = sorted(SEARCHES.filter(x => !del.includes(x.id)).map(x => opened.includes(x.id) ? { ...x, newN: 0 } : x));
-  const props: SavedProp[] = sorted(saved.slice(0, 6).map((l, k) => ({ key: "p" + l.id, l, status: PROP_STATUS[k % PROP_STATUS.length], when: PROP_WHEN[k] })).filter(x => !del.includes(x.key)));
+  const sorted = <T extends { when: string }>(a: T[]) => sort === "Default" ? a : a.slice().sort((x, y) => ((RANK[x.when] ?? 0) - (RANK[y.when] ?? 0)) * (sort === "Newest" ? 1 : -1));
+  // Opening or hovering a saved search marks its new matches as seen (store `markSeen`).
+  const searches = sorted(sv.searches);
+  // Status + "when" follow the row position, as the canvas `mapP` does. Row keys are "p:" + the store key.
+  const props: PropItem[] = sorted(sv.props.map((p, k) => ({ key: "p:" + p.key, l: p.l, status: PROP_STATUS[k % PROP_STATUS.length], when: PROP_WHEN[Math.min(k, PROP_WHEN.length - 1)] })));
   const bellS = searches.some(x => x.newN > 0), bellP = props.length > 0;
 
-  const openSearch = (x: SavedSearch) => { seenSearch(x.id); setFull(false); onSearch(x.sq); };
-  const openProp = (x: SavedProp) => { setFull(false); onOpen(x.l.id); };
-  const seenSearch = (id: string) => setOpened(o => (o.includes(id) ? o : o.concat(id)));
+  const openSearch = (x: SavedSearch) => { seenSearch(x.id); setFull(false); onOpenSearch(x); };
+  const openProp = (x: PropItem) => { setFull(false); onOpenProp(x.l); };
+  const seenSearch = (id: string) => sv.markSeen(id);
   // Hovering a saved search counts as interacting with it: its "n new" badge turns to Active (review feedback).
-  const enter = (id: string) => () => { setHover(id); if (!id.startsWith("p")) seenSearch(id); };
+  const enter = (id: string) => () => { setHover(id); if (!id.startsWith("p:")) seenSearch(id); };
   const leave = (id: string) => () => setHover(h => (h === id ? null : h));
   const askDel = (id: string, nm: string) => { setConfirm({ id, name: nm }); setSortOpen(false); };
-  const isProp = confirm?.id.startsWith("p");
+  const isProp = confirm?.id.startsWith("p:");
 
   // `live` = rows can show the delete button. Like the canvas, only the full
   // "All updates" view allows deleting; the compact card is read-only.
@@ -173,7 +163,7 @@ export function HomeCard({ name, forYou, saved, seen, onOpen, onHover, onSearch,
       {rows.map(x => <SearchRow key={x.id} x={x} full={full} hover={live && hover === x.id} onEnter={enter(x.id)} onLeave={leave(x.id)} onOpen={() => openSearch(x)} onDel={() => askDel(x.id, x.name)} />)}
     </div>
   );
-  const propList = (rows: SavedProp[], live: boolean) => rows.map(x => <PropRow key={x.key} x={x} hover={live && hover === x.key} onEnter={enter(x.key)} onLeave={leave(x.key)} onOpen={() => openProp(x)} onDel={() => askDel(x.key, x.l.addr)} />);
+  const propList = (rows: PropItem[], live: boolean) => rows.map(x => <PropRow key={x.key} x={x} hover={live && hover === x.key} onEnter={enter(x.key)} onLeave={leave(x.key)} onOpen={() => openProp(x)} onDel={() => askDel(x.key, x.l.addr)} />);
   const forYouList = forYou.map(l => <ListingCard key={l.id} l={l} fresh={l.isNew && !seen.has(l.id)} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />);
   const hello = (
     <>
@@ -266,7 +256,7 @@ export function HomeCard({ name, forYou, saved, seen, onOpen, onHover, onSearch,
             </div>
             <div style={{ display: "flex", gap: 12 }}>
               <button onClick={() => setConfirm(null)} style={{ height: 43, padding: "0 20px", border: "none", borderRadius: 9999, background: "rgb(253,252,252)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.16)", font: "700 15px/20px var(--font-sans)", color: "rgb(17,16,16)", cursor: "pointer" }}>Cancel</button>
-              <button onClick={() => { setDel(d => d.concat(confirm.id)); setHover(null); setConfirm(null); toast(isProp ? "Saved property removed" : "Saved search deleted"); }} className="hc-danger" style={{ height: 43, padding: "0 20px", border: "none", borderRadius: 9999, background: "rgb(172,44,34)", font: "700 15px/20px var(--font-sans)", color: "rgb(253,252,252)", cursor: "pointer" }}>{isProp ? "Remove" : "Delete search"}</button>
+              <button onClick={() => { if (isProp) sv.removeProp(confirm.id.slice(2)); else sv.removeSearch(confirm.id); setHover(null); setConfirm(null); toast(isProp ? "Saved property removed" : "Saved search deleted"); }} className="hc-danger" style={{ height: 43, padding: "0 20px", border: "none", borderRadius: 9999, background: "rgb(172,44,34)", font: "700 15px/20px var(--font-sans)", color: "rgb(253,252,252)", cursor: "pointer" }}>{isProp ? "Remove" : "Delete search"}</button>
             </div>
           </div>
         </div>

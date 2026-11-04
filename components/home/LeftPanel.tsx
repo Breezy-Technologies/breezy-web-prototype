@@ -2,19 +2,23 @@
 import { Listing, OPP, fullPrice } from "@/lib/fake";
 import { SORT_OPTS, SortKey } from "@/lib/filters";
 import { css } from "@/lib/css";
+import { SavedProp, useSaved } from "@/components/SavedState";
+import { ManageSearchButton, PickedFooter, SaveToggle } from "./Saved";
 
 const card: React.CSSProperties = { display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 24, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgb(245,240,238),0 14px 36px rgba(40,26,20,.1)", pointerEvents: "auto", animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) both" };
 
 // `fresh` controls the "New match" badge; it clears once the card has been
-// interacted with (sprint item).
+// interacted with (sprint item). The "+" saves the home (`r.save`); saved homes
+// show a green check and land in the Home panel's Properties tab.
 export function ListingCard({ l, onOpen, onHover, fresh = l.isNew }: { l: Listing; onOpen: () => void; onHover: (on: boolean) => void; fresh?: boolean }) {
+  const sv = useSaved();
   return (
     <div onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} style={{ display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }}>
       <div style={{ position: "relative", height: 210, borderRadius: 20, background: `rgb(241,231,228) url(${l.photos[0]}) center/cover no-repeat` }}>
         <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 13px/28px var(--font-sans)" }}>
           {fresh && <span style={{ width: 7, height: 7, borderRadius: 9999, background: "rgb(226,57,50)" }} />}{fresh ? "New match" : l.status}
         </span>
-        <span style={{ position: "absolute", right: 12, top: 12, width: 32, height: 32, borderRadius: 9999, background: "var(--paper)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-plus" /></span>
+        <SaveToggle saved={sv.isSaved(l)} onToggle={() => sv.toggleProp(l)} />
         <span style={{ position: "absolute", left: 12, bottom: 12, display: "flex", alignItems: "center", gap: 6, height: 26, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.72)", font: "700 12px/26px var(--font-sans)", color: "var(--paper)" }}>
           <i className={`ph-bold ph-${OPP[l.opp].ic}`} />{l.oppWhy.split(" · ")[0]}
         </span>
@@ -30,9 +34,12 @@ export function ListingCard({ l, onOpen, onHover, fresh = l.isNew }: { l: Listin
 
 // Sort button (`onSortToggle`) and the "No matches found" state (`isNoMatch`:
 // `onShowNearest`, `onFilterReset`) are ported from the canvas results column.
-export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, sortOpen, onSortToggle, onShowNearest, onResetFilters }: {
+// Footer: "Save search" / "Manage search" (`onFooterSearch`), or, once homes are
+// picked with "+", the picked footer (`hasPicked`). The pencil is `onManageSearch`.
+export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, sortOpen, onSortToggle, onShowNearest, onResetFilters, active, onFooterSearch, onManage, picked = [], onOpenSaved, onSharePicked }: {
   title: string; meta: string; listings: Listing[]; onOpen: (id: number) => void; onHover: (id: number | null) => void; compact?: boolean;
   sortOpen?: boolean; onSortToggle?: () => void; onShowNearest?: () => void; onResetFilters?: () => void;
+  active?: boolean; onFooterSearch?: () => void; onManage?: () => void; picked?: SavedProp[]; onOpenSaved?: () => void; onSharePicked?: () => void;
 }) {
   return (
     <div style={{ ...card, flex: 1, minHeight: 0 }}>
@@ -41,6 +48,7 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
           <span style={{ font: "700 19px/24px var(--font-sans)" }}>{title}</span>
           <span style={{ font: "400 14px/18px var(--font-sans)", color: "var(--fg-2)" }}>{meta}</span>
         </span>
+        {active && onManage && <ManageSearchButton onClick={onManage} />}
         <button onClick={onSortToggle} title="Sort" className="fb-sort" style={css("flex:none;width:32px;height:32px;border:none;border-radius:9999px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgb(17,16,16);transition:background .16s;background:" + (sortOpen ? "rgba(13,12,12,.1)" : "rgba(13,12,12,.05)"))}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5" /></svg>
         </button>
@@ -61,7 +69,12 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
           </div>
         )}
       </div>
-      {!compact && <div style={{ flex: "none", padding: 16, boxShadow: "inset 0 1px 0 rgb(245,240,238)" }}><button className="btn-dark" style={{ width: "100%" }}><i className="ph-bold ph-bell" />Save search</button></div>}
+      {!compact && picked.length === 0 && listings.length > 0 && (
+        <div style={css("flex:none;padding:16px;background:rgb(253,252,252);box-shadow:inset 0 1px 0 rgb(245,240,238)")}>
+          <button onClick={onFooterSearch} className="fb-dark" style={css("width:100%;height:48px;border:none;border-radius:9999px;background:rgb(17,16,16);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer")}>{active ? "Manage search" : "Save search"}</button>
+        </div>
+      )}
+      {!compact && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved?.()} onShare={onSharePicked} />}
     </div>
   );
 }
