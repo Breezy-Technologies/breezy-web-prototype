@@ -24,7 +24,9 @@ export type Filters = {
 
 export const fDef = (): Filters => ({
   roi: 0, ub: 0, pLo: 0, pHi: 100, pdLo: 0, pdHi: 100, sdLo: 0, sdHi: 100, exLo: 0, exHi: 100, wdLo: 0, wdHi: 100,
-  st: { Active: true }, tg: {}, drops: false, types: { "Single family": true },
+  // Relaxed defaults (review feedback): any status and any type, so the map
+  // starts full; the canvas defaulted to Active + Single family.
+  st: {}, tg: {}, drops: false, types: {},
   bedMin: 0, bedMax: 0, bathMin: 0, bathMax: 0, szLo: 0, szHi: 100, lotMin: 0, lotMax: 0, lotUnit: "ac", styles: {}, feats: {},
 });
 
@@ -118,7 +120,7 @@ export function fDims(F: Filters, drops = 0): Record<DimKey, Dim> {
   const lotFmt = (v: number) => F.lotUnit === "ft2" ? Math.round(v * 43560).toLocaleString() : String(v);
   const lotU = F.lotUnit === "ft2" ? "ft²" : "ac";
   const stOn = onKeys(F.st), tOn = onKeys(F.types);
-  const stNonDef = !(stOn.length === 1 && stOn[0] === "Active");
+  const stNonDef = stOn.length > 0;
   const stOrd: string[] = [...stOn.filter(x => x !== "Active"), ...stOn.filter(x => x === "Active")];
   const priced = F.pLo > 0 || F.pHi < 100;
   const pLabel = F.pLo === 0 ? "Under " + money(F.pHi * 50000) : F.pHi === 100 ? money(F.pLo * 50000) + "+" : money(F.pLo * 50000) + "–" + money(F.pHi * 50000);
@@ -127,9 +129,9 @@ export function fDims(F: Filters, drops = 0): Record<DimKey, Dim> {
     roi: { on: F.roi > 0, label: "ROI " + F.roi + "%+", clear: { roi: 0 } },
     ub: { on: (F.ub || 0) > 0, label: "Build potential " + F.ub + "%+", clear: { ub: 0 } },
     price: { on: priced, label: pLabel, clear: { pLo: 0, pHi: 100 } },
-    status: { on: stNonDef || priced, label: multi(stOrd, "Any status") + (priced ? ": " + pLabel : ""), clear: { st: { Active: true }, pLo: 0, pHi: 100 } },
+    status: { on: stNonDef || priced, label: multi(stOrd, "Any status") + (priced ? ": " + pLabel : ""), clear: { st: {}, pLo: 0, pHi: 100 } },
     drops: { on: F.drops, label: "Price drops · " + drops, clear: { drops: false } },
-    types: { on: !(tOn.length === 1 && tOn[0] === "Single family"), label: multi(tOn, "Any type"), clear: { types: d.types } },
+    types: { on: tOn.length > 0, label: multi(tOn, "Any type"), clear: { types: d.types } },
     beds: { on: F.bedMin > 0 || F.bedMax > 0, label: range(F.bedMin, F.bedMax, "bd"), clear: { bedMin: 0, bedMax: 0 } },
     baths: { on: F.bathMin > 0 || F.bathMax > 0, label: range(F.bathMin, F.bathMax, "ba"), clear: { bathMin: 0, bathMax: 0 } },
     size: { on: F.szLo > 0 || F.szHi < 100, label: F.szLo === 0 ? "Under " + sz(F.szHi) + " ft²" : F.szHi === 100 ? sz(F.szLo) + "+ ft²" : sz(F.szLo) + "–" + sz(F.szHi) + " ft²", clear: { szLo: 0, szHi: 100 } },
