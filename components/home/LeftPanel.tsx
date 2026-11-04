@@ -36,10 +36,11 @@ export function ListingCard({ l, onOpen, onHover, fresh = l.isNew }: { l: Listin
 // `onShowNearest`, `onFilterReset`) are ported from the canvas results column.
 // Footer: "Save search" / "Manage search" (`onFooterSearch`), or, once homes are
 // picked with "+", the picked footer (`hasPicked`). The pencil is `onManageSearch`.
-export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, sortOpen, onSortToggle, onShowNearest, onResetFilters, active, onFooterSearch, onManage, picked = [], onOpenSaved, onSharePicked }: {
+export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, sortOpen, onSortToggle, onShowNearest, onResetFilters, active, onFooterSearch, onManage, picked = [], onOpenSaved, onSharePicked, unsupported, onTryArea }: {
   title: string; meta: string; listings: Listing[]; onOpen: (id: number) => void; onHover: (id: number | null) => void; compact?: boolean;
   sortOpen?: boolean; onSortToggle?: () => void; onShowNearest?: () => void; onResetFilters?: () => void;
   active?: boolean; onFooterSearch?: () => void; onManage?: () => void; picked?: SavedProp[]; onOpenSaved?: () => void; onSharePicked?: () => void;
+  unsupported?: string | null; onTryArea?: () => void; // `isUnsupported` / `unsupArea` / `onTryArea`
 }) {
   return (
     <div style={{ ...card, flex: 1, minHeight: 0 }}>
@@ -55,7 +56,19 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
       </div>
       <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: "4px 16px 16px" }}>
         {listings.map(l => <ListingCard key={l.id} l={l} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />)}
-        {listings.length === 0 && (
+        {unsupported && (
+          <div style={css("flex:1 0 auto;margin:auto 0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:32px;padding:24px 24px 48px;text-align:center;animation:fadeIn .25s ease both")}>
+            <img src="/ui/pin-3d.png" alt="" style={css("display:block;width:66px;height:auto;margin-bottom:8px")} />
+            <div style={css("display:flex;flex-direction:column;align-items:center;gap:6px")}>
+              <span style={css("font:400 18px/24px var(--font-sans);color:rgb(17,16,16)")}>Unsupported area</span>
+              <span style={css("max-width:320px;font:400 14px/1.6 var(--font-sans);letter-spacing:.25px;color:rgb(98,90,89);text-wrap:pretty")}>{unsupported} isn’t part of our coverage yet, so properties and alerts aren’t available here.</span>
+            </div>
+            <div style={css("display:flex;flex-direction:column;align-items:center;gap:12px")}>
+              <button onClick={onTryArea} className="fb-dark fb-cta2" style={css("height:48px;padding:0 18px;border:none;border-radius:9999px;background:rgb(17,16,16);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap")}>Try another area</button>
+            </div>
+          </div>
+        )}
+        {listings.length === 0 && !unsupported && (
           <div style={css("flex:1 0 auto;margin:auto 0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:32px;padding:24px 24px 48px;text-align:center;animation:fadeIn .25s ease both")}>
             <img src="/ui/pin-3d.png" alt="" style={css("display:block;width:66px;height:auto;margin-bottom:8px")} />
             <div style={css("display:flex;flex-direction:column;align-items:center;gap:6px")}>
@@ -69,7 +82,7 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
           </div>
         )}
       </div>
-      {!compact && picked.length === 0 && listings.length > 0 && (
+      {!compact && picked.length === 0 && listings.length > 0 && !unsupported && (
         <div style={css("flex:none;padding:16px;background:rgb(253,252,252);box-shadow:inset 0 1px 0 rgb(245,240,238)")}>
           <button onClick={onFooterSearch} className="fb-dark" style={css("width:100%;height:48px;border:none;border-radius:9999px;background:rgb(17,16,16);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer")}>{active ? "Manage search" : "Save search"}</button>
         </div>

@@ -19,9 +19,9 @@ import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
 import { ReportsSheet, useReports } from "@/components/home/Reports";
-import { Listing, OppType } from "@/lib/fake";
+import { Listing, OppType, makeListings } from "@/lib/fake";
 import { SortKey, homeOk, sortListings } from "@/lib/filters";
-import { Place, searchPlaces } from "@/lib/places";
+import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces } from "@/lib/places";
 import { ringBBox } from "@/lib/geo";
 
 const COL = 388, GAP = 12;
@@ -29,7 +29,7 @@ const COL = 388, GAP = 12;
 export default function HomeWeb() {
   const router = useRouter();
   const { map, ready, setInset, setAreaRings, offline, setHeat } = useMapCtx();
-  const { place, rings, listings, picks, user, choosePlace, onboarded, restartOnboarding } = useApp();
+  const { place, rings, listings, picks, user, choosePlace, chooseAreas, areas, onboarded, restartOnboarding } = useApp();
   const [navX, setNavX] = useState(false);
   const [view, setView] = useState<"home" | "results">("home");
   const [selId, setSelId] = useState<number | null>(null);
@@ -64,6 +64,12 @@ export default function HomeWeb() {
   const closeSaved = () => { if (savedOut) return; setSavedOut(true); setTimeout(() => { setSavedOut(false); setSavedOpen(false); }, 190); };
   const picked = sv.props.filter(p => !p.seed);
   const active = view === "results" ? sv.active : null;
+  // Search step (canvas `step === "search"`): the field's suggestion panel replaces the left column.
+  const [searching, setSearching] = useState(false);
+  // "Unsupported area" (`_unsupQ`): the searched area is outside Breezy's coverage, or
+  // couldn't be found at all (`placed` false: no outline, camera stays put).
+  const [unsup, setUnsup] = useState<{ label: string; placed: boolean } | null>(null);
+  const unsupOn = view === "results" && !!unsup && !sv.active;
 
   useEffect(() => { setInset({ left: navW, top: 0, radius: 36 }); }, [navW, setInset]);
   useEffect(() => { if (ready) setHeat("roi"); }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -71,11 +77,12 @@ export default function HomeWeb() {
   // Outline the searched area only in results; fit the camera to it.
   const fit = (left: number) => {
     if (!map) return;
-    const bb = rings && rings.length ? ringBBox(rings) : place.bbox;
+    // Several areas: fit the union of their boxes (`place.bbox` of the combined place).
+    const bb = areas.length > 1 ? place.bbox : rings && rings.length ? ringBBox(rings) : place.bbox;
     if (bb) map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { left: left + 40, right: 120, top: 100, bottom: 40 }, duration: 900, maxZoom: 14.4 });
     else map.flyTo({ center: place.center, zoom: 13.4, duration: 900 });
   };
-  useEffect(() => { setAreaRings(view === "results" ? rings : null); }, [view, rings, ready, setAreaRings]);
+  useEffect(() => { setAreaRings(view === "results" && !(unsup && !unsup.placed) ? rings : null); }, [view, rings, ready, setAreaRings, unsup]);
   const firstFit = useRef(false);
   useEffect(() => {
     if (!map || !ready) return;
@@ -97,20 +104,45 @@ export default function HomeWeb() {
   const fyOn = view === "home" && homeTab === "For you";
   const sigFilter = fyOn && fySignals.length > 0;
   const signalIds = useMemo(() => fyOn ? new Set(forYou.filter(l => (!sigFilter || fySignals.includes(l.opp)) && !seen.has(l.id)).map(l => l.id)) : undefined, [fyOn, sigFilter, fySignals, forYou, seen]);
-  const pinListings = useMemo(() => sigFilter ? shown.filter(l => fySignals.includes(l.opp)) : shown, [sigFilter, fySignals, shown]);
+  const pinListings = useMemo(() => unsupOn ? [] : sigFilter ? shown.filter(l => fySignals.includes(l.opp)) : shown, [unsupOn, sigFilter, fySignals, shown]);
 
   const openListing = (id: number) => {
     if (id !== selId) alerts.close();
-    setParcel(null); setSoloL(null); setSelId(id); setHoverId(null);
+    setParcel(null); setSoloL(null); setSelId(id); setHoverId(null); setSearching(false);
     setSeen(s => new Set(s).add(id));
     setBadgeSeen(s => new Set(s).add(id));
     const l = listings.find(x => x.id === id);
     if (l && map) map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 15), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
   };
   const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); };
-  const goPlace = async (p: Place) => { closeDetail(); setView("results"); await choosePlace(p); };
-  // A new area from the search field leaves the active saved search (`_commitAreas`: activeS null).
-  const pickPlace = async (p: Place) => { sv.setActive(null); await goPlace(p); };
+  const goPlace = async (p: Place) => { closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
+  // `_commitAreas`: results for the field's area(s); leaves the active saved search.
+  // Each chip resolves to a Place (live geocoding / gazetteer; "Current location" via
+  // geolocation), then they go to `chooseAreas` together (outlines + listings for all).
+  const commitAreas = async (list: Area[]) => {
+    sv.setActive(null); closeDetail(); setSearching(false); setView("results"); setUnsup(null);
+    const ps = await Promise.all(list.map(a => resolveArea(a, place.center)));
+    const ok = ps.filter((p): p is Place => !!p);
+    const missed = list.filter((_, k) => !ps[k]);
+    if (!ok.length) { setUnsup({ label: list[list.length - 1].label, placed: false }); return; }
+    if (missed.length) showToast("No results for " + missed.map(a => a.label.split(",")[0]).join(", "), "info");
+    if (!ok.some(isCovered)) setUnsup({ label: ok[ok.length - 1].label, placed: true });
+    await chooseAreas(ok);
+  };
+  // An address suggestion opens that property on its own (`_openSolo`). Outside
+  // coverage there's no property data: neutral "No property found" toast (sprint item).
+  const pickAddress = (p: Place) => {
+    sv.setActive(null);
+    const [lng, lat] = p.center;
+    const l = isCovered(p) ? makeListings("addr:" + p.id, p.center, [lng - 5e-4, lat - 5e-4, lng + 5e-4, lat + 5e-4], null, 1, p.label.split(", ").slice(1, 2).join(""))[0] : null;
+    if (!l) return showToast("No property found", "info");
+    openSavedProp({ ...l, lng, lat, addr: p.name });
+  };
+  // `onClearSearch` from the search step: back to Home with no area query.
+  const clearSearch = () => { sv.setActive(null); closeDetail(); setUnsup(null); setView("home"); setSortOpen(false); setSavedOpen(false); };
+  const fieldAreas: Area[] = view !== "results" ? [] : unsup && !unsup.placed ? [{ label: unsup.label }] : areas.map(p => ({ label: p.label, place: p }));
+  const multi = areas.length > 1;
+  const areaMeta = multi ? areas.map(a => a.label.split(",")[0]).slice(0, -1).join(", ") + " & " + areas[areas.length - 1].label.split(",")[0] : place.label;
   // Saved home: open it in place when it's in this area's listings, otherwise on its own.
   const openSavedProp = (l: Listing) => {
     const hit = listings.find(x => propKey(x) === propKey(l));
@@ -153,18 +185,20 @@ export default function HomeWeb() {
       <SideNav expanded={navX} onToggle={() => setNavX(v => !v)} userName={user.name.split(" ")[0]}
         dev={[{ label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } }]}
         onPick={k => {
-        if (k === "Map") { closeDetail(); setView("home"); if (rp.open) rp.close(); }
+        if (k === "Map") { closeDetail(); setView("home"); setSearching(false); if (rp.open) rp.close(); }
         // Reports (side-nav footer) opens the saved reports sheet over the left column.
         if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
       }} />
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none" }}>
           <div style={{ pointerEvents: "auto" }}>
-            <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : view === "results" ? place.label : ""} near={place.center}
-              onClear={() => { if (detailOpen) closeDetail(); else { setView("home"); } }} onPick={pickPlace}
+            <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : areaSq(fieldAreas.map(a => a.label))} near={place.center}
+              areas={fieldAreas} searching={searching} onSearching={on => { setSearching(on); if (on) { fs.setDd(null); setSortOpen(false); } }}
+              onCommit={commitAreas} onPickAddress={pickAddress} onClearAll={clearSearch}
+              onClear={() => { if (detailOpen) closeDetail(); else { setView("home"); setUnsup(null); } }}
               active={detailOpen ? null : active} onManage={() => openSheet(active)} onClearActive={clearActive} />
           </div>
-          {view === "home"
+          {searching ? null : view === "home"
             ? <HomeCard name={user.name} forYou={forYou} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
                 picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} />
@@ -173,8 +207,9 @@ export default function HomeWeb() {
               <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: depth > 1 ? "scale(.88)" : depth ? "scale(.94)" : "none", filter: depth > 1 ? "brightness(.93)" : depth ? "brightness(.955)" : "none" }}>
                 {/* `resultsTitle` / `resultsMeta` for an active saved search */}
                 <ResultsPanel title={active ? (active.newN ? "New matches" : active.name) : "Results"}
-                  meta={active && active.newN ? `${active.newN} since you last visited` : `${shown.length} ${shown.length === 1 ? "home" : "homes"} · ${active ? active.params[3] || place.label : place.label}`}
-                  listings={results} onOpen={openListing} onHover={setHoverId}
+                  meta={active && active.newN ? `${active.newN} since you last visited` : unsupOn ? "" : `${shown.length} ${shown.length === 1 ? "home" : "homes"} · ${active ? active.params[3] || place.label : areaMeta}`}
+                  listings={unsupOn ? [] : results} onOpen={openListing} onHover={setHoverId}
+                  unsupported={unsupOn ? unsup!.label.split(",")[0] : null} onTryArea={() => setSearching(true)}
                   sortOpen={sortOpen} onSortToggle={() => { setSortOpen(o => !o); fs.setDd(null); }}
                   onShowNearest={() => { fs.reset(); showToast("Showing nearest properties"); }} onResetFilters={fs.reset}
                   active={!!active} onManage={() => openSheet(active)} onFooterSearch={() => openSheet(active)}
@@ -220,7 +255,7 @@ export default function HomeWeb() {
         <HoverCard l={hover} onKeep={() => clearTimeout(keepT.current)} onLeave={() => { keepT.current = setTimeout(() => setHoverId(null), 160); }} onOpen={() => openListing(hover.id)} />
       )}
       <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => {
-        alerts.close(); setSelId(null); setSoloL(null); setParcel(p);
+        alerts.close(); setSearching(false); setSelId(null); setSoloL(null); setParcel(p);
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
         if (map) map.easeTo({ center: [p.cx, p.cy], zoom: Math.max(map.getZoom(), 16), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
       }} />
