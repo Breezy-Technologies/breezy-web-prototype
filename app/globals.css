@@ -1,0 +1,47 @@
+@import "mapbox-gl/dist/mapbox-gl.css";
+
+@font-face { font-family: "Akkurat LL"; src: url("/fonts/AkkuratLLTT-Light.ttf") format("truetype"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "Akkurat LL"; src: url("/fonts/AkkuratLLTT-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Akkurat LL"; src: url("/fonts/AkkuratLLTT-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+
+:root {
+  --font-sans: "Akkurat LL", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --ink: rgb(18, 18, 18);
+  --paper: rgb(253, 252, 252);
+  --fg-2: rgb(73, 67, 65);
+  --fg-3: rgb(129, 117, 111);
+  --clay: rgb(175, 127, 113);
+  --clay-dark: rgb(147, 89, 75);
+  --nav-bg: rgb(245, 243, 243);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; color: var(--ink); background: var(--nav-bg); }
+button { font-family: inherit; }
+input { font-family: inherit; }
+.mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
+
+.btn-dark { border: none; border-radius: 9999px; background: var(--ink); color: rgb(249, 249, 249); font: 700 15px/20px var(--font-sans); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 22px; transition: background .15s, transform .1s; }
+.btn-dark:hover { background: rgb(45, 40, 38); }
+.btn-dark:active { transform: scale(.98); }
+.btn-soft { border: none; border-radius: 9999px; background: rgba(18, 18, 18, .06); color: var(--ink); font: 700 15px/20px var(--font-sans); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 20px; transition: background .15s; }
+.btn-soft:hover { background: rgba(18, 18, 18, .1); }
+.btn-ghost { border: none; background: none; cursor: pointer; border-radius: 9999px; }
+.btn-ghost:hover { background: rgba(13, 12, 12, .06); }
+.hover-row:hover { background: rgba(13, 12, 12, .045); }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes riseIn { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+@keyframes panelDrop { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
+@keyframes pinPop { 0% { opacity: 0; transform: translate(-50%, -100%) scale(.6) } 70% { opacity: 1; transform: translate(-50%, -100%) scale(1.06) } 100% { opacity: 1; transform: translate(-50%, -100%) scale(1) } }
+@keyframes hvPop { from { opacity: 0; transform: translateY(6px) scale(.97) } to { opacity: 1; transform: none } }
+@keyframes liftUp { from { transform: translateY(0) } to { transform: translateY(var(--l)) } }
+@keyframes sweep { to { transform: translate(-50%, -50%) rotate(360deg) } }
+@keyframes ping { 0% { transform: translate(-50%, -50%) scale(.3); opacity: .6 } 100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0 } }
+@keyframes pulse { 0% { transform: scale(1); opacity: .55 } 100% { transform: scale(2.2); opacity: 0 } }
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes cardSwipeL { to { transform: translateX(-120%) rotate(-14deg); opacity: 0 } }
+@keyframes cardSwipeR { to { transform: translateX(120%) rotate(14deg); opacity: 0 } }
+@keyframes countUp { from { transform: translateY(40px); opacity: 0 } to { transform: none; opacity: 1 } }
