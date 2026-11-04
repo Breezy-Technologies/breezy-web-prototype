@@ -140,3 +140,91 @@ export function heatColor(kind: "roi" | "ub", v: number): string {
   const t = HEAT_TONES[kind][Math.min(5, Math.floor(v * 6))];
   return `rgb(${t.join(",")})`;
 }
+
+// ---- Property detail extras (Specs / Records / Owners tabs) ----
+// Derived from a listing on a separate random stream, so the listing's own
+// generated values never change. Swap for the listings / records / owner
+// services later.
+export type RecEvent = { date: string; change: string; title: string; price: string; ppsf: string; beds: number; baths: number; sqft: string; lot: string; update?: boolean };
+export type ListingDetail = {
+  hoa: number; garage: number; condition: string; view: string;
+  apn: string; zone: string; mls: string; source: string; listedOn: string; listedDate: string;
+  agent: string; brokerage: string;
+  desc: string; descShort: string;
+  recYears: { year: string; events: RecEvent[] }[];
+  tax: [string, string][]; mortgage: [string, string][];
+  ownerSince: string;
+  former: { date: string; people: { id: string; name: string; img?: string; ini: string }[] }[];
+};
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const AGENTS: [string, string][] = [["Miguel Hernandes", "The Ozark Brokers"], ["Alana Brooks", "Sunset Realty Group"], ["Devon Price", "Canyon & Co. Estates"], ["Rita Okafor", "Eastside Home Partners"]];
+const LENDERS = ["Wells Fargo Bank", "Chase Home Lending", "Bank of America", "Rocket Mortgage", "US Bank"];
+const DEVS = ["Amazing Developments LLC", "Hillside Builders LLC", "Crescent Land Co.", "Reservoir Partners LLC"];
+const CONDS = ["Remodel", "Updated", "Original", "Turnkey"];
+const VIEWS = ["Woodlands", "City lights", "Canyon", "Reservoir", "Hills"];
+// "Today" for the demo, so dates derived from days on market stay stable.
+const DEMO_TODAY = Date.UTC(2026, 10, 5);
+
+export function listingDetail(l: Listing): ListingDetail {
+  const R = rng(hashStr(`detail:${l.id}:${l.addr}`));
+  const pick = <T,>(a: T[]) => a[Math.floor(R() * a.length)];
+  const digits = (n: number) => Array.from({ length: n }, () => Math.floor(R() * 10)).join("");
+  const listed = new Date(DEMO_TODAY - l.dom * 864e5);
+  const md = (d: Date) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+  const ppsf = (p: number) => "$" + Math.round(p / l.sqft).toLocaleString("en-US");
+  const pct = (a: number, b: number) => (a >= b ? "+" : "") + (((a - b) / b) * 100).toFixed(1) + "%";
+  const ev = (d: Date, title: string, price: number, prev: number | null, extra?: Partial<RecEvent>): RecEvent => ({
+    date: md(d), change: prev ? pct(price, prev) : "", title, price: fullPrice(price), ppsf: ppsf(price),
+    beds: l.beds, baths: l.baths, sqft: l.sqft.toLocaleString("en-US") + " ft²", lot: l.lotAc + " ac", ...extra,
+  });
+  const since = +(l.owner.sub.match(/\d{4}/)?.[0] || 2016);
+  // Previous sale: the year the current owner bought it.
+  const saleY = Math.min(since, 2025), saleP = Math.round((l.price * (0.55 + R() * 0.25)) / 5e3) * 5e3;
+  const saleD = new Date(Date.UTC(saleY, Math.floor(R() * 9) + 2, 1 + Math.floor(R() * 27)));
+  const preD = new Date(saleD.getTime() - (30 + Math.floor(R() * 80)) * 864e5);
+  const preP = Math.round((saleP * (0.96 + R() * 0.03)) / 5e3) * 5e3;
+  const cut = l.opp === "drop" || R() < 0.5;
+  const firstP = cut ? Math.round((l.price * (1.04 + R() * 0.08)) / 5e3) * 5e3 : 0;
+  const firstD = new Date(listed.getTime() - (20 + Math.floor(R() * 60)) * 864e5);
+  const recent: RecEvent[] = cut
+    ? [ev(listed, "Price change", l.price, firstP, { update: true }), ev(firstD, "Listed for sale", firstP, saleP)]
+    : [ev(listed, "Listed for sale", l.price, saleP, { update: true })];
+  const byYear = new Map<string, RecEvent[]>();
+  const push = (d: Date, e: RecEvent) => { const y = String(d.getUTCFullYear()); byYear.set(y, [...(byYear.get(y) || []), e]); };
+  if (cut) { push(listed, recent[0]); push(firstD, recent[1]); } else push(listed, recent[0]);
+  push(saleD, ev(saleD, "Sold", saleP, preP));
+  push(preD, ev(preD, "Listed for sale", preP, null));
+  const assessed = Math.round((saleP * Math.pow(1.02, 2026 - saleY)) / 1e3) * 1e3;
+  const loan = Math.round((saleP * 0.8) / 1e3) * 1e3, rate = 2.9 + R() * 4;
+  const yrs = 2026 - saleY, bal = Math.round((loan * Math.max(0.55, 1 - yrs * 0.022)) / 100) * 100;
+  const [agent, brokerage] = pick(AGENTS);
+  const street = l.addr.replace(/^\d+\s+/, "");
+  const desc = `Tucked away on ${street}, this ${l.beds}-bedroom, ${l.baths}-bathroom ${l.pstyle.toLowerCase()} home sits on a ${l.lotAc}-acre lot with mature landscaping, a private garden and room to grow. Built in ${l.built}, it keeps its original character while offering clear upside: ${l.oppWhy.toLowerCase()}. ${l.sqft.toLocaleString("en-US")} ft² of living space, a ${l.ptype.toLowerCase()} layout and generous outdoor areas leave room to expand.`;
+  const cutAt = desc.lastIndexOf(" ", 120);
+  const formerY = since, devY = since - 1 - Math.floor(R() * 3);
+  return {
+    hoa: Math.round((90 + R() * 210) / 10) * 10,
+    garage: 1 + Math.floor(R() * 4),
+    condition: pick(CONDS), view: pick(VIEWS),
+    apn: digits(10), zone: pick(["RA", "RE", "RS", "R1"]) + digits(4), mls: digits(14), source: "CRMLS",
+    listedOn: md(listed), listedDate: `${md(listed)} ${listed.getUTCFullYear()}`,
+    agent, brokerage,
+    desc, descShort: desc.slice(0, cutAt) + "…",
+    recYears: [...byYear.entries()].sort((a, b) => +b[0] - +a[0]).map(([year, events]) => ({ year, events })),
+    tax: [
+      ["2026 assessed value", fullPrice(assessed)], ["2026 property tax", fullPrice(assessed * 0.012)],
+      ["2025 assessed value", fullPrice(assessed / 1.02)], ["2025 property tax", fullPrice((assessed / 1.02) * 0.012)],
+      ["Tax rate", "1.2%"], ["Exemptions", /Investor|Absentee|Trust/.test(l.owner.sub) ? "None" : "Homeowner"],
+    ],
+    mortgage: [
+      ["Lender", pick(LENDERS)], ["Loan amount", fullPrice(loan)], ["Loan type", "Conventional, 30-yr fixed"],
+      ["Origination", `${MONTHS[saleD.getUTCMonth()]} ${saleY}`], ["Interest rate", rate.toFixed(1) + "%"], ["Est. balance", fullPrice(bal)],
+    ],
+    ownerSince: String(since),
+    former: [
+      { date: `Jan ${formerY}`, people: [{ id: "bg", name: "Becky Grenson", img: "/photos/owner-becky.jpg", ini: "BG" }, { id: "mg", name: "Michael Grenson", img: "/photos/avatar-michael.jpg", ini: "MG" }] },
+      { date: `Nov ${devY}`, people: [{ id: "dv", name: pick(DEVS), ini: "" }] },
+    ].map(g => ({ ...g, people: g.people.map(p => ({ ...p, ini: p.ini || p.name.split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("") })) })),
+  };
+}
