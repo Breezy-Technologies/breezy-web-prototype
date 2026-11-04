@@ -192,8 +192,9 @@ export default function HomeWeb() {
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none" }}>
           <div style={{ pointerEvents: "auto" }}>
+            {/* Entering the search step (`onSearchFocus`) closes dropdowns and the detail panel, as the canvas step change does. */}
             <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : areaSq(fieldAreas.map(a => a.label))} near={place.center}
-              areas={fieldAreas} searching={searching} onSearching={on => { setSearching(on); if (on) { fs.setDd(null); setSortOpen(false); } }}
+              areas={fieldAreas} searching={searching} onSearching={on => { setSearching(on); if (on) { fs.setDd(null); setSortOpen(false); closeDetail(); } }}
               onCommit={commitAreas} onPickAddress={pickAddress} onClearAll={clearSearch}
               onClear={() => { if (detailOpen) closeDetail(); else { setView("home"); setUnsup(null); } }}
               active={detailOpen ? null : active} onManage={() => openSheet(active)} onClearActive={clearActive} />
