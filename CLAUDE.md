@@ -20,10 +20,10 @@ The source of truth for the UI design is the Claude Design canvas (pages "Home W
 
 ## Current priority: get the live map right before more UI work
 
-1. Add `NEXT_PUBLIC_MAPBOX_TOKEN` to `.env.local` and confirm the live style loads. The app falls back to offline after a 4 s timeout or a style error. Then set `NEXT_PUBLIC_MAPBOX_STYLE` to the Breezy custom style (dev-breezy account) so it matches production.
+1. Add `NEXT_PUBLIC_MAPBOX_TOKEN` to `.env.local` and confirm the live style loads. The app falls back to offline after a 4 s timeout or a style error. Then set `NEXT_PUBLIC_MAPBOX_STYLE` to the Breezy custom style (dev-breezy account) so it matches production. *Status (4 Nov): done. Production doesn't use a custom style: it's stock `mapbox://styles/mapbox/streets-v12` (light) and `mapbox://styles/mapbox/navigation-night-v1` (dark), on the dev-breezy production public token (keep it to prototypes). Dark mode recolours landmass #221d1b, water #234447, greenspace #405e44 and primary roads #343434. The prototype has no dark mode yet. `lib/map/theme.ts` (a Breezy palette over light-v11) is only active if the style is set back to light-v11.*
 2. Verify Mapbox search (`searchPlaces` in `lib/places.ts`) for city, ZIP, neighbourhood, county, state and address.
 3. Verify `/api/boundary` returns Census outlines for each search type. Check the layer-name matching against the live TIGERweb service metadata and tune `maxAllowableOffset` for large states. Make sure rings come back clockwise, because the inner-glow edge relies on a positive `line-offset`.
-4. When the Regrid token arrives: check the tile URL, `source-layer` name, the `promoteId` (`ll_uuid`) and the property fields used on hover (`address`, `owner`). Parcel hover / lift / click must work on real parcels. Building footprints can be added later.
+4. When the Regrid token arrives: check the tile URL, `source-layer` name, the `promoteId` (`ll_uuid`) and the property fields used on hover (`address`, `owner`). Parcel hover / lift / click must work on real parcels. Building footprints can be added later. *Status (4 Nov): token added and checked. The tile URL template is right (confirmed via the TileJSON at `tiles.regrid.com/api/v1/parcels?token=`). Source layer `parcels` has fields `ll_uuid, owner, parcelnumb, address, path, fid, ogc_fid`, and hover shows the real address and owner. Limits: the token expires 4 Dec 2026, and its coverage is currently **Dallas only**, so LA (Silver Lake / Beverly Hills) parcels come back empty. Test around 32.7767, -96.7970 until LA County is added. Tiles carry no lot size or specs, so those stay fake.*
 5. Replace the viewport-generated fake heat hexes with something stable (e.g. H3 cells) so they don't shift between pans. Still fake values.
 6. Pins should come from a single listings source per area and refresh on "search this area" (see open design items).
 
@@ -64,6 +64,7 @@ components/map/             MapProvider (inset, mode, heat, area), Overlay (port
 components/home/            SideNav, SearchBar, LeftPanel, PricePins, HoverCard, ParcelLift, DetailPanel, MapControls, CompsFlow
 components/onboarding/      OppPins
 lib/map/style.ts            live vs offline styles
+lib/map/theme.ts            optional Breezy palette over light-v11 (inactive on streets-v12)
 lib/map/layers.ts           heat hexes, parcels (Regrid or demo), area inner-glow layers
 lib/places.ts               search + boundaries + offline gazetteer
 lib/fake.ts                 demo data

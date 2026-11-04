@@ -6,6 +6,7 @@ import mapboxgl, { Map as MbMap } from "mapbox-gl";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { config, isLiveMap } from "@/lib/config";
 import { MapMode, offlineStyle, styleFor } from "@/lib/map/style";
+import { applyBreezyTheme } from "@/lib/map/theme";
 import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel } from "@/lib/map/layers";
 import { Ring } from "@/lib/geo";
 
@@ -64,6 +65,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     m.touchZoomRotate.disableRotation();
     const restore = () => {
       if (!ensureLayers(m)) return;
+      applyBreezyTheme(m);
       setArea(m, areaRef.current);
       syncHeat(m, heatRef.current);
       setParcels(fakeParcelsFor(m, heatRef.current));
