@@ -60,7 +60,9 @@ const SEED_SEARCHES: SavedSearch[] = [
 ];
 // Seed saved properties: the first six homes of the default area, as before.
 const seedProps = (): SavedProp[] => makeListings(DEFAULT_PLACE.id, DEFAULT_PLACE.center, DEFAULT_PLACE.bbox, DEFAULT_PLACE.rings || null, 28, DEFAULT_PLACE.label)
-  .slice(0, 6).map(l => ({ key: propKey(l), l, seed: true }));
+  // Taken from the end of the list so the example saves don't pre-tick the top
+  // "For you" cards (they made "+" look broken: pressing it un-saved a seed).
+  .slice(-6).map(l => ({ key: propKey(l), l, seed: true }));
 
 type Saved = {
   searches: SavedSearch[];

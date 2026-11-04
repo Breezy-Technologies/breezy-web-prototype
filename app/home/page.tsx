@@ -89,6 +89,8 @@ export default function HomeWeb() {
     const on = Object.entries(picks).filter(([, v]) => v).map(([k]) => k);
     return on.length ? listings.filter(l => on.includes(l.opp)) : listings.slice(0, 10);
   }, [listings, picks]);
+  // Special pins: the For you opportunities wear their signal chip on the map too.
+  const forYouIds = useMemo(() => new Set(forYou.map(l => l.id)), [forYou]);
 
   const openListing = (id: number) => {
     if (id !== selId) alerts.close();
@@ -157,7 +159,8 @@ export default function HomeWeb() {
           </div>
           {view === "home"
             ? <HomeCard name={user.name} forYou={forYou} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
-                onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()} />
+                onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
+                picked={picked} onSharePicked={() => sh.sharePicked()} />
             : (
               // The results column steps back (scale + dim) while a sheet sits on top of it.
               <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: depth > 1 ? "scale(.88)" : depth ? "scale(.94)" : "none", filter: depth > 1 ? "brightness(.93)" : depth ? "brightness(.955)" : "none" }}>
@@ -204,7 +207,7 @@ export default function HomeWeb() {
         )}
       </div>
 
-      <PricePins listings={shown} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
+      <PricePins signal={forYouIds} listings={shown} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
         onHover={id => { clearTimeout(keepT.current); if (id == null) keepT.current = setTimeout(() => setHoverId(null), 160); else setHoverId(id); }} />
       {hover && hoverId !== selId && (
         <HoverCard l={hover} onKeep={() => clearTimeout(keepT.current)} onLeave={() => { keepT.current = setTimeout(() => setHoverId(null), 160); }} onOpen={() => openListing(hover.id)} />

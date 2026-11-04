@@ -342,7 +342,9 @@ export function SaveToggle({ saved, onToggle }: { saved: boolean; onToggle: () =
 const shareLabel = (n: number) => "Share " + n + (n === 1 ? " property" : " properties");
 
 // `hasPicked` footer: stacked thumbs (+n) opening the saved sheet, and Share.
-export function PickedFooter({ picked, onOpen, onShare }: { picked: SavedProp[]; onOpen: () => void; onShare?: () => void }) {
+// `onSaveSearch` adds a round Save search (bell) button so saving homes doesn't hide
+// saving the search (review feedback; the canvas swapped one footer for the other).
+export function PickedFooter({ picked, onOpen, onShare, onSaveSearch, searchLabel = "Save search" }: { picked: SavedProp[]; onOpen: () => void; onShare?: () => void; onSaveSearch?: () => void; searchLabel?: string }) {
   const vis = picked.slice(0, 2);
   return (
     <div style={css("flex:none;height:81px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 20px 20px;background:rgb(253,252,252);box-shadow:inset 0 1px 0 rgba(13,12,12,.16);animation:fadeIn .2s ease both")}>
@@ -355,6 +357,11 @@ export function PickedFooter({ picked, onOpen, onShare }: { picked: SavedProp[];
         </div>
         {picked.length > 2 && <span style={css("min-width:19px;font:700 16px/1.26 var(--font-sans);letter-spacing:-.25px;color:rgb(18,18,18);text-align:center")}>+{picked.length - 2}</span>}
       </div>
+      {onSaveSearch && (
+        <button onClick={onSaveSearch} title={searchLabel} className="sv-grey" style={css("flex:none;width:43px;height:43px;border:none;border-radius:9999px;background:rgba(13,12,12,.06);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
+          <i className="ph-bold ph-bell" style={{ fontSize: 18 }} />
+        </button>
+      )}
       <button onClick={onShare} className="fb-dark" style={css("flex:1;min-width:0;height:43px;padding:0 12px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 15px/20px var(--font-sans);color:rgb(253,252,252);cursor:pointer;white-space:nowrap")}>{shareLabel(picked.length)}</button>
     </div>
   );

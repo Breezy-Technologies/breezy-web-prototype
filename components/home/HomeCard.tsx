@@ -7,7 +7,8 @@
 // or a home elsewhere lands here.
 import { useRef, useState } from "react";
 import { Listing, fullPrice } from "@/lib/fake";
-import { CLIENT_PHOTOS, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
+import { CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
+import { PickedFooter } from "./Saved";
 import { ForYouFeed } from "./ForYouFeed";
 
 type Tab = "For you" | "Searches" | "Properties";
@@ -125,8 +126,8 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
   );
 }
 
-export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast }: {
-  name: string; forYou: Listing[]; seen: Set<number>;
+export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked }: {
+  name: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void;
   onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
   const sv = useSaved();
@@ -203,6 +204,8 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
             </>}
             {tab === "Properties" && propList(props.slice(0, 3), false)}
           </div>
+          {/* Homes saved with "+" from the feed: thumbnails open the Properties tab, Share opens the share report (review feedback). */}
+          {tab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => setTab("Properties")} onShare={onSharePicked} />}
           {tab !== "For you" && (tab === "Properties" ? props.length > 0 : searches.length > 0) && (
             <div style={{ flex: "none", marginTop: 20, display: "flex", alignItems: "center", gap: 16, padding: "12px 20px 20px", boxShadow: "inset 0 1px 0 rgba(13,12,12,.16)" }}>
               <button onClick={() => { setFromH(cardRef.current?.offsetHeight || 520); setFullTab(tab === "Properties" ? "Properties" : "Searches"); setFull(true); }} className="btn-soft" style={{ flex: 1, height: 43 }}>View all</button>

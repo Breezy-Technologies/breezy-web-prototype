@@ -74,7 +74,7 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
           <button onClick={onFooterSearch} className="fb-dark" style={css("width:100%;height:48px;border:none;border-radius:9999px;background:rgb(17,16,16);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer")}>{active ? "Manage search" : "Save search"}</button>
         </div>
       )}
-      {!compact && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved?.()} onShare={onSharePicked} />}
+      {!compact && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved?.()} onShare={onSharePicked} onSaveSearch={listings.length > 0 ? onFooterSearch : undefined} searchLabel={active ? "Manage search" : "Save search"} />}
     </div>
   );
 }
