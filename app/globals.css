@@ -45,3 +45,17 @@ input { font-family: inherit; }
 @keyframes cardSwipeL { to { transform: translateX(-120%) rotate(-14deg); opacity: 0 } }
 @keyframes cardSwipeR { to { transform: translateX(120%) rotate(14deg); opacity: 0 } }
 @keyframes countUp { from { transform: translateY(40px); opacity: 0 } to { transform: none; opacity: 1 } }
+
+/* Home panel (ported from the canvas Home Web.dc.html) */
+@keyframes hcGrow { from { clip-path: inset(0 0 calc(100% - var(--hcH, 520px)) 0 round 24px) } to { clip-path: inset(0 0 0 0 round 24px) } }
+@keyframes hcGhostOut { 0% { opacity: 1; transform: none } 100% { opacity: 0; transform: translateY(-56px) } }
+@keyframes hcHeadIn { from { opacity: 0; transform: translateY(28px) } to { opacity: 1; transform: none } }
+@keyframes hcTabsIn { from { transform: translateY(7px) } to { transform: none } }
+@keyframes hcListIn { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: none } }
+@keyframes bzModalIn { from { opacity: 0; transform: translate(-50%, calc(-50% + 12px)) } to { opacity: 1; transform: translate(-50%, -50%) } }
+@keyframes bzToastIn { from { opacity: 0; transform: translate(-50%, 12px) } to { opacity: 1; transform: translate(-50%, 0) } }
+.hc-row:hover { background: rgba(13, 12, 12, .035) }
+.hc-del:hover { background: rgb(255, 240, 238) !important }
+.hc-round:hover { background: rgba(18, 18, 18, .1) !important }
+.hc-danger:hover { background: rgb(150, 36, 28) !important }
+.hc-danger:active { transform: scale(.99) }

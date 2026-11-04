@@ -5,7 +5,9 @@ import { useMapCtx } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
 import { SideNav, NAV_W } from "@/components/home/SideNav";
 import { SearchBar, FilterChips } from "@/components/home/SearchBar";
-import { HomeCard, ResultsPanel } from "@/components/home/LeftPanel";
+import { ResultsPanel } from "@/components/home/LeftPanel";
+import { HomeCard } from "@/components/home/HomeCard";
+import { Toast, useToast } from "@/components/home/Toast";
 import { PricePins } from "@/components/home/PricePins";
 import { HoverCard } from "@/components/home/HoverCard";
 import { ParcelLift, ParcelHit } from "@/components/home/ParcelLift";
@@ -30,6 +32,10 @@ export default function HomeWeb() {
   const [comps, setComps] = useState<Listing | null>(null);
   const [seen, setSeen] = useState<Set<number>>(new Set());
   const keepT = useRef<any>(null);
+  const { toast, show: showToast } = useToast();
+  // Hovering or opening a listing counts as the first interaction that clears its "New match" badge.
+  const [badgeSeen, setBadgeSeen] = useState<Set<number>>(new Set());
+  const hoverListing = (id: number | null) => { setHoverId(id); if (id != null) setBadgeSeen(s => s.has(id) ? s : new Set(s).add(id)); };
   const navW = navX ? NAV_W.expanded : NAV_W.collapsed;
 
   useEffect(() => { setInset({ left: navW, top: 0, radius: 36 }); }, [navW, setInset]);
@@ -60,6 +66,7 @@ export default function HomeWeb() {
   const openListing = (id: number) => {
     setParcel(null); setSelId(id); setHoverId(null);
     setSeen(s => new Set(s).add(id));
+    setBadgeSeen(s => new Set(s).add(id));
     const l = listings.find(x => x.id === id);
     if (l && map) map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 15), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
   };
@@ -77,7 +84,8 @@ export default function HomeWeb() {
               onClear={() => { if (detailOpen) closeDetail(); else { setView("home"); } }} onPick={pickPlace} />
           </div>
           {view === "home"
-            ? <HomeCard name={user.name} areaLabel={place.label} forYou={forYou} onOpen={openListing} onHover={setHoverId} onSearch={async q => { const r = await searchPlaces(q); if (r[0]) pickPlace(r[0]); }} />
+            ? <HomeCard name={user.name} forYou={forYou} saved={listings} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
+                onSearch={async q => { const r = await searchPlaces(q); if (r[0]) pickPlace(r[0]); else showToast("No results for " + q, "info"); }} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()} />
             : <ResultsPanel title="Results" meta={`${listings.length} homes · ${place.label}`} listings={listings} onOpen={openListing} onHover={setHoverId} />}
         </div>
         {detailOpen && (
@@ -106,6 +114,7 @@ export default function HomeWeb() {
       )}
       <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => { setSelId(null); setParcel(p); }} />
       {comps && <CompsFlow l={comps} onClose={() => setComps(null)} />}
+      <Toast toast={toast} />
     </>
   );
 }

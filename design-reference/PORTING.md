@@ -15,11 +15,13 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 
 ## Not yet ported
 
-### Home panel (For you / Searches / Properties)
-- ⬜ Tabs + saved searches list with "n new" badges, avatars, chips — `t.pick`, `ss.open`, `ss.enter`, `ss.del`, `onManageSearch`, `onHcViewAll`
-- ⬜ Saved properties list, sort, delete confirm — `pp.open`, `pp.enter`, `pp.add`, `pp.del`, `onHcSortToggle`, `onHcDelCancel`, `onHcDelOk`, `onHcStart`, `onHcBack`
-- ⬜ Thumbnail hover preview in lists — `onThHoverOpen`, `onThHoverKeep`, `thGal.next/prev`
-- ⬜ "New match" badge clears on first interaction (sprint item)
+### Home panel (For you / Searches / Properties) — `components/home/HomeCard.tsx`
+- ✅ Tabs + saved searches list with "n new" badges, avatars, chips — `t.pick`, `ss.open`, `ss.enter`, `ss.del`, `onHcViewAll` (opening a search clears its "n new")
+- ✅ Saved properties list, sort, delete confirm, "All updates" full view — `pp.open`, `pp.enter`, `pp.del`, `onHcSortToggle`, `onHcDelCancel`, `onHcDelOk`, `onHcStart`, `onHcBack`. Delete is only offered in the full view, as in the canvas.
+- ✅ "New match" badge clears on first interaction (hover or open) (sprint item)
+- ⬜ `onManageSearch` (active saved-search header in the search field) and `pp.add` (save from detail): belong to the search field and detail panel areas
+- ⬜ Thumbnail hover preview — `onThHoverOpen`, `onThHoverKeep`, `thGal.next/prev`. This is the hover card for the small dot pins on the map, not the lists; port it with the price pins.
+- Note: "For you" keeps the V5 onboarding hand-off list (the canvas compact card shows nothing under that tab) and stays the default tab, so the onboarding flow lands on the matches.
 
 ### Filters
 - ⬜ Filter bar dropdowns: All filters, ROI, Build potential, Status & price, Type — `onOpenPanel`, `onPanelClose`, `onPanelApply`, `onFilterReset`, `onDdClose`, `ddClear`, `fs.*.toggle`, `fd.inc/dec`, `rt.pick`, `rc.pick`, `rz.pick`, `op.pick`, `ds.toggle`, `pr.toggle`, `sp.toggle`, `sp.focus`, `onSpCollapse`
@@ -35,7 +37,7 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 
 ### Area search
 - ⬜ "Search this area" pill (trigger when viewport ~50% empty of pins) + draw area — `onTryArea`, `onAddArea`, `onShowNearest`, `onPickedClear`
-- ⬜ "No property found" toast with neutral black info icon (sprint item)
+- 🟡 "No property found" toast with neutral black info icon (sprint item): `Toast` has the `info` tone; wire it when area search lands
 
 ### Share
 - ⬜ Share property / picked set, link sheet, quick copy, share to contact — `onShareProp`, `onSharePicked`, `onShLinkOpen`, `onShLinkCopy`, `onShLinkClose`, `onShQuickCopy`, `onShContact`, `onShClose`, `sv.*`
