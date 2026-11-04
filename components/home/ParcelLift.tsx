@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
 import { Listing, heatColor, heatValue, makeListings } from "@/lib/fake";
-import { hasRegrid } from "@/lib/config";
+import { config, hasRegrid, isLiveMap } from "@/lib/config";
 import { OwnerRow, QeRow } from "./HoverCard";
 
 export type ParcelHit = { key: string; ring: [number, number][]; cx: number; cy: number; addr: string; listing: Listing };
@@ -14,6 +14,7 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   const { map, tick, heat, mode } = useMapCtx();
   const [hit, setHit] = useState<ParcelHit | null>(null);
   const keyRef = useRef("");
+  const satUrls = useRef(new Map<string, string>()); // parcel key -> satellite image URL (fetched once per parcel)
 
   useEffect(() => {
     if (!map) return;
@@ -55,6 +56,27 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   const shade = (c: number[], f: number) => `rgb(${c.slice(0, 3).map(v => Math.round(v * f)).join(",")})`;
   const sideC = sat ? "rgb(122,112,100)" : hv ? shade(hv, 0.8) : "rgb(212,200,192)";
   const topC = sat ? "rgb(246,243,238)" : hc || "rgb(253,251,248)";
+  // Satellite: the slab top is the parcel's own satellite imagery, as if that
+  // patch of ground were lifted up (review feedback). A Mapbox Static Images
+  // request for the parcel's bbox, sized to its on-screen pixels so the
+  // Mercator extent matches exactly; placed by projecting the bbox each frame.
+  const clipId = show.key.replace(/[^a-zA-Z0-9_-]/g, "");
+  let satTop: { url: string; x: number; y: number; w: number; h: number } | null = null;
+  if (sat && isLiveMap()) {
+    const lngs = show.ring.map(p => p[0]), lats = show.ring.map(p => p[1]);
+    const bw = Math.min(...lngs), be = Math.max(...lngs), bs = Math.min(...lats), bn = Math.max(...lats);
+    const nw = map.project([bw, bn]), se = map.project([be, bs]);
+    const w = se.x - nw.x, h = se.y - nw.y;
+    if (w > 2 && h > 2) {
+      let url = satUrls.current.get(show.key);
+      if (!url) {
+        const k = Math.min(1, 1280 / Math.max(w, h));
+        url = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/[${bw},${bs},${be},${bn}]/${Math.max(1, Math.round(w * k))}x${Math.max(1, Math.round(h * k))}@2x?access_token=${config.mapboxToken}&attribution=false&logo=false`;
+        satUrls.current.set(show.key, url);
+      }
+      satTop = { url, x: nw.x, y: nw.y, w, h };
+    }
+  }
   const edgeC = sat ? "rgb(255,209,41)" : "rgba(17,16,16,.75)";
   const hole = `M0,0H${W}V${H}H0Z M${q.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(" L")}Z`;
   const top = Math.min(...q.map(v => v.y)), bot = Math.max(...q.map(v => v.y)), cx = q.reduce((a, v) => a + v.x, 0) / q.length;
@@ -75,6 +97,13 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
         {Array.from({ length: 9 }, (_, k) => <polygon key={k} points={pts} fill={sideC} stroke={sideC} strokeWidth={1} strokeLinejoin="round" style={{ ["--l" as any]: `${-(k + 1)}px`, animation: "liftUp .3s cubic-bezier(.2,.8,.2,1) both" }} />)}
         <g style={{ ["--l" as any]: "-10px", animation: "liftUp .3s cubic-bezier(.2,.8,.2,1) both" }}>
           <polygon points={pts} fill={topC} stroke={edgeC} strokeWidth={sat ? 2.5 : 1.6} strokeLinejoin="round" />
+          {satTop && (
+            <>
+              <clipPath id={`bzTop-${clipId}`}><polygon points={pts} /></clipPath>
+              <image href={satTop.url} x={satTop.x} y={satTop.y} width={satTop.w} height={satTop.h} preserveAspectRatio="none" clipPath={`url(#bzTop-${clipId})`} />
+              <polygon points={pts} fill="none" stroke={edgeC} strokeWidth={2.5} strokeLinejoin="round" />
+            </>
+          )}
           {num && <text x={cx} y={ccy} textAnchor="middle" dominantBaseline="central" fontFamily="Akkurat LL, sans-serif" fontWeight={700} fontSize={fs} fill="rgb(18,18,18)" stroke="rgba(255,255,255,.95)" strokeWidth={3} paintOrder="stroke">{num}</text>}
         </g>
         {/* The parcel's real outline on the ground stays visible above the lifted slab (review feedback). */}

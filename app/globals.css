@@ -59,3 +59,9 @@ input { font-family: inherit; }
 .hc-round:hover { background: rgba(18, 18, 18, .1) !important }
 .hc-danger:hover { background: rgb(150, 36, 28) !important }
 .hc-danger:active { transform: scale(.99) }
+
+/* Owner contact lines: copy icon on hover */
+.copy-line:hover { background: rgba(13, 12, 12, .045) }
+.copy-line .copy-ic { opacity: 0; transition: opacity .15s }
+.copy-line:hover .copy-ic { opacity: 1 }
+@keyframes activePing { 0% { transform: scale(1); opacity: .7 } 80%, 100% { transform: scale(2.6); opacity: 0 } }

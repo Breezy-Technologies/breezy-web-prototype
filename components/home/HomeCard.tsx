@@ -87,7 +87,14 @@ function SearchRow({ x, hover, full, onEnter, onLeave, onOpen, onDel }: { x: Sav
         <span style={{ font: "400 13px/18px var(--font-sans)", color: "rgb(73,67,65)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(p[1] || "Any type") + " · " + (p[2] || "Any price") + " · " + (p[3] || "Silver Lake")}</span>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <span style={{ minWidth: 0, font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ppl ? forTxt(cl) : "No clients added"}</span>
-          <span style={{ flex: "none", height: 20, padding: "0 8px", borderRadius: 9999, whiteSpace: "nowrap", ...(x.newN ? { font: "700 11px/20px var(--font-sans)", background: "rgb(249,60,45)", color: "rgb(253,252,252)" } : { font: "400 11px/20px var(--font-sans)", background: "rgba(18,18,18,.06)", color: "rgb(98,90,89)" }) }}>{x.newN ? `${x.newN} new` : "No new"}</span>
+          {x.newN
+            ? <span style={{ flex: "none", height: 20, padding: "0 8px", borderRadius: 9999, whiteSpace: "nowrap", font: "700 11px/20px var(--font-sans)", background: "rgb(249,60,45)", color: "rgb(253,252,252)" }}>{x.newN} new</span>
+            : <span style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, height: 20, padding: "0 8px 0 7px", borderRadius: 9999, whiteSpace: "nowrap", font: "400 11px/20px var(--font-sans)", background: "rgba(49,140,96,.1)", color: "rgb(36,104,72)" }}>
+                <span style={{ position: "relative", flex: "none", width: 6, height: 6 }}>
+                  <span style={{ position: "absolute", inset: 0, borderRadius: 9999, background: "rgb(49,160,104)", animation: "activePing 1.8s ease-out infinite" }} />
+                  <span style={{ position: "absolute", inset: 0, borderRadius: 9999, background: "rgb(49,160,104)" }} />
+                </span>Active
+              </span>}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingTop: 6 }}>
           {tags.map(t => (
@@ -145,14 +152,16 @@ export function HomeCard({ name, forYou, saved, seen, onOpen, onHover, onSearch,
   const cardRef = useRef<HTMLDivElement>(null);
 
   const sorted = <T extends { when: string }>(a: T[]) => sort === "Default" ? a : a.slice().sort((x, y) => (RANK[x.when] - RANK[y.when]) * (sort === "Newest" ? 1 : -1));
-  // Opening a saved search marks its new matches as seen.
+  // Opening or hovering a saved search marks its new matches as seen.
   const searches = sorted(SEARCHES.filter(x => !del.includes(x.id)).map(x => opened.includes(x.id) ? { ...x, newN: 0 } : x));
   const props: SavedProp[] = sorted(saved.slice(0, 6).map((l, k) => ({ key: "p" + l.id, l, status: PROP_STATUS[k % PROP_STATUS.length], when: PROP_WHEN[k] })).filter(x => !del.includes(x.key)));
   const bellS = searches.some(x => x.newN > 0), bellP = props.length > 0;
 
-  const openSearch = (x: SavedSearch) => { setOpened(o => o.includes(x.id) ? o : o.concat(x.id)); setFull(false); onSearch(x.sq); };
+  const openSearch = (x: SavedSearch) => { seenSearch(x.id); setFull(false); onSearch(x.sq); };
   const openProp = (x: SavedProp) => { setFull(false); onOpen(x.l.id); };
-  const enter = (id: string) => () => setHover(id);
+  const seenSearch = (id: string) => setOpened(o => (o.includes(id) ? o : o.concat(id)));
+  // Hovering a saved search counts as interacting with it: its "n new" badge turns to Active (review feedback).
+  const enter = (id: string) => () => { setHover(id); if (!id.startsWith("p")) seenSearch(id); };
   const leave = (id: string) => () => setHover(h => (h === id ? null : h));
   const askDel = (id: string, nm: string) => { setConfirm({ id, name: nm }); setSortOpen(false); };
   const isProp = confirm?.id.startsWith("p");

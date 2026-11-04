@@ -69,7 +69,7 @@ export function DetailPanel({ l, onClose, onGetComps }: { l: Listing; onClose: (
               </span>
             </div>
             {revealed
-              ? <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 70, font: "400 14px/20px var(--font-sans)", animation: "fadeIn .25s ease both" }}><span>{l.owner.phone}</span><span>{l.owner.email}</span><span style={{ color: "rgb(98,90,89)" }}>{l.owner.mail}</span></div>
+              ? <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 62, font: "400 14px/20px var(--font-sans)", animation: "fadeIn .25s ease both" }}><CopyLine text={l.owner.phone} /><CopyLine text={l.owner.email} /><CopyLine text={l.owner.mail} muted /></div>
               : <span style={{ paddingLeft: 70, font: "400 13px/18px var(--font-sans)", color: "var(--fg-3)" }}>Phone, email and mailing address unlock with Contact owner below.</span>}
           </div>
           <div style={{ padding: 16 }}>
@@ -107,5 +107,23 @@ export function DetailPanel({ l, onClose, onGetComps }: { l: Listing; onClose: (
         </> : <button className="btn-dark" style={{ flex: 1 }} onClick={() => setRevealed(true)}><i className="ph-bold ph-user" />Contact owner</button>}
       </div>
     </div>
+  );
+}
+
+// Owner contact line: hovering shows a copy icon; clicking copies the value to
+// the clipboard and briefly shows a check (review feedback).
+function CopyLine({ text, muted }: { text: string; muted?: boolean }) {
+  const [done, setDone] = useState(false);
+  const copy = () => {
+    // writeText is async and rejects when the page isn't focused; swallow that.
+    navigator.clipboard?.writeText(text).catch(() => {});
+    setDone(true);
+    setTimeout(() => setDone(false), 1400);
+  };
+  return (
+    <button onClick={copy} title={done ? "Copied" : "Copy"} className="copy-line" style={{ display: "flex", alignItems: "center", gap: 8, height: 28, margin: 0, padding: "0 8px", border: "none", borderRadius: 8, background: "none", font: "inherit", color: muted ? "rgb(98,90,89)" : "var(--ink)", cursor: "pointer", textAlign: "left" }}>
+      <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{text}</span>
+      <i className={`ph-bold ph-${done ? "check" : "copy"} copy-ic`} style={{ flex: "none", fontSize: 15, color: done ? "rgb(49,140,96)" : "var(--fg-2)", opacity: done ? 1 : undefined }} />
+    </button>
   );
 }
