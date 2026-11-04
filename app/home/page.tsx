@@ -17,6 +17,8 @@ import { MapControls } from "@/components/home/MapControls";
 import { CompsFlow } from "@/components/home/CompsFlow";
 import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
+import { ShareModal, useShare } from "@/components/home/Share";
+import { ReportsSheet, useReports } from "@/components/home/Reports";
 import { Listing } from "@/lib/fake";
 import { SortKey, homeOk, sortListings } from "@/lib/filters";
 import { Place, searchPlaces } from "@/lib/places";
@@ -27,13 +29,18 @@ const COL = 388, GAP = 12;
 export default function HomeWeb() {
   const router = useRouter();
   const { map, ready, setInset, setAreaRings, offline, setHeat } = useMapCtx();
-  const { place, rings, listings, picks, user, choosePlace, onboarded } = useApp();
+  const { place, rings, listings, picks, user, choosePlace, onboarded, restartOnboarding } = useApp();
   const [navX, setNavX] = useState(false);
   const [view, setView] = useState<"home" | "results">("home");
   const [selId, setSelId] = useState<number | null>(null);
   const [parcel, setParcel] = useState<ParcelHit | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
   const [comps, setComps] = useState<Listing | null>(null);
+  // Share (picked set, share modal) and saved Reports; see Share.tsx / Reports.tsx.
+  const sh = useShare();
+  const rp = useReports();
+  const [shareL, setShareL] = useState<Listing | null>(null);
+  const [compsCached, setCompsCached] = useState(false);
   const [seen, setSeen] = useState<Set<number>>(new Set());
   const keepT = useRef<any>(null);
   const { toast, show: showToast } = useToast();
@@ -118,17 +125,29 @@ export default function HomeWeb() {
     if (s) ss.openManage(s); else ss.openNew();
   };
 
+  // Share (`onShareProp` / `onSharePicked`): one property, or the picked set from the saved store.
+  const shareOne = (l: Listing) => { setShareL(l); sh.shareProp(l.id); };
+  const shareItems = sh.only != null ? (shareL ? [shareL] : []) : picked.map(p => p.l);
+  // A comps report that has already been run reopens on its result (sprint item).
+  const openComps = (l: Listing) => { setCompsCached(rp.has(l)); setComps(l); };
+
   const detailOpen = !!sel;
   // Sheets stacked over the results column (`depth`): the save-search sheet or "All
   // filters" on top, the saved-properties sheet under it. Each one steps the column back.
   const svOn = view === "results" && savedOpen && picked.length > 0 && !savedOut;
-  const topOn = view === "results" && ((!!fs.fd && !fs.panelOut) || ss.on);
+  const topOn = (view === "results" && ((!!fs.fd && !fs.panelOut) || ss.on)) || (rp.open && !rp.out);
   const depth = (svOn ? 1 : 0) + (topOn ? 1 : 0);
   const layerOn = depth > 0;
-  const layerBack = () => { if (fs.fd) fs.closePanel(); if (ss.open) ss.requestClose(); if (savedOpen) closeSaved(); };
+  const layerBack = () => { if (fs.fd) fs.closePanel(); if (ss.open) ss.requestClose(); if (savedOpen) closeSaved(); if (rp.open) rp.close(); };
   return (
     <>
-      <SideNav expanded={navX} onToggle={() => setNavX(v => !v)} userName={user.name.split(" ")[0]} onPick={k => { if (k === "Map") { closeDetail(); setView("home"); } }} />
+      <SideNav expanded={navX} onToggle={() => setNavX(v => !v)} userName={user.name.split(" ")[0]}
+        dev={[{ label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } }]}
+        onPick={k => {
+        if (k === "Map") { closeDetail(); setView("home"); if (rp.open) rp.close(); }
+        // Reports (side-nav footer) opens the saved reports sheet over the left column.
+        if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
+      }} />
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none" }}>
           <div style={{ pointerEvents: "auto" }}>
@@ -149,7 +168,7 @@ export default function HomeWeb() {
                   sortOpen={sortOpen} onSortToggle={() => { setSortOpen(o => !o); fs.setDd(null); }}
                   onShowNearest={() => { fs.reset(); showToast("Showing nearest properties"); }} onResetFilters={fs.reset}
                   active={!!active} onManage={() => openSheet(active)} onFooterSearch={() => openSheet(active)}
-                  picked={picked} onOpenSaved={() => { setSortOpen(false); setSavedOut(false); setSavedOpen(true); }} />
+                  picked={picked} onOpenSaved={() => { setSortOpen(false); setSavedOut(false); setSavedOpen(true); }} onSharePicked={() => sh.sharePicked()} />
               </div>
             )}
           {view === "results" && savedOpen && picked.length > 0 && (
@@ -157,13 +176,14 @@ export default function HomeWeb() {
               onRemove={p => sv.toggleProp(p.l)} onClear={() => { sv.clearPicked(); setSavedOpen(false); }} />
           )}
           {view === "results" && ss.layers}
+          <ReportsSheet rp={rp} onOpen={r => { rp.close(); openComps(r.l); }} />
           {layerOn && <div onClick={layerBack} title="Back to results" style={{ position: "absolute", left: 0, right: 0, top: 64, bottom: 0, zIndex: 3, pointerEvents: "auto", cursor: "pointer" }} />}
         </div>
         {detailOpen && (
           // The detail column steps back while the Alerts sheet sits on top of it (`dtT` / `dtF`).
           <div style={{ position: "absolute", left: GAP + COL + GAP, top: GAP, bottom: GAP, transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
-            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => setComps(sel!)}
-              alertN={alerts.count(sel)} onBell={() => alerts.open(sel!)} />
+            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => openComps(sel!)}
+              alertN={alerts.count(sel)} onBell={() => alerts.open(sel!)} onShare={() => shareOne(sel!)} />
           </div>
         )}
         {detailOpen && alerts.panel(GAP + COL + GAP)}
@@ -194,8 +214,10 @@ export default function HomeWeb() {
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
         if (map) map.easeTo({ center: [p.cx, p.cy], zoom: Math.max(map.getZoom(), 16), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
       }} />
-      {comps && <CompsFlow l={comps} onClose={() => setComps(null)} />}
+      {comps && <CompsFlow key={comps.id + comps.addr} l={comps} cached={compsCached} onClose={() => setComps(null)}
+        onDone={() => { if (!rp.has(comps)) showToast("Report saved to Reports"); rp.save(comps); }} onShare={() => shareOne(comps)} />}
       {ss.modals}
+      {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
     </>
   );

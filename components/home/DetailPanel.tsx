@@ -6,7 +6,8 @@ import { BellButton } from "./Saved";
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
 
 // Footer bell: `onBell` opens the Alerts panel; with alerts set it turns green with the count.
-export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell }: { l: Listing; onClose: () => void; onGetComps: () => void; alertN?: number; onBell?: () => void }) {
+// Footer share: `onShare` (canvas `onShareProp`) opens the Share modal for this property.
+export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShare }: { l: Listing; onClose: () => void; onGetComps: () => void; alertN?: number; onBell?: () => void; onShare?: () => void }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Summary");
   const [revealed, setRevealed] = useState(false);
   const [gi, setGi] = useState(0);
@@ -102,7 +103,9 @@ export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell }: { l:
       </div>
       <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: 16, boxShadow: "inset 0 1px 0 rgb(245,240,238)" }}>
         <BellButton n={alertN} onClick={() => onBell?.()} />
-        <button className="btn-soft" title="Share property" style={{ width: 48, padding: 0 }}><i className="ph-bold ph-share-network" /></button>
+        <button className="btn-soft" title="Share property" onClick={onShare} style={{ width: 48, padding: 0 }}>
+          <span style={{ width: 18, height: 18, background: "rgb(17,16,16)", WebkitMask: "url('/ui/share.svg') center/contain no-repeat", mask: "url('/ui/share.svg') center/contain no-repeat" }} />
+        </button>
         {revealed ? <>
           <button className="btn-dark" style={{ flex: 1 }}><i className="ph-bold ph-phone" />Call owner</button>
           <button className="btn-soft" title="Email owner" style={{ width: 48, padding: 0 }}><i className="ph-bold ph-envelope-simple" /></button>

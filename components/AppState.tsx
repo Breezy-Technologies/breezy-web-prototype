@@ -16,6 +16,7 @@ type AppState = {
   choosePlace: (p: Place) => Promise<void>;
   setPicks: (p: AppState["picks"]) => void;
   finishOnboarding: () => void;
+  restartOnboarding: () => void; // developer menu: clear picks and run onboarding again
 };
 
 const Ctx = createContext<AppState | null>(null);
@@ -57,6 +58,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       place, rings, listings, picks, onboarded,
       user: { name: "James Carter", email: "james.carter@compass.com" },
       choosePlace, setPicks: setPicksS, finishOnboarding: () => setOnboarded(true),
+      restartOnboarding: () => { setPicksS({}); setOnboarded(false); },
     }}>
       {children}
     </Ctx.Provider>

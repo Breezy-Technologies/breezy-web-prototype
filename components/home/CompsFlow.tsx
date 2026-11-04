@@ -1,13 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Listing, fullPrice, shortPrice } from "@/lib/fake";
+import { css } from "@/lib/css";
 
 const STEPS = ["Reading the subject property", "Finding sales within 0.5 mi", "Scoring condition and finishes", "Adjusting for lot and location", "Writing the analysis"];
 
 // Review data → full-screen "Let AI do the work" → analysis → results.
-export function CompsFlow({ l, onClose }: { l: Listing; onClose: () => void }) {
-  const [phase, setPhase] = useState<"review" | "choose" | "run" | "result">("review");
+// `cached` opens a report that has already been run straight on its result
+// (canvas `startFlow`: `if (s.got[key]) return this._go("result")`).
+// `onDone` fires when the result is reached (saved to Reports); `onShare` is
+// the canvas report's "Share report" CTA (`footShare` → `onShareProp`).
+export function CompsFlow({ l, onClose, cached, onDone, onShare }: { l: Listing; onClose: () => void; cached?: boolean; onDone?: () => void; onShare?: () => void }) {
+  const [phase, setPhase] = useState<"review" | "choose" | "run" | "result">(cached ? "result" : "review");
   const [step, setStep] = useState(0);
+  // Review rows edit inline (`cmRows`: `rw.edit`, `rw.change`, `rw.key`, `rw.done`).
+  const [cm, setCm] = useState<[string, string][]>(() => [["Bed", String(l.beds)], ["Bath", String(l.baths)], ["Home ft²", l.sqft.toLocaleString()], ["Lot ft²", Math.round(l.lotAc * 43560).toLocaleString()]]);
+  const [editK, setEditK] = useState<string | null>(null);
+  useEffect(() => { if (phase === "result") onDone?.(); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (phase !== "run") return;
     setStep(0);
@@ -23,11 +32,17 @@ export function CompsFlow({ l, onClose }: { l: Listing; onClose: () => void }) {
         <span style={{ display: "block", font: "300 36px/44px var(--font-sans)", letterSpacing: "-.5px" }}>Review the subject property data</span>
         <span style={{ display: "block", marginTop: 8, font: "400 15px/20px var(--font-sans)" }}>Ensure you get accurate comps for<br />{l.addr}{l.city ? ", " + l.city : ""}</span>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, margin: "28px 0 32px" }}>
-          {[["Bed", l.beds], ["Bath", l.baths], ["Home ft²", l.sqft.toLocaleString()], ["Lot ft²", Math.round(l.lotAc * 43560).toLocaleString()]].map(([k, v]) => (
-            <div key={String(k)} style={{ display: "flex", alignItems: "center", gap: 12, height: 52 }}>
+          {cm.map(([k, v]) => (
+            <div key={k} style={{ display: "flex", alignItems: "center", gap: 12, height: 52 }}>
               <span style={{ flex: 1, textAlign: "left", font: "400 15px/20px var(--font-sans)" }}>{k}</span>
-              <span style={{ font: "700 16px/20px var(--font-sans)" }}>{v}</span>
-              <button className="btn-ghost" style={{ width: 36, height: 36, background: "rgba(13,12,12,.06)" }}><i className="ph-bold ph-pencil-simple" /></button>
+              {editK === k
+                ? <input autoFocus onFocus={e => e.currentTarget.select()} value={v} onChange={e => setCm(c => c.map(r => r[0] === k ? [k, e.target.value] : r))}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") setEditK(null); }} onBlur={() => setEditK(null)}
+                    style={css("width:110px;height:36px;box-sizing:border-box;padding:0 12px;border:none;border-radius:10px;background:rgb(253,252,252);box-shadow:inset 0 0 0 1.5px rgb(17,16,16);outline:none;font:700 15px/20px var(--font-sans);color:rgb(17,16,16);text-align:right")} />
+                : <span style={{ font: "700 16px/20px var(--font-sans)" }}>{v}</span>}
+              {/* onMouseDown + preventDefault so clicking the pencil doesn't blur-then-reopen the field. */}
+              <button onMouseDown={e => { e.preventDefault(); setEditK(editK === k ? null : k); }} title="Edit" className="sh-add"
+                style={css("flex:none;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:none;border-radius:9999px;cursor:pointer;background:" + (editK === k ? "rgba(13,12,12,.14)" : "rgba(13,12,12,.06)"))}><i className="ph-bold ph-pencil-simple" /></button>
             </div>
           ))}
         </div>
@@ -38,7 +53,16 @@ export function CompsFlow({ l, onClose }: { l: Listing; onClose: () => void }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#fff", display: "flex", flexDirection: "column", animation: "fadeIn .3s ease both" }}>
-      <div style={{ padding: 20 }}><button className="btn-soft" style={{ height: 40, fontSize: 14 }} onClick={onClose}><i className="ph-bold ph-arrow-left" />Back to map</button></div>
+      <div style={{ padding: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <button className="btn-soft" style={{ height: 40, fontSize: 14 }} onClick={onClose}><i className="ph-bold ph-arrow-left" />Back to map</button>
+        {phase === "result" && onShare && (
+          // Canvas report footer CTA (`footShare`, `shareCtaLabel` = "Share report").
+          <button onClick={onShare} title="Share report" className="fb-dark" style={css("flex:none;height:48px;padding:0 22px;display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer;animation:fadeIn .25s ease backwards")}>
+            <span style={css("width:16px;height:16px;background:currentColor;-webkit-mask:url('/ui/share.svg') center/contain no-repeat;mask:url('/ui/share.svg') center/contain no-repeat")} />
+            Share report
+          </button>
+        )}
+      </div>
       {phase === "choose" && (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, textAlign: "center", animation: "riseIn .4s ease both" }}>
           <span style={{ font: "300 40px/48px var(--font-sans)", letterSpacing: "-.6px" }}>Let AI do the work</span>
