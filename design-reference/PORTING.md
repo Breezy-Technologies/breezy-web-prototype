@@ -9,7 +9,13 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 - ✅ Side nav collapse / wordmark — `onNavToggle`, `onToggleRail`
 - 🟡 Search field + suggestions — `onClearSearch`, `sg.pick`, `onFooterSearch`, `onUseMyLoc`, `onUseCurLoc`, `onLocPill`, `onLocClose`
 - 🟡 Price pins, collapse pills, hover card — `p.enter`, `p.pick`, `onHoverKeep`, `onHoverOpen`, `hvCar.next/prev`, `onPillLeft/Right`
-- 🟡 Detail panel — `onCloseDetail`, `onCloseSel`, `onGalNext/Prev`, `onFlipHero`, `onDescToggle`, `onOwnersTab`, `onOwnerReveal`, `onDetGetComps`, `onViewProperty`
+- ✅ Detail panel tabs — `components/home/DetailPanel.tsx`, data from `listingDetail()` in `lib/fake.ts` (separate random stream, existing listing values unchanged)
+  - Shell: hero gallery with prev / next (`onGalPrev/Next`, `onGalScroll`), status + n/total pills, stats row (Bed, Bath, ft² Home, /ac Lot, /mo HOA), sticky tab bar; picking a tab scrolls it up to stick (`detailTabs[].pick`); past 210 px the compact header appears with the address, Close and, off Summary, a back arrow (`dHdr`, `onBackSummary`, `onCloseDetail`); bottom fade above the footer.
+  - Summary: Quick estimate card + Get comps (`onDetGetComps`), Max build / Profit potential tiles, Owner with View history (`onOwnersTab`) and contact lines after Contact owner (`onOwnerReveal`, lines keep click-to-copy), listing description with Listed by / source and Show more (`onDescToggle`), Listing history card, Features chips.
+  - Specs: MLS source pill, "AI found 6 features" banner, spec rows with icon tiles / thumbnails and AI Review → Confirmed toggles (`r.onReview`), Features & amenities chips (AI chips accept on click, others remove; `c.act`), Address and Identifiers.
+  - Records: Listings / Tax Records / Mortgage segments (`sg.pick`); listing events grouped by year with change %, price, per ft², specs and Update.
+  - Owners: Current / Former groups with Add to contacts toggles (`pp.add`).
+  - Not wired (no target in the app yet): the Max build / Profit tiles (UB / ROI flows), "Add feature", "Update", "More", MLS source pill, photo lightbox (`g.open`, see Lightbox), `onFlipHero` (peek card), `onViewProperty` / `onCloseSel` (peek step). "View more" under Listing history / Features opens Records / Specs (no handler in the canvas).
 - 🟡 Map controls + layers — `onZoomIn/Out`, `onRecenter`, `onInfoToggle`, `onToggleLayers`, `onLayersEnter`, `onLayerBack`, `lt.pick`, `ml.pick`, `mt.pick`
 - 🟡 Comps flow — `onGetComps`, `onReviewClose`, `onReviewConfirm`, `r.onReview`, `onBackSummary`, `onCompsBack`, `onCompSelf`, `onResultBack`, `onResultComps`, `onResultEdit`, `gcPause`
 
