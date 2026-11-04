@@ -81,3 +81,11 @@ input { font-family: inherit; }
 .fb-sort:hover { background: rgba(13, 12, 12, .1) !important }
 .fb-grey:hover { background: rgb(222, 222, 222) !important }
 .fb-grey:active, .fb-cta2:active { transform: scale(.98) }
+
+/* Share + Reports (ported from the canvas Home Web.dc.html) */
+@keyframes bzModalIn2 { from { opacity: 0; transform: translateY(16px) scale(.985) } to { opacity: 1; transform: none } }
+@keyframes bzPanelDrop { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: none } }
+.sh-x:hover { background: rgba(13, 12, 12, .1) !important }
+.sh-add:hover { background: rgba(13, 12, 12, .12) !important }
+.sh-pv:hover { background: rgb(245, 240, 238) !important }
+.sh-row:hover { background: rgba(13, 12, 12, .03) !important }

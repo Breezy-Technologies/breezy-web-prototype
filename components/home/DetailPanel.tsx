@@ -4,7 +4,7 @@ import { Listing, fullPrice, shortPrice } from "@/lib/fake";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
 
-export function DetailPanel({ l, onClose, onGetComps }: { l: Listing; onClose: () => void; onGetComps: () => void }) {
+export function DetailPanel({ l, onClose, onGetComps, onShare }: { l: Listing; onClose: () => void; onGetComps: () => void; onShare?: () => void }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Summary");
   const [revealed, setRevealed] = useState(false);
   const [gi, setGi] = useState(0);
@@ -100,7 +100,10 @@ export function DetailPanel({ l, onClose, onGetComps }: { l: Listing; onClose: (
       </div>
       <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: 16, boxShadow: "inset 0 1px 0 rgb(245,240,238)" }}>
         <button className="btn-soft" title="Set alert" style={{ width: 48, padding: 0 }}><i className="ph-bold ph-bell" /></button>
-        <button className="btn-soft" title="Share property" style={{ width: 48, padding: 0 }}><i className="ph-bold ph-share-network" /></button>
+        {/* Canvas `onShareProp`: opens the Share properties modal for this property. */}
+        <button className="btn-soft" title="Share property" onClick={onShare} style={{ width: 48, padding: 0 }}>
+          <span style={{ width: 18, height: 18, background: "rgb(17,16,16)", WebkitMask: "url('/ui/share.svg') center/contain no-repeat", mask: "url('/ui/share.svg') center/contain no-repeat" }} />
+        </button>
         {revealed ? <>
           <button className="btn-dark" style={{ flex: 1 }}><i className="ph-bold ph-phone" />Call owner</button>
           <button className="btn-soft" title="Email owner" style={{ width: 48, padding: 0 }}><i className="ph-bold ph-envelope-simple" /></button>

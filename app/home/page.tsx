@@ -15,6 +15,8 @@ import { ParcelLift, ParcelHit } from "@/components/home/ParcelLift";
 import { DetailPanel } from "@/components/home/DetailPanel";
 import { MapControls } from "@/components/home/MapControls";
 import { CompsFlow } from "@/components/home/CompsFlow";
+import { PickedFooter, SavedSheet, ShareModal, useShare } from "@/components/home/Share";
+import { ReportsSheet, useReports } from "@/components/home/Reports";
 import { Listing } from "@/lib/fake";
 import { SortKey, homeOk, sortListings } from "@/lib/filters";
 import { Place, searchPlaces } from "@/lib/places";
@@ -32,6 +34,11 @@ export default function HomeWeb() {
   const [parcel, setParcel] = useState<ParcelHit | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
   const [comps, setComps] = useState<Listing | null>(null);
+  // Share (picked set, share modal) and saved Reports; see Share.tsx / Reports.tsx.
+  const sh = useShare();
+  const rp = useReports();
+  const [shareL, setShareL] = useState<Listing | null>(null);
+  const [compsCached, setCompsCached] = useState(false);
   const [seen, setSeen] = useState<Set<number>>(new Set());
   const keepT = useRef<any>(null);
   const { toast, show: showToast } = useToast();
@@ -79,13 +86,23 @@ export default function HomeWeb() {
     if (l && map) map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 15), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
   };
   const closeDetail = () => { setSelId(null); setParcel(null); };
+  const byId = (id: number) => listings.find(l => l.id === id);
+  const shareOne = (l: Listing) => { setShareL(l); sh.shareProp(l.id); };
+  const shareItems = sh.only != null ? (shareL ? [shareL] : []) : sh.picked.slice().reverse().map(byId).filter((l): l is Listing => !!l);
+  // A comps report that has already been run reopens on its result (sprint item).
+  const openComps = (l: Listing) => { setCompsCached(rp.has(l)); setComps(l); };
   const pickPlace = async (p: Place) => { closeDetail(); setView("results"); await choosePlace(p); };
 
   const detailOpen = !!sel;
-  const layerOn = view === "results" && !!fs.fd && !fs.panelOut;
+  const savedOn = view === "results" && sh.savedOpen && !sh.savedOut;
+  const layerOn = (view === "results" && !!fs.fd && !fs.panelOut) || savedOn || (rp.open && !rp.out);
   return (
     <>
-      <SideNav expanded={navX} onToggle={() => setNavX(v => !v)} userName={user.name.split(" ")[0]} onPick={k => { if (k === "Map") { closeDetail(); setView("home"); } }} />
+      <SideNav expanded={navX} onToggle={() => setNavX(v => !v)} userName={user.name.split(" ")[0]} onPick={k => {
+        if (k === "Map") { closeDetail(); setView("home"); if (rp.open) rp.close(); }
+        // Reports (side-nav footer) opens the saved reports sheet over the left column.
+        if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
+      }} />
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none" }}>
           <div style={{ pointerEvents: "auto" }}>
@@ -100,14 +117,17 @@ export default function HomeWeb() {
               <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: layerOn ? "scale(.94)" : "none", filter: layerOn ? "brightness(.955)" : "none" }}>
                 <ResultsPanel title="Results" meta={`${shown.length} ${shown.length === 1 ? "home" : "homes"} · ${place.label}`} listings={results} onOpen={openListing} onHover={setHoverId}
                   sortOpen={sortOpen} onSortToggle={() => { setSortOpen(o => !o); fs.setDd(null); }}
-                  onShowNearest={() => { fs.reset(); showToast("Showing nearest properties"); }} onResetFilters={fs.reset} />
+                  onShowNearest={() => { fs.reset(); showToast("Showing nearest properties"); }} onResetFilters={fs.reset}
+                  isSaved={id => sh.picked.includes(id)} onSave={sh.toggle} footer={sh.picked.length ? <PickedFooter sh={sh} byId={byId} /> : null} />
               </div>
             )}
-          {layerOn && <div onClick={fs.closePanel} title="Back to results" style={{ position: "absolute", left: 0, right: 0, top: 64, bottom: 0, zIndex: 3, pointerEvents: "auto", cursor: "pointer" }} />}
+          {view === "results" && <SavedSheet sh={sh} byId={byId} onOpen={openListing} />}
+          <ReportsSheet rp={rp} onOpen={r => { rp.close(); openComps(r.l); }} />
+          {layerOn && <div onClick={() => { fs.closePanel(); if (sh.savedOpen) sh.closeSaved(); if (rp.open) rp.close(); }} title="Back" style={{ position: "absolute", left: 0, right: 0, top: 64, bottom: 0, zIndex: 3, pointerEvents: "auto", cursor: "pointer" }} />}
         </div>
         {detailOpen && (
           <div style={{ position: "absolute", left: GAP + COL + GAP, top: GAP, bottom: GAP }}>
-            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => setComps(sel!)} />
+            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => openComps(sel!)} onShare={() => shareOne(sel!)} />
           </div>
         )}
         <FilterBar fs={fs} left={detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} />
@@ -137,7 +157,9 @@ export default function HomeWeb() {
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
         if (map) map.easeTo({ center: [p.cx, p.cy], zoom: Math.max(map.getZoom(), 16), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
       }} />
-      {comps && <CompsFlow l={comps} onClose={() => setComps(null)} />}
+      {comps && <CompsFlow key={comps.id + comps.addr} l={comps} cached={compsCached} onClose={() => setComps(null)}
+        onDone={() => { if (!rp.has(comps)) showToast("Report saved to Reports"); rp.save(comps); }} onShare={() => shareOne(comps)} />}
+      {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
     </>
   );

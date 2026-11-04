@@ -29,7 +29,7 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName }
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "8px 8px 16px" }}>
         {FOOT.map(([k, ic, dot]) => (
-          <button key={k} title={k} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: 0, border: "none", whiteSpace: "nowrap" }}>
+          <button key={k} title={k} onClick={() => onPick?.(k)} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: 0, border: "none", whiteSpace: "nowrap" }}>
             <span style={{ position: "relative", flex: "none", width: 40, height: 40, borderRadius: 9999, background: "rgba(13,12,12,.07)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <i className={`ph-bold ${ic}`} style={{ fontSize: 18, color: "rgb(48,42,40)" }} />
               {dot && <span style={{ position: "absolute", right: 1, top: 1, width: 9, height: 9, borderRadius: 9999, background: "rgb(169,44,72)", boxShadow: "0 0 0 2px var(--nav-bg)" }} />}

@@ -7,14 +7,23 @@ const card: React.CSSProperties = { display: "flex", flexDirection: "column", ov
 
 // `fresh` controls the "New match" badge; it clears once the card has been
 // interacted with (sprint item).
-export function ListingCard({ l, onOpen, onHover, fresh = l.isNew }: { l: Listing; onOpen: () => void; onHover: (on: boolean) => void; fresh?: boolean }) {
+// `saved` / `onSave` are the canvas `r.save` toggle (adds the card to the
+// picked set that "Share n properties" shares).
+export function ListingCard({ l, onOpen, onHover, fresh = l.isNew, saved, onSave }: { l: Listing; onOpen: () => void; onHover: (on: boolean) => void; fresh?: boolean; saved?: boolean; onSave?: () => void }) {
   return (
     <div onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} style={{ display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }}>
       <div style={{ position: "relative", height: 210, borderRadius: 20, background: `rgb(241,231,228) url(${l.photos[0]}) center/cover no-repeat` }}>
         <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 13px/28px var(--font-sans)" }}>
           {fresh && <span style={{ width: 7, height: 7, borderRadius: 9999, background: "rgb(226,57,50)" }} />}{fresh ? "New match" : l.status}
         </span>
-        <span style={{ position: "absolute", right: 12, top: 12, width: 32, height: 32, borderRadius: 9999, background: "var(--paper)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-plus" /></span>
+        {onSave
+          ? <button onClick={e => { e.stopPropagation(); onSave(); }} title="Save" style={css("position:absolute;right:12px;top:12px;width:32px;height:32px;border:none;border-radius:9999px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);transition:background .16s;"
+              + (saved ? "background:rgb(13,87,57);color:rgb(237,252,243)" : "background:rgb(253,252,252);color:rgb(17,16,16)"))}>
+              {saved
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>}
+            </button>
+          : <span style={{ position: "absolute", right: 12, top: 12, width: 32, height: 32, borderRadius: 9999, background: "var(--paper)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-plus" /></span>}
         <span style={{ position: "absolute", left: 12, bottom: 12, display: "flex", alignItems: "center", gap: 6, height: 26, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.72)", font: "700 12px/26px var(--font-sans)", color: "var(--paper)" }}>
           <i className={`ph-bold ph-${OPP[l.opp].ic}`} />{l.oppWhy.split(" · ")[0]}
         </span>
@@ -30,9 +39,12 @@ export function ListingCard({ l, onOpen, onHover, fresh = l.isNew }: { l: Listin
 
 // Sort button (`onSortToggle`) and the "No matches found" state (`isNoMatch`:
 // `onShowNearest`, `onFilterReset`) are ported from the canvas results column.
-export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, sortOpen, onSortToggle, onShowNearest, onResetFilters }: {
+// `isSaved` / `onSave` drive the picked set; `footer` (the canvas `hasPicked`
+// footer) replaces the Save search footer while something is picked.
+export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, sortOpen, onSortToggle, onShowNearest, onResetFilters, isSaved, onSave, footer }: {
   title: string; meta: string; listings: Listing[]; onOpen: (id: number) => void; onHover: (id: number | null) => void; compact?: boolean;
   sortOpen?: boolean; onSortToggle?: () => void; onShowNearest?: () => void; onResetFilters?: () => void;
+  isSaved?: (id: number) => boolean; onSave?: (id: number) => void; footer?: React.ReactNode;
 }) {
   return (
     <div style={{ ...card, flex: 1, minHeight: 0 }}>
@@ -46,7 +58,7 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
         </button>
       </div>
       <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: "4px 16px 16px" }}>
-        {listings.map(l => <ListingCard key={l.id} l={l} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />)}
+        {listings.map(l => <ListingCard key={l.id} l={l} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} saved={isSaved?.(l.id)} onSave={onSave && (() => onSave(l.id))} />)}
         {listings.length === 0 && (
           <div style={css("flex:1 0 auto;margin:auto 0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:32px;padding:24px 24px 48px;text-align:center;animation:fadeIn .25s ease both")}>
             <img src="/ui/pin-3d.png" alt="" style={css("display:block;width:66px;height:auto;margin-bottom:8px")} />
@@ -61,7 +73,7 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
           </div>
         )}
       </div>
-      {!compact && <div style={{ flex: "none", padding: 16, boxShadow: "inset 0 1px 0 rgb(245,240,238)" }}><button className="btn-dark" style={{ width: "100%" }}><i className="ph-bold ph-bell" />Save search</button></div>}
+      {footer || !compact && <div style={{ flex: "none", padding: 16, boxShadow: "inset 0 1px 0 rgb(245,240,238)" }}><button className="btn-dark" style={{ width: "100%" }}><i className="ph-bold ph-bell" />Save search</button></div>}
     </div>
   );
 }
