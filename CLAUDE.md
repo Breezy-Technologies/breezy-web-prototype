@@ -8,7 +8,7 @@ A standalone Next.js 15 + React 19 + TypeScript app that showcases Breezy's **V5
 
 Breezy is a property-intelligence app for real-estate agents. It surfaces opportunities on a map: underbuilt lots, high ROI, price drops, expired / withdrawn / stale listings.
 
-The source of truth for the UI design is the Claude Design canvas (pages "Home Web" and "Home Web V5 Prototype"). This repo is the coded version of it.
+The source of truth for the UI design is the Claude Design canvas (pages "Home Web" and "Home Web V5 Prototype"). This repo is the coded version of it. A runnable copy of both pages lives in `design-reference/` (see its README). **Before building any Home Web UI, find the matching handlers in `design-reference/project/Home Web.dc.html` and port from there.** `design-reference/PORTING.md` tracks what is done.
 
 ## Decisions already made
 

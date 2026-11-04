@@ -6,3 +6,10 @@ out
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
+
+# Local drop of the design reference (moved to design-reference/)
+breezy-design-reference/
+breezy-design-reference.zip
+
+# Design reference local config (holds the Mapbox token)
+design-reference/project/local-config.js
