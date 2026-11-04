@@ -7,7 +7,13 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 ## Already in the app (verify against canvas)
 
 - ✅ Side nav collapse / wordmark — `onNavToggle`, `onToggleRail`
-- 🟡 Search field + suggestions — `onClearSearch`, `sg.pick`, `onFooterSearch`, `onUseMyLoc`, `onUseCurLoc`, `onLocPill`, `onLocClose`
+- ✅ Search field + suggestions (`step === "search"`) — `components/home/SearchBar.tsx`, wired in `app/home/page.tsx`. Field and panel markup copied from the canvas: focus (`onSearchFocus`) swaps the left column for the panel; empty query shows Current location (`onUseCurLoc`) + Recent searches (`sugRecent`, `rc.pick` → `_tagArea`); typing shows "Results suggested" with the match in bold (`searchList`, `r.pick`), from the live `searchPlaces` (Mapbox v6, gazetteer fallback, now with an 8 s timeout). Multi-area: "Add another search" (`onAddArea`), chips in the field (`sbChips`, `ch.remove` → `_removeArea`), "Enter another area" placeholder, "Show results for n areas" (`onTagsGo`), `_pickArea` / `_commitAreas` / `_areaSq`. Keys from `onSearchKey`: Enter, Esc (leaves add mode, then the search), Backspace removes the last chip; the canvas has no arrow keys. × (`onClearSearch`): back to Home; with a property open it deselects it (CLAUDE.md). The active saved-search header (`hasActiveS`, `onManageSearch`, `onClearActive`) is kept.
+  - Multi-area in app state: `AppState.chooseAreas(places)` keeps every area; outlines are the concatenated rings (drawn together), listings are generated per area, and `place` becomes a combined place whose bbox is the union, which the camera fits. Results meta reads "n homes · A & B" as in the canvas.
+  - Recent searches are the canvas seeds until you search; then they're the last 3 committed areas (localStorage `bz-recent-searches`, one per place name).
+  - "Current location" uses browser geolocation (map centre if denied) + Mapbox reverse geocoding (nearest gazetteer place offline); the chip / field label stays "Current location".
+  - Unsupported query (`_unsupQ`, `isUnsupported`, `unsupArea`, `onTryArea`): an area outside coverage (California + Dallas/Regrid, `isCovered` in `lib/places.ts`), or text that can't be found, lands on the canvas "Unsupported area" empty state with "Try another area"; pins and the results footer are hidden. In the canvas this path is effectively dead (`cities` is always set after a commit), so the coverage rule is ours.
+  - Address suggestions open that property on its own (`_openSolo`); the property is generated fake data at the geocoded point.
+  - Not in Home: `onLocPill`, `onLocClose`, `onUseMyLoc`, `sg.pick`, `_markets` belong to the onboarding "Where's your market?" picker (steps scan/track/deck…), i.e. `app/onboarding`. `sugSearches` / `showSuggest` are computed but not used by the template. `onFooterSearch` is the results footer (Save / Manage search), already ported with Saved searches.
 - 🟡 Price pins, collapse pills, hover card — `p.enter`, `p.pick`, `onHoverKeep`, `onHoverOpen`, `hvCar.next/prev`, `onPillLeft/Right`
 - ✅ Detail panel tabs — `components/home/DetailPanel.tsx`, data from `listingDetail()` in `lib/fake.ts` (separate random stream, existing listing values unchanged)
   - Shell: hero gallery with prev / next (`onGalPrev/Next`, `onGalScroll`), status + n/total pills, stats row (Bed, Bath, ft² Home, /ac Lot, /mo HOA), sticky tab bar; picking a tab scrolls it up to stick (`detailTabs[].pick`); past 210 px the compact header appears with the address, Close and, off Summary, a back arrow (`dHdr`, `onBackSummary`, `onCloseDetail`); bottom fade above the footer.
@@ -25,7 +31,7 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 - ✅ Tabs + saved searches list with "n new" badges, avatars, chips — `t.pick`, `ss.open`, `ss.enter`, `ss.del`, `onHcViewAll` (opening a search clears its "n new")
 - ✅ Saved properties list, sort, delete confirm, "All updates" full view — `pp.open`, `pp.enter`, `pp.del`, `onHcSortToggle`, `onHcDelCancel`, `onHcDelOk`, `onHcStart`, `onHcBack`. Delete is only offered in the full view, as in the canvas.
 - ✅ "New match" badge clears on first interaction (hover or open) (sprint item)
-- ⬜ `onManageSearch` (active saved-search header in the search field) and `pp.add` (save from detail): belong to the search field and detail panel areas
+- ✅ `onManageSearch` (active saved-search header in the search field; kept by the search-field port). ⬜ `pp.add` (save from detail): belong to the search field and detail panel areas
 - ⬜ Thumbnail hover preview — `onThHoverOpen`, `onThHoverKeep`, `thGal.next/prev`. This is the hover card for the small dot pins on the map, not the lists; port it with the price pins.
 - Note: "For you" keeps the V5 onboarding hand-off list (the canvas compact card shows nothing under that tab) and stays the default tab, so the onboarding flow lands on the matches.
 
@@ -35,7 +41,7 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 - Note: the canvas filters only by the Active price slider; here each status row's slider filters listings of that status, and the tags filter by days on market. The fake data maps "Off market" to Expired (or Withdrawn for withdrawn opportunities). Defaults are the canvas defaults (Active + Single family), so fewer pins show by default than before.
 - 🟡 "Add feature" button is visual only (no handler in the canvas either).
 - ✅ Active filter chips: a set filter turns its bar chip into a check + value label with a dark ring ("ROI 60%+", "Recently sold", "Condo +1"); per-dimension Clear in each dropdown; Clear all / Reset filters.
-- ⬜ `ch.remove`, `onClearActive`: these are the multi-area chips and the active saved-search header inside the search field, not filter chips. They belong to Area search and Saved searches.
+- ✅ `ch.remove`, `onClearActive` (ported with the search field): these are the multi-area chips and the active saved-search header inside the search field, not filter chips. They belong to Area search and Saved searches.
 - ✅ Results sort — `onSortToggle`, `onSortClose`, `o.pick` (Most relevant, DOM newest/oldest, price high/low), plus the "No matches found" state with `onShowNearest` and `onFilterReset`.
 
 ### Saved searches & alerts
@@ -47,7 +53,7 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 
 ### Area search
 - ⬜ "Search this area" pill (trigger when viewport ~50% empty of pins) + draw area — `onTryArea`, `onAddArea`, `onShowNearest`, `onPickedClear`
-- 🟡 "No property found" toast with neutral black info icon (sprint item): `Toast` has the `info` tone; wire it when area search lands
+- ✅ "No property found" toast with neutral black info icon (sprint item): picking an address outside coverage from the search field shows it in `Toast`'s `info` tone. (The canvas has no such toast; when "Search this area" lands, reuse the same `showToast("No property found", "info")`.)
 
 ### Share
 - ⬜ Share property / picked set, link sheet, quick copy, share to contact — `onShareProp`, `onSharePicked`, `onShLinkOpen`, `onShLinkCopy`, `onShLinkClose`, `onShQuickCopy`, `onShContact`, `onShClose`, `sv.*`

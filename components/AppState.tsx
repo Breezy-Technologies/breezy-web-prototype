@@ -2,18 +2,22 @@
 // Shared app state so onboarding hands its area, listings and picks straight
 // to Home Web. Persisted in sessionStorage so a refresh keeps the demo going.
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { DEFAULT_PLACE, Place, placeBoundary } from "@/lib/places";
-import { Ring } from "@/lib/geo";
+import { DEFAULT_PLACE, Place, areaSq, placeBoundary } from "@/lib/places";
+import { BBox, Ring, ringBBox } from "@/lib/geo";
 import { Listing, OppType, makeListings } from "@/lib/fake";
 
 type AppState = {
   place: Place;
+  // Every searched area (multi-area search from the search field). `place` is the
+  // first one, or a combined place (union bbox, "A, B" label) when there are several.
+  areas: Place[];
   rings: Ring[] | null;
   listings: Listing[];
   picks: Partial<Record<OppType | "fc", boolean>>;
   user: { name: string; email: string };
   onboarded: boolean;
   choosePlace: (p: Place) => Promise<void>;
+  chooseAreas: (ps: Place[]) => Promise<void>;
   setPicks: (p: AppState["picks"]) => void;
   finishOnboarding: () => void;
   restartOnboarding: () => void; // developer menu: clear picks and run onboarding again
@@ -28,36 +32,55 @@ export const useApp = () => {
 
 const KEY = "bz-demo-state";
 
+const boxOf = (p: Place, r: Ring[] | null): BBox => r && r.length ? ringBBox(r) : p.bbox || [p.center[0] - 0.02, p.center[1] - 0.015, p.center[0] + 0.02, p.center[1] + 0.015];
+
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
+  const [areas, setAreas] = useState<Place[]>([DEFAULT_PLACE]);
   const [rings, setRings] = useState<Ring[] | null>(DEFAULT_PLACE.rings || null);
   const [listings, setListings] = useState<Listing[]>(() => makeListings(DEFAULT_PLACE.id, DEFAULT_PLACE.center, DEFAULT_PLACE.bbox, DEFAULT_PLACE.rings || null, 28, DEFAULT_PLACE.label));
   const [picks, setPicksS] = useState<AppState["picks"]>({});
   const [onboarded, setOnboarded] = useState(false);
 
-  const choosePlace = useCallback(async (p: Place) => {
-    setPlace(p);
-    const r = await placeBoundary(p);
-    setRings(r);
-    setListings(makeListings(p.id, p.center, p.bbox, r, 28, p.label));
+  // Several areas: the outlines are drawn together (rings concatenated, which the
+  // line / inner-glow layers and the even-odd point test treat as a multipolygon),
+  // listings are generated per area, and `place` becomes a combined place whose
+  // bbox is the union of the areas' boxes, so the camera fits all of them.
+  // A single area behaves exactly as before.
+  const chooseAreas = useCallback(async (ps: Place[]) => {
+    if (!ps.length) return;
+    const p0 = ps[0];
+    if (ps.length === 1) setPlace(p0);
+    setAreas(ps);
+    const rs = await Promise.all(ps.map(p => placeBoundary(p)));
+    const all = rs.flatMap(r => r || []);
+    if (ps.length > 1) {
+      const bbs = ps.map((p, k) => boxOf(p, rs[k]));
+      const bbox: BBox = [Math.min(...bbs.map(b => b[0])), Math.min(...bbs.map(b => b[1])), Math.max(...bbs.map(b => b[2])), Math.max(...bbs.map(b => b[3]))];
+      setPlace({ ...p0, id: ps.map(p => p.id).join("+"), name: ps.map(p => p.name).join(", "), label: areaSq(ps.map(p => p.label)), sub: "Areas", bbox, rings: undefined });
+    }
+    setRings(all.length ? all : null);
+    const n = ps.length > 1 ? Math.max(12, Math.round(40 / ps.length)) : 28;
+    setListings(ps.flatMap((p, k) => makeListings(p.id, p.center, p.bbox, rs[k], n, p.label).map(l => (k ? { ...l, id: l.id + k * 1000 } : l))));
   }, []);
+  const choosePlace = useCallback((p: Place) => chooseAreas([p]), [chooseAreas]);
 
   // restore
   useEffect(() => {
     try {
       const s = JSON.parse(sessionStorage.getItem(KEY) || "null");
-      if (s && s.place) { choosePlace(s.place); setPicksS(s.picks || {}); setOnboarded(!!s.onboarded); }
+      if (s && s.place) { chooseAreas(s.areas && s.areas.length ? s.areas : [s.place]); setPicksS(s.picks || {}); setOnboarded(!!s.onboarded); }
     } catch {}
-  }, [choosePlace]);
+  }, [chooseAreas]);
   useEffect(() => {
-    try { sessionStorage.setItem(KEY, JSON.stringify({ place: { ...place, rings: undefined }, picks, onboarded })); } catch {}
-  }, [place, picks, onboarded]);
+    try { sessionStorage.setItem(KEY, JSON.stringify({ place: { ...place, rings: undefined }, areas: areas.map(a => ({ ...a, rings: undefined })), picks, onboarded })); } catch {}
+  }, [place, areas, picks, onboarded]);
 
   return (
     <Ctx.Provider value={{
-      place, rings, listings, picks, onboarded,
+      place, areas, rings, listings, picks, onboarded,
       user: { name: "James Carter", email: "james.carter@compass.com" },
-      choosePlace, setPicks: setPicksS, finishOnboarding: () => setOnboarded(true),
+      choosePlace, chooseAreas, setPicks: setPicksS, finishOnboarding: () => setOnboarded(true),
       restartOnboarding: () => { setPicksS({}); setOnboarded(false); },
     }}>
       {children}
