@@ -72,6 +72,13 @@ lib/fake.ts                 demo data
 
 `window.__bzMap` exposes the map instance in the browser console for debugging.
 
+## Reviewing and comments
+
+- Repo: `Breezy-Technologies/breezy-web-prototype`, linked to the Vercel project `breezy-web-prototype` (team `breezy18`). Env keys live in Vercel project settings, never in git.
+- `main` is the demo: https://breezy-web-prototype.vercel.app (public, comment toolbar off).
+- Each change goes on its own branch. Vercel builds a preview at `breezy-web-prototype-git-<branch>-breezy18.vercel.app`; it needs a Vercel sign-in, and the comment toolbar is on.
+- Reviewers comment on the preview with the Vercel toolbar. Claude reads the open threads (Vercel MCP `list_toolbar_threads`), fixes the issues on the branch, replies in each thread and resolves it. Merge to `main` once the branch is approved.
+
 ## Working agreements
 
 - Keep the offline demo path working whenever live services are added.
