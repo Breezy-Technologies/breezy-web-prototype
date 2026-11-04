@@ -112,7 +112,11 @@ export default function HomeWeb() {
       {hover && hoverId !== selId && (
         <HoverCard l={hover} onKeep={() => clearTimeout(keepT.current)} onLeave={() => { keepT.current = setTimeout(() => setHoverId(null), 160); }} onOpen={() => openListing(hover.id)} />
       )}
-      <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => { setSelId(null); setParcel(p); }} />
+      <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => {
+        setSelId(null); setParcel(p);
+        // Centre the clicked parcel in the visible map, between the left column and the detail panel.
+        if (map) map.easeTo({ center: [p.cx, p.cy], zoom: Math.max(map.getZoom(), 16), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
+      }} />
       {comps && <CompsFlow l={comps} onClose={() => setComps(null)} />}
       <Toast toast={toast} />
     </>

@@ -67,8 +67,10 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
     <MapOverlay>
       <svg width={W} height={H} style={{ position: "absolute", inset: 0, zIndex: 45, pointerEvents: "none" }} key={show.key}>
         <defs><filter id="bzLiftBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" /></filter></defs>
-        {sat ? <path d={hole} fill="rgba(8,10,12,.45)" fillRule="evenodd" style={{ animation: "fadeIn .3s ease both" }} />
-          : <rect width={W} height={H} fill="rgb(253,251,248)" opacity={0.28} style={{ animation: "fadeIn .3s ease both" }} />}
+        {/* Light fade around the lifted parcel so the rest of the map, neighbouring parcels and labels stay readable (review feedback).
+            The alpha lives in the fill colour: the fadeIn animation ends at CSS opacity 1, which would override an opacity attribute. */}
+        {sat ? <path d={hole} fill="rgba(8,10,12,.2)" fillRule="evenodd" style={{ animation: "fadeIn .3s ease both" }} />
+          : <path d={hole} fill="rgba(253,251,248,.22)" fillRule="evenodd" style={{ animation: "fadeIn .3s ease both" }} />}
         <polygon points={pts} fill={sat ? "rgba(0,0,0,.6)" : "rgba(58,42,38,.4)"} filter="url(#bzLiftBlur)" transform="translate(5 9)" style={{ animation: "fadeIn .3s ease both" }} />
         {Array.from({ length: 9 }, (_, k) => <polygon key={k} points={pts} fill={sideC} stroke={sideC} strokeWidth={1} strokeLinejoin="round" style={{ ["--l" as any]: `${-(k + 1)}px`, animation: "liftUp .3s cubic-bezier(.2,.8,.2,1) both" }} />)}
         <g style={{ ["--l" as any]: "-10px", animation: "liftUp .3s cubic-bezier(.2,.8,.2,1) both" }}>

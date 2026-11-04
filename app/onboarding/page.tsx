@@ -179,7 +179,7 @@ export default function Onboarding() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 16, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.1)" }}>
             <span style={{ width: 40, height: 40, borderRadius: 9999, background: "url(/photos/avatar.jpg) center/cover" }} />
             <span style={{ flex: 1, display: "flex", flexDirection: "column" }}><span style={{ font: "700 15px/20px var(--font-sans)" }}>{app.user.name}</span><span style={{ font: "400 13px/18px var(--font-sans)", color: "rgb(98,90,89)" }}>{app.user.email}</span></span>
-            <span style={{ display: "flex", alignItems: "center", gap: 6, font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)" }}><i className="ph-bold ph-google-logo" />Detected</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)" }}><GoogleG />Detected</span>
           </div>
           <button className="btn-dark" onClick={next}>Continue as {app.user.name.split(" ")[0]}</button>
           <span style={{ font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)", textAlign: "center" }}>Pre-filled from your Google sign-in · Not you? <u>Use another account</u></span>
@@ -187,7 +187,8 @@ export default function Onboarding() {
       </>}
 
       {step === "cards" && <>
-        <OppPins items={opps} shown={() => true} lit={l => answered === 0 || !!ans[l.opp]} />
+        {/* While cards are showing, light up only the pins for the current card's type so users can focus on one kind at a time; once done, light their picks. */}
+        <OppPins items={opps} shown={() => true} lit={l => ci < CARDS.length ? l.opp === CARDS[ci].k : answered === 0 || !!ans[l.opp]} />
         <div style={{ ...panel, gap: 18 }}>
           <span style={{ font: "700 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Step 9 of 9 · Personalise</span>
           <span style={{ font: "300 30px/36px var(--font-sans)", letterSpacing: "-.02em" }}>What should Breezy look out for?</span>
@@ -211,9 +212,9 @@ export default function Onboarding() {
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
-              <button onClick={() => answer(false)} title="Not for me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "#fff", boxShadow: "0 0 0 1px rgba(13,12,12,.1),0 6px 16px rgba(30,18,12,.12)", cursor: "pointer", fontSize: 24 }}><i className="ph-bold ph-x" /></button>
+              <button onClick={() => answer(false)} title="Not for me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "#fff", boxShadow: "0 0 0 1px rgba(13,12,12,.1),0 6px 16px rgba(30,18,12,.12)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-x" /></button>
               <span style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 120 }}><span style={{ font: "700 13px/16px var(--font-sans)" }}>Interested?</span><span style={{ font: "400 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Swipe or tap</span></span>
-              <button onClick={() => answer(true)} title="Yes, show me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "var(--ink)", color: "var(--paper)", cursor: "pointer", fontSize: 24 }}><i className="ph-bold ph-check" /></button>
+              <button onClick={() => answer(true)} title="Yes, show me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "var(--ink)", color: "var(--paper)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-check" /></button>
             </div>
             <span style={{ flex: 1 }} />
             <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
@@ -222,9 +223,10 @@ export default function Onboarding() {
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <button onClick={() => { setAns({}); setCi(0); }} className="btn-ghost" style={{ height: 40, padding: "0 12px", font: "700 14px/18px var(--font-sans)" }}><i className="ph-bold ph-arrow-counter-clockwise" /> Restart</button>
-              {!minMet && <button className="btn-soft" style={{ height: 40, fontSize: 14 }} onClick={() => finish(true)}>Skip for now, show me everything</button>}
+              {minMet
+                ? <button className="btn-dark" style={{ height: 40, fontSize: 14, animation: "fadeIn .25s ease both" }} onClick={() => finish()}><i className="ph-bold ph-sparkle" />Build my feed</button>
+                : <button className="btn-soft" style={{ height: 40, fontSize: 14 }} onClick={() => finish(true)}>Skip for now, show me everything</button>}
             </div>
-            {minMet && <button className="btn-dark" onClick={() => finish()}><i className="ph-bold ph-sparkle" />Build my feed</button>}
           </> : (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, textAlign: "center" }}>
               <span style={{ font: "300 96px/1 var(--font-sans)", letterSpacing: "-3px", animation: "countUp .6s cubic-bezier(.2,.8,.2,1) both" }}>{matchN}</span>
@@ -324,6 +326,9 @@ function Freebie({ k, l, onBack, onNext }: { k: "comps" | "ub" | "roi"; l: Listi
   const D = FREE[k], i = ["comps", "ub", "roi"].indexOf(k);
   const p = map ? map.project([l.lng, l.lat]) : { x: 0, y: 0 };
   const bar = (v: number) => <span style={{ flex: 1, height: 8, borderRadius: 15, background: "rgba(13,12,12,.08)", padding: 2 }}><span style={{ display: "block", height: 4, width: v + "%", borderRadius: 17, background: v >= 70 ? "rgb(96,201,172)" : v >= 40 ? "rgb(221,171,71)" : "rgb(226,110,88)" }} /></span>;
+  const [flip, setFlip] = useState(false);
+  useEffect(() => setFlip(false), [k]);
+  const face: React.CSSProperties = { gridArea: "1 / 1", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", borderRadius: 24, background: "var(--paper)", boxShadow: "0 24px 60px rgba(30,18,12,.22)" };
   const hero = k === "comps" ? fullPrice(l.qe.value) : k === "ub" ? `${l.ub}% underbuilt` : `${shortPrice((l.price * l.roi) / 100)} profit`;
   return <>
     <div style={{ ...panel, top: "auto", bottom: PAD, gap: 14 }}>
@@ -333,34 +338,56 @@ function Freebie({ k, l, onBack, onNext }: { k: "comps" | "ub" | "roi"; l: Listi
       <span style={bodyS}>{D.body}</span>
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}><button className="btn-soft" onClick={onBack}>Back</button><span style={{ flex: 1 }} /><button className="btn-dark" onClick={onNext}>Next<i className="ph-bold ph-arrow-right" /></button></div>
     </div>
+    {/* The property is shown with the same opportunity pin as the map, not a photo marker (review feedback). */}
+    <OppPins items={[l]} shown={() => true} />
     <MapOverlay>
-      <span style={{ position: "absolute", left: p.x, top: p.y, width: 64, height: 64, transform: "translate(-50%,-50%)", borderRadius: 14, border: "3px solid var(--paper)", boxShadow: "0 0 0 2px rgb(199,146,131),0 10px 24px rgba(30,18,12,.3)", background: `url(${l.photos[0]}) center/cover` }} />
-      <div key={k} style={{ position: "absolute", left: p.x + 60, top: p.y, transform: "translateY(-50%)", width: 600, display: "flex", borderRadius: 24, background: "var(--paper)", boxShadow: "0 24px 60px rgba(30,18,12,.22)", pointerEvents: "auto", animation: "riseIn .5s cubic-bezier(.2,.8,.2,1) .4s both" }}>
-        <div style={{ flex: "none", width: 260, display: "flex", flexDirection: "column", padding: "10px 10px 18px" }}>
-          <div style={{ position: "relative", height: 170, borderRadius: 16, background: `url(${l.photos[0]}) center/cover` }}>
-            <span style={{ position: "absolute", left: 10, top: 10, height: 26, padding: "0 10px", borderRadius: 9999, background: "rgba(253,252,252,.94)", font: "700 12px/26px var(--font-sans)" }}>{k === "comps" ? "Strongest comp · 1 of 6" : l.oppWhy.split(" · ")[0]}</span>
-          </div>
-          <span style={{ marginTop: 12, padding: "0 4px", font: "700 15px/20px var(--font-sans)" }}>{l.addr}</span>
-          <span style={{ marginTop: 2, padding: "0 4px", font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{l.beds} bd · {l.baths} ba · {l.sqft.toLocaleString()} ft² · built {l.built}</span>
-          <span style={{ marginTop: 16, textAlign: "center", font: "400 12px/17px var(--font-sans)", color: "var(--fg-2)" }}>{k === "comps" ? "Price estimate based on strongest comps" : k === "ub" ? "Room to grow" : "Estimated profit over 18 months"}</span>
-          <span style={{ textAlign: "center", font: "700 20px/25px var(--font-sans)", color: k === "ub" ? "#93594B" : "#469B70" }}>{hero}</span>
-        </div>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, padding: "20px 20px 20px 8px" }}>
-          <span style={{ font: "700 11px/14px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--fg-3)" }}>{D.right}</span>
-          {k === "comps" && [["Overall standard", 82], ["Condition", 74], ["Interior finishes", 46], ["Outdoor living", 71], ["Location", 86], ["Market trajectory", 81]].map(([lb, v]) => (
-            <div key={String(lb)} style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 120, font: "400 12px/16px var(--font-sans)" }}>{lb}</span>{bar(Number(v))}<span style={{ width: 24, textAlign: "right", font: "400 12px/16px var(--font-sans)", color: "var(--fg-2)" }}>{v}</span></div>
-          ))}
-          {k !== "comps" && (k === "ub"
-            ? [["Existing home", `${l.sqft.toLocaleString()} ft²`], ["Addition & remodel", `${Math.round(l.sqft * 2.1).toLocaleString()} ft²`], ["Teardown & rebuild", `${Math.round(l.sqft * 3.4).toLocaleString()} ft²`]]
-            : [["Buy", shortPrice(l.price)], ["Improve", shortPrice(l.price * 0.9)], ["Sell", shortPrice(l.price * (1.9 + l.roi / 100))], ["Profit", shortPrice((l.price * l.roi) / 100)]]
-          ).map(([lb, v], j, arr) => (
-            <div key={lb} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 12px", borderRadius: 10, background: "rgb(247,243,241)" }}>
-              <span style={{ font: "400 14px/19px var(--font-sans)" }}>{lb}</span>
-              <span style={{ font: "300 20px/1.26 var(--font-sans)", color: k === "roi" && j === arr.length - 1 ? "rgb(70,155,112)" : "var(--ink)" }}>{v}</span>
+      {/* Summary card; "Learn more" flips it to show the scoring detail (review feedback). */}
+      <div style={{ position: "absolute", left: p.x + 36, top: p.y, transform: "translateY(-50%)", width: 300, perspective: 1400, pointerEvents: "auto" }}>
+        <div key={k} style={{ animation: "riseIn .5s cubic-bezier(.2,.8,.2,1) .4s both" }}>
+          <div style={{ display: "grid", transformStyle: "preserve-3d", transition: "transform .6s cubic-bezier(.3,.7,.2,1)", transform: flip ? "rotateY(180deg)" : "none" }}>
+            <div style={{ ...face, display: "flex", flexDirection: "column", padding: "10px 10px 14px" }}>
+              <div style={{ position: "relative", height: 170, borderRadius: 16, background: `url(${l.photos[0]}) center/cover` }}>
+                <span style={{ position: "absolute", left: 10, top: 10, height: 26, padding: "0 10px", borderRadius: 9999, background: "rgba(253,252,252,.94)", font: "700 12px/26px var(--font-sans)" }}>{k === "comps" ? "Strongest comp · 1 of 6" : l.oppWhy.split(" · ")[0]}</span>
+              </div>
+              <span style={{ marginTop: 12, padding: "0 4px", font: "700 15px/20px var(--font-sans)" }}>{l.addr}</span>
+              <span style={{ marginTop: 2, padding: "0 4px", font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{l.beds} bd · {l.baths} ba · {l.sqft.toLocaleString()} ft² · built {l.built}</span>
+              <span style={{ marginTop: 16, textAlign: "center", font: "400 12px/17px var(--font-sans)", color: "var(--fg-2)" }}>{k === "comps" ? "Price estimate based on strongest comps" : k === "ub" ? "Room to grow" : "Estimated profit over 18 months"}</span>
+              <span style={{ textAlign: "center", font: "700 20px/25px var(--font-sans)", color: k === "ub" ? "#93594B" : "#469B70" }}>{hero}</span>
+              <span style={{ flex: 1, minHeight: 12 }} />
+              <button className="btn-soft" style={{ height: 40, fontSize: 14 }} onClick={() => setFlip(true)}>Learn more<i className="ph-bold ph-arrows-clockwise" /></button>
             </div>
-          ))}
+            <div style={{ ...face, transform: "rotateY(180deg)", display: "flex", flexDirection: "column", gap: 10, padding: "20px 18px 14px" }}>
+              <span style={{ font: "700 11px/14px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--fg-3)" }}>{D.right}</span>
+              {k === "comps" && [["Overall standard", 82], ["Condition", 74], ["Interior finishes", 46], ["Outdoor living", 71], ["Location", 86], ["Market trajectory", 81]].map(([lb, v]) => (
+                <div key={String(lb)} style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 120, font: "400 12px/16px var(--font-sans)" }}>{lb}</span>{bar(Number(v))}<span style={{ width: 24, textAlign: "right", font: "400 12px/16px var(--font-sans)", color: "var(--fg-2)" }}>{v}</span></div>
+              ))}
+              {k !== "comps" && (k === "ub"
+                ? [["Existing home", `${l.sqft.toLocaleString()} ft²`], ["Addition & remodel", `${Math.round(l.sqft * 2.1).toLocaleString()} ft²`], ["Teardown & rebuild", `${Math.round(l.sqft * 3.4).toLocaleString()} ft²`]]
+                : [["Buy", shortPrice(l.price)], ["Improve", shortPrice(l.price * 0.9)], ["Sell", shortPrice(l.price * (1.9 + l.roi / 100))], ["Profit", shortPrice((l.price * l.roi) / 100)]]
+              ).map(([lb, v], j, arr) => (
+                <div key={lb} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 12px", borderRadius: 10, background: "rgb(247,243,241)" }}>
+                  <span style={{ font: "400 14px/19px var(--font-sans)" }}>{lb}</span>
+                  <span style={{ font: "300 20px/1.26 var(--font-sans)", color: k === "roi" && j === arr.length - 1 ? "rgb(70,155,112)" : "var(--ink)" }}>{v}</span>
+                </div>
+              ))}
+              <span style={{ flex: 1, minHeight: 12 }} />
+              <button className="btn-soft" style={{ height: 40, fontSize: 14 }} onClick={() => setFlip(false)}><i className="ph-bold ph-arrow-left" />Back to summary</button>
+            </div>
+          </div>
         </div>
       </div>
     </MapOverlay>
   </>;
+}
+
+// Google "G" mark (four-colour), for the pre-filled sign-in row.
+function GoogleG() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 48 48" style={{ flex: "none", display: "block" }} aria-label="Google">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
 }
