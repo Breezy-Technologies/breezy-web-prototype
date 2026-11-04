@@ -19,7 +19,7 @@ import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
 import { ReportsSheet, useReports } from "@/components/home/Reports";
-import { Listing } from "@/lib/fake";
+import { Listing, OppType } from "@/lib/fake";
 import { SortKey, homeOk, sortListings } from "@/lib/filters";
 import { Place, searchPlaces } from "@/lib/places";
 import { ringBBox } from "@/lib/geo";
@@ -89,8 +89,15 @@ export default function HomeWeb() {
     const on = Object.entries(picks).filter(([, v]) => v).map(([k]) => k);
     return on.length ? listings.filter(l => on.includes(l.opp)) : listings.slice(0, 10);
   }, [listings, picks]);
-  // Special pins: the For you opportunities wear their signal chip on the map too.
-  const forYouIds = useMemo(() => new Set(forYou.map(l => l.id)), [forYou]);
+  // Special pins (review feedback): only while Home's "For you" tab is showing. They
+  // follow the feed's signal filter, and a pin reverts to a plain white pill once its
+  // detail has been opened. Picked signals also limit which pins are on the map.
+  const [homeTab, setHomeTab] = useState<string>("For you");
+  const [fySignals, setFySignals] = useState<OppType[]>([]);
+  const fyOn = view === "home" && homeTab === "For you";
+  const sigFilter = fyOn && fySignals.length > 0;
+  const signalIds = useMemo(() => fyOn ? new Set(forYou.filter(l => (!sigFilter || fySignals.includes(l.opp)) && !seen.has(l.id)).map(l => l.id)) : undefined, [fyOn, sigFilter, fySignals, forYou, seen]);
+  const pinListings = useMemo(() => sigFilter ? shown.filter(l => fySignals.includes(l.opp)) : shown, [sigFilter, fySignals, shown]);
 
   const openListing = (id: number) => {
     if (id !== selId) alerts.close();
@@ -160,7 +167,7 @@ export default function HomeWeb() {
           {view === "home"
             ? <HomeCard name={user.name} forYou={forYou} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
-                picked={picked} onSharePicked={() => sh.sharePicked()} />
+                picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} />
             : (
               // The results column steps back (scale + dim) while a sheet sits on top of it.
               <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: depth > 1 ? "scale(.88)" : depth ? "scale(.94)" : "none", filter: depth > 1 ? "brightness(.93)" : depth ? "brightness(.955)" : "none" }}>
@@ -207,7 +214,7 @@ export default function HomeWeb() {
         )}
       </div>
 
-      <PricePins signal={forYouIds} listings={shown} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
+      <PricePins signal={signalIds} listings={pinListings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
         onHover={id => { clearTimeout(keepT.current); if (id == null) keepT.current = setTimeout(() => setHoverId(null), 160); else setHoverId(id); }} />
       {hover && hoverId !== selId && (
         <HoverCard l={hover} onKeep={() => clearTimeout(keepT.current)} onLeave={() => { keepT.current = setTimeout(() => setHoverId(null), 160); }} onOpen={() => openListing(hover.id)} />

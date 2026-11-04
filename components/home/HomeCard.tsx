@@ -5,13 +5,13 @@
 // onHcSortToggle, onHcDel*, onHcStart). Saved searches and saved properties
 // come from the shared store (`components/SavedState.tsx`), so saving a search
 // or a home elsewhere lands here.
-import { useRef, useState } from "react";
-import { Listing, fullPrice } from "@/lib/fake";
+import { useEffect, useRef, useState } from "react";
+import { Listing, OppType, fullPrice } from "@/lib/fake";
 import { CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
 import { PickedFooter } from "./Saved";
 import { ForYouFeed } from "./ForYouFeed";
 
-type Tab = "For you" | "Searches" | "Properties";
+export type Tab = "For you" | "Searches" | "Properties";
 type Sort = "Default" | "Newest" | "Oldest";
 
 const PROP_STATUS = ["Increased 1% to $1M", "Price dropped 3%", "New photos added", "Back on market", "Open house Sat", "Price dropped 5%"];
@@ -126,14 +126,18 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
   );
 }
 
-export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked }: {
+export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onTab, onSignals }: {
   name: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void;
+  onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void;
   onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
   const sv = useSaved();
   const [tab, setTab] = useState<Tab>("For you");
   const [full, setFull] = useState(false);
   const [fullTab, setFullTab] = useState<Tab>("Searches");
+  // The page shows the special signal pins only while "For you" is the visible tab.
+  const shownTab = full ? fullTab : tab;
+  useEffect(() => { onTab?.(shownTab); }, [shownTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [fromH, setFromH] = useState(520);
   const [sort, setSort] = useState<Sort>("Default");
   const [sortOpen, setSortOpen] = useState(false);
@@ -166,7 +170,7 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
   );
   const propList = (rows: PropItem[], live: boolean) => rows.map(x => <PropRow key={x.key} x={x} hover={live && hover === x.key} onEnter={enter(x.key)} onLeave={leave(x.key)} onOpen={() => openProp(x)} onDel={() => askDel(x.key, x.l.addr)} />);
   // V5 "For you" feed: filter by opportunity signal, larger cards with the signal badge.
-  const forYouList = <ForYouFeed items={forYou} seen={seen} onOpen={onOpen} onHover={onHover} />;
+  const forYouList = <ForYouFeed items={forYou} seen={seen} onOpen={onOpen} onHover={onHover} onSignals={onSignals} />;
   const hello = (
     <>
       <span style={{ font: "300 26px/1.26 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>Hello {name.split(" ")[0]}</span>
@@ -245,6 +249,7 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
             {fullTab === "Searches" && searchList(searches, true)}
             {fullTab === "Properties" && propList(props, true)}
           </div>
+          {fullTab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => setFullTab("Properties")} onShare={onSharePicked} />}
         </div>
       )}
 

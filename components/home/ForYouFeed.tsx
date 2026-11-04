@@ -55,8 +55,12 @@ function FeedCard({ l, fresh, onOpen, onHover }: { l: Listing; fresh: boolean; o
   );
 }
 
-export function ForYouFeed({ items, seen, onOpen, onHover }: { items: Listing[]; seen: Set<number>; onOpen: (id: number) => void; onHover: (id: number | null) => void }) {
+export function ForYouFeed({ items, seen, onOpen, onHover, onSignals }: { items: Listing[]; seen: Set<number>; onOpen: (id: number) => void; onHover: (id: number | null) => void; onSignals?: (keys: OppType[]) => void }) {
   const [sel, setSel] = useState<Partial<Record<OppType, boolean>>>({});
+  // The picked signals also filter the map pins (review feedback); cleared when the feed unmounts.
+  const selKey = (Object.keys(sel) as OppType[]).filter(k => sel[k]).sort().join(",");
+  useEffect(() => { onSignals?.(selKey ? (selKey.split(",") as OppType[]) : []); }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onSignals?.([]), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const wrap = useRef<HTMLDivElement>(null);
