@@ -184,7 +184,7 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
   return (
     <>
       {!full ? (
-        <div ref={cardRef} style={{ ...card, flex: "0 1 auto", minHeight: 0, animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) both" }}>
+        <div ref={cardRef} style={{ ...card, flex: 1, minHeight: 0, animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) both" }}>
           <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 16, padding: 20 }}>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>{hello}</div>
             <div className="no-scrollbar" style={{ display: "flex", gap: 8, overflowX: "auto" }}><Tabs tab={tab} onPick={setTab} bellS={bellS} bellP={bellP} /></div>

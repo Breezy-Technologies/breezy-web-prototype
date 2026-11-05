@@ -114,3 +114,10 @@ input { font-family: inherit; }
 .dt-src:hover { background: rgb(248, 245, 244) !important }
 .dt-add:hover { background: rgb(232, 229, 228) !important }
 .dt-contact:hover { background: rgba(13, 12, 12, .05) !important }
+
+/* Onboarding round 4 */
+@keyframes obModalIn { from { opacity: 0; transform: translate(-50%, calc(-50% + 36px)) scale(.97) } to { opacity: 1; transform: translate(-50%, -50%) } }
+@keyframes isoFloat { from { opacity: 0; translate: 0 14px } to { opacity: 1; translate: 0 0 } }
+@keyframes needleSwing { from { transform: translateX(-50%) rotate(-90deg) } to { transform: translateX(-50%) rotate(52deg) } }
+@keyframes segLight { from { opacity: .16 } to { opacity: 1 } }
+@keyframes wavePop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) } 60% { opacity: 1; transform: translate(-50%, -50%) scale(1.18) } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1) } }

@@ -79,7 +79,7 @@ export function syncHeat(m: MbMap, kind: HeatKind) {
       const ring: number[][] = [];
       for (let k = 0; k < 6; k++) { const a = (Math.PI / 180) * (60 * k - 30); ring.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]); }
       ring.push(ring[0]);
-      feats.push({ type: "Feature", properties: { c: col, l: col.replace("rgb(", "rgba(").replace(")", ",.9)") }, geometry: { type: "Polygon", coordinates: [ring] } });
+      feats.push({ type: "Feature", properties: { c: col, l: col.replace("rgb(", "rgba(").replace(")", ",.9)"), x: cx, y: cy }, geometry: { type: "Polygon", coordinates: [ring] } });
     }
   }
   src.setData({ type: "FeatureCollection", features: feats });
@@ -130,4 +130,22 @@ function makeCell(x0: number, y0: number, size: number, seed: number): FakeParce
     }
   }
   return out;
+}
+
+// ---- Onboarding reveal: heat hexes appear as a wave rolling out from a point ----
+// Hexes inside radius R (metres) from `c` are shown; a band at the front of the
+// wave is brighter, so each hex pulses once as the wave passes it.
+const HEX_FILL_OP = ["interpolate", ["linear"], ["zoom"], 14.8, 0.36, 15.6, 0] as any;
+const HEX_LINE_OP = ["interpolate", ["linear"], ["zoom"], 14.8, 0.35, 15.6, 0] as any;
+export function heatWave(m: MbMap, c: [number, number], R: number, band: number) {
+  if (!m.getLayer("bz-hex-fill")) return;
+  const kx = metersPerDegLng(c[1]), ky = metersPerDegLat;
+  const d = ["sqrt", ["+", ["^", ["*", ["-", ["get", "x"], c[0]], kx], 2], ["^", ["*", ["-", ["get", "y"], c[1]], ky], 2]]];
+  m.setPaintProperty("bz-hex-fill", "fill-opacity", ["case", ["<", d, R - band], 0.36, ["<", d, R], 0.66, 0] as any);
+  m.setPaintProperty("bz-hex-line", "line-opacity", ["case", ["<", d, R - band], 0.35, ["<", d, R], 0.95, 0] as any);
+}
+export function heatWaveEnd(m: MbMap) {
+  if (!m.getLayer("bz-hex-fill")) return;
+  m.setPaintProperty("bz-hex-fill", "fill-opacity", HEX_FILL_OP);
+  m.setPaintProperty("bz-hex-line", "line-opacity", HEX_LINE_OP);
 }

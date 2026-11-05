@@ -7,9 +7,10 @@ import { OppPins } from "@/components/onboarding/OppPins";
 import { MapOverlay } from "@/components/map/Overlay";
 import { Place, GAZETTEER, searchPlaces } from "@/lib/places";
 import { Listing, OPP, OPP_TYPES, OppType, fullPrice, shortPrice } from "@/lib/fake";
-import { ringBBox } from "@/lib/geo";
+import { ringBBox, metersPerDegLat, metersPerDegLng } from "@/lib/geo";
+import { heatWave, heatWaveEnd } from "@/lib/map/layers";
 
-const STEPS = ["where", "radar", "comps", "ub", "roi", "heat", "alerts", "signup", "cards"] as const;
+const STEPS = ["where", "radar", "comps", "ub", "roi", "heat", "signup", "cards"] as const; // heat + market alerts merged (review feedback)
 type Step = (typeof STEPS)[number];
 const PANEL = 420, PAD = 24;
 
@@ -69,8 +70,8 @@ export default function Onboarding() {
   };
   useEffect(() => {
     if (!map || !ready) return;
-    setAreaRings(["radar", "heat", "alerts", "signup", "cards"].includes(step) ? app.rings : null);
-    setHeat(step === "heat" ? "roi" : step === "alerts" || step === "signup" ? "ub" : "none");
+    setAreaRings(["radar", "heat", "signup", "cards"].includes(step) ? app.rings : null);
+    setHeat(step === "heat" ? "roi" : step === "signup" ? "ub" : "none");
     if (step === "where") map.flyTo({ center: app.place.center, zoom: 12.8, offset: [(PAD + PANEL) / 2, 0], duration: 1200 });
     else if (step === "comps" || step === "ub" || step === "roi") {
       const l = freeL(step);
@@ -94,6 +95,40 @@ export default function Onboarding() {
     return c;
   }, [opps, rN, step]);
 
+  // ---- heatmap + alerts reveal: hexes and pins roll out together from the
+  // middle of the pin cluster like a wave; each hex pulses once as the front
+  // passes, pins pop in at the same moment and keep pulsing (review feedback).
+  const WAVE_MS = 2400;
+  const [wave, setWave] = useState<{ c: [number, number]; rmax: number } | null>(null);
+  useEffect(() => {
+    if (step !== "heat" || !map || !ready) return;
+    const pts = opps.map(l => [l.lng, l.lat] as [number, number]);
+    const bb = pts.length ? ringBBox([pts]) : null;
+    const c: [number, number] = bb ? [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2] : app.place.center;
+    heatWave(map, c, 0, 1); // hidden until the camera has settled
+    let raf = 0, t0 = 0;
+    const start = setTimeout(() => {
+      const b = map.getBounds();
+      const kx = metersPerDegLng(c[1]);
+      const rmax = b ? Math.max(...[[b.getWest(), b.getNorth()], [b.getEast(), b.getNorth()], [b.getWest(), b.getSouth()], [b.getEast(), b.getSouth()]].map(([x, y]) => Math.hypot((x - c[0]) * kx, (y - c[1]) * metersPerDegLat))) : 4000;
+      setWave({ c, rmax });
+      const band = rmax * 0.18;
+      const tickF = (t: number) => {
+        if (!t0) t0 = t;
+        const k = Math.min(1, (t - t0) / WAVE_MS);
+        heatWave(map, c, k * (rmax + band), band);
+        if (k < 1) raf = requestAnimationFrame(tickF); else heatWaveEnd(map);
+      };
+      raf = requestAnimationFrame(tickF);
+    }, 1300);
+    return () => { clearTimeout(start); cancelAnimationFrame(raf); heatWaveEnd(map); setWave(null); };
+  }, [step, map, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  const waveDelay = (l: Listing) => {
+    if (!wave) return 0;
+    const d = Math.hypot((l.lng - wave.c[0]) * metersPerDegLng(wave.c[1]), (l.lat - wave.c[1]) * metersPerDegLat);
+    return Math.round((d / wave.rmax) * WAVE_MS);
+  };
+
   // ---- personalisation cards ----
   const [ci, setCi] = useState(0);
   const [ans, setAns] = useState<Record<string, boolean>>({});
@@ -102,6 +137,14 @@ export default function Onboarding() {
     if (swipe) return;
     setSwipe(yes ? "R" : "L");
     setTimeout(() => { setAns(a => ({ ...a, [CARDS[ci].k]: yes })); setCi(i => i + 1); setSwipe(null); }, 280);
+  };
+  // Mouse / touch swipe on the card (review feedback): drag past 110px to answer.
+  const [drag, setDrag] = useState<{ x0: number; dx: number } | null>(null);
+  const dragProps = {
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => { if (swipe) return; e.currentTarget.setPointerCapture(e.pointerId); setDrag({ x0: e.clientX, dx: 0 }); },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => { if (drag) setDrag({ ...drag, dx: e.clientX - drag.x0 }); },
+    onPointerUp: () => { if (!drag) return; const dx = drag.dx; setDrag(null); if (Math.abs(dx) > 110) answer(dx > 0); },
+    onPointerCancel: () => setDrag(null),
   };
   const answered = Object.keys(ans).length, minMet = answered >= 5;
   const matchN = opps.filter(l => answered === 0 || ans[l.opp]).length;
@@ -162,25 +205,29 @@ export default function Onboarding() {
 
       {(step === "comps" || step === "ub" || step === "roi") && <Freebie k={step} l={freeL(step)} onBack={prev} onNext={next} />}
 
-      {(step === "heat" || step === "alerts") && <>
-        {step === "alerts" && <OppPins items={opps} shown={l => l.opp === "drop" || l.opp === "exp" || l.isNew} labels />}
+      {step === "heat" && <>
+        {wave && <OppPins items={opps} shown={() => true} delay={waveDelay} />}
         <div style={{ ...panel, top: "auto", bottom: PAD, gap: 14 }}>
-          <span style={kickS}>{step === "heat" ? "Heatmap layers" : "Market alerts"}</span>
-          <span style={titleS}>{step === "heat" ? "Spot the upside fast" : "Your next lead won't wait"}</span>
-          <span style={{ ...bodyS, color: "rgb(48,42,40)" }}>{step === "heat" ? "Compare build potential and ROI across neighborhoods to spot where the upside is." : "Stay on top of new leads and market updates, so you know when it's time to make the call."}</span>
+          <span style={kickS}>Heatmap &amp; market alerts</span>
+          <span style={titleS}>Spot the upside fast</span>
+          <span style={{ ...bodyS, color: "rgb(48,42,40)" }}>Compare build potential and ROI across neighborhoods, and get alerted the moment new leads and market changes appear.</span>
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <button className="btn-soft" onClick={prev}>Back</button>
             <span style={{ flex: 1 }} />
-            <button className="btn-dark" onClick={next}>{step === "heat" ? "Next" : "Keep me in the know"}</button>
+            <button className="btn-dark" onClick={next}>Keep me in the know</button>
           </div>
         </div>
       </>}
 
       {step === "signup" && <>
         <div style={{ position: "fixed", inset: 0, zIndex: 41, background: "rgba(247,246,246,.5)", animation: "fadeIn .3s ease both" }} />
-        <div style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", zIndex: 42, width: 440, display: "flex", flexDirection: "column", gap: 18, padding: 32, borderRadius: 28, background: "var(--paper)", boxShadow: "0 24px 60px rgba(30,18,12,.22)", animation: "fadeIn .35s ease both" }}>
-          <span style={{ font: "300 30px/36px var(--font-sans)", letterSpacing: "-.02em" }}>{opps.length} opportunities are waiting in {app.place.name}</span>
-          <span style={bodyS}>Create your free account to save them and get alerts when new ones appear.</span>
+        {/* Brand moment (review feedback): bolder count, centred headline and copy; the modal rises and fades in. */}
+        <div style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", zIndex: 42, width: 460, display: "flex", flexDirection: "column", gap: 18, padding: "36px 32px 28px", borderRadius: 28, background: "var(--paper)", boxShadow: "0 24px 60px rgba(30,18,12,.22)", animation: "obModalIn .55s cubic-bezier(.2,.8,.2,1) .1s both" }}>
+          <span style={{ textAlign: "center", font: "300 32px/38px var(--font-sans)", letterSpacing: "-.02em", textWrap: "balance" } as React.CSSProperties}>
+            <b style={{ display: "block", font: "700 56px/1.05 var(--font-sans)", letterSpacing: "-.04em", color: "var(--clay-dark)" }}>{opps.length}</b>
+            <b style={{ fontWeight: 700 }}>opportunities</b> are waiting in {app.place.name}
+          </span>
+          <span style={{ ...bodyS, textAlign: "center", textWrap: "pretty" } as React.CSSProperties}>Create your free account to save them and get alerts when new ones appear.</span>
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 16, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.1)" }}>
             <span style={{ width: 40, height: 40, borderRadius: 9999, background: "url(/photos/avatar.jpg) center/cover" }} />
             <span style={{ flex: 1, display: "flex", flexDirection: "column" }}><span style={{ font: "700 15px/20px var(--font-sans)" }}>{app.user.name}</span><span style={{ font: "400 13px/18px var(--font-sans)", color: "rgb(98,90,89)" }}>{app.user.email}</span></span>
@@ -194,55 +241,55 @@ export default function Onboarding() {
       {step === "cards" && <>
         {/* While cards are showing, light up only the pins for the current card's type so users can focus on one kind at a time; once done, light their picks. */}
         <OppPins items={opps} shown={() => true} lit={l => ci < CARDS.length ? l.opp === CARDS[ci].k : answered === 0 || !!ans[l.opp]} />
-        <div style={{ ...panel, gap: 18 }}>
-          <span style={{ font: "700 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Step 9 of 9 · Personalise</span>
-          <span style={{ font: "300 30px/36px var(--font-sans)", letterSpacing: "-.02em" }}>What should Breezy look out for?</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ flex: 1, height: 6, borderRadius: 9999, background: "rgba(18,18,18,.08)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${Math.min(1, answered / 5) * 100}%`, background: minMet ? "rgb(49,140,96)" : "var(--clay)", transition: "width .3s" }} /></span>
-            <span style={{ font: "700 13px/18px var(--font-sans)" }}>{Math.min(answered, CARDS.length)} / {CARDS.length}</span>
+        <div style={{ ...panel, gap: 0, overflow: "hidden", padding: 0 }}>
+          <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 18, padding: "32px 32px 20px" }}>
+            <span style={{ font: "700 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Step {STEPS.length} of {STEPS.length} · Personalise</span>
+            <span style={{ font: "300 30px/36px var(--font-sans)", letterSpacing: "-.02em" }}>What should Breezy look out for?</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ flex: 1, height: 6, borderRadius: 9999, background: "rgba(18,18,18,.08)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${Math.min(1, answered / 5) * 100}%`, background: minMet ? "rgb(49,140,96)" : "var(--clay)", transition: "width .3s" }} /></span>
+              <span style={{ font: "700 13px/18px var(--font-sans)" }}>{Math.min(answered, CARDS.length)} / {CARDS.length}</span>
+            </div>
+            <span style={{ marginTop: -10, font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{minMet ? "Nice — that's enough to build your feed." : `Answer at least ${5 - answered} more to tune your feed.`}</span>
+            {ci < CARDS.length ? <>
+              <div key={ci} {...dragProps} style={{ flex: "none", position: "relative", touchAction: "none", userSelect: "none", cursor: drag ? "grabbing" : "grab",
+                transform: drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 22}deg)` : undefined, transition: drag ? "none" : "transform .25s cubic-bezier(.2,.8,.2,1)",
+                animation: swipe ? `cardSwipe${swipe} .28s ease-in both` : "riseIn .3s ease backwards" }}>
+                <OppCard c={CARDS[ci]} />
+                {drag && Math.abs(drag.dx) > 24 && (
+                  <span style={{ position: "absolute", top: 18, [drag.dx > 0 ? "right" : "left"]: 18, height: 30, padding: "0 12px", borderRadius: 9999, display: "flex", alignItems: "center", gap: 6, font: "700 13px/30px var(--font-sans)", opacity: Math.min(1, Math.abs(drag.dx) / 110),
+                    ...(drag.dx > 0 ? { background: "var(--ink)", color: "var(--paper)" } : { background: "var(--paper)", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" }) } as React.CSSProperties}>
+                    <i className={`ph-bold ph-${drag.dx > 0 ? "check" : "x"}`} />{drag.dx > 0 ? "Interested" : "Not for me"}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
+                <button onClick={() => answer(false)} title="Not for me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "#fff", boxShadow: "0 0 0 1px rgba(13,12,12,.1),0 6px 16px rgba(30,18,12,.12)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-x" /></button>
+                <span style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 120 }}><span style={{ font: "700 13px/16px var(--font-sans)" }}>Interested?</span><span style={{ font: "400 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Swipe or tap</span></span>
+                <button onClick={() => answer(true)} title="Yes, show me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "var(--ink)", color: "var(--paper)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-check" /></button>
+              </div>
+            </> : (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, textAlign: "center" }}>
+                <span style={{ font: "300 96px/1 var(--font-sans)", letterSpacing: "-3px", animation: "countUp .6s cubic-bezier(.2,.8,.2,1) both" }}>{matchN}</span>
+                <span style={{ font: "400 18px/24px var(--font-sans)" }}>opportunities match your picks</span>
+                <span style={{ maxWidth: 320, font: "400 14px/20px var(--font-sans)", color: "rgb(98,90,89)" }}>They&apos;re lit up on the map. We&apos;ll build your feed around them.</span>
+              </div>
+            )}
           </div>
-          <span style={{ marginTop: -10, font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{minMet ? "Nice — that's enough to build your feed." : `Answer at least ${5 - answered} more to tune your feed.`}</span>
-          {ci < CARDS.length ? <>
-            <div key={ci} style={{ flex: "none", borderRadius: 24, overflow: "hidden", background: "#fff", boxShadow: "0 12px 30px rgba(30,18,12,.14)", animation: swipe ? `cardSwipe${swipe} .28s ease-in both` : "riseIn .3s ease both" }}>
-              <div style={{ position: "relative", height: 170, background: `url(/photos/${CARDS[ci].ph}.jpg) center/cover` }}>
-                <span style={{ position: "absolute", left: 16, bottom: 16, display: "flex", alignItems: "center", gap: 8, height: 30, padding: "0 12px 0 4px", borderRadius: 9999, background: "rgba(253,252,252,.94)", font: "700 12px/30px var(--font-sans)" }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 9999, background: "rgb(255,209,41)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ph-bold ph-${CARDS[ci].ic}`} /></span>{CARDS[ci].tag}
-                </span>
-                {CARDS[ci].soon && <span style={{ position: "absolute", right: 12, top: 12, height: 24, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.7)", font: "400 11px/24px var(--font-sans)", color: "#fff" }}>New dataset · may launch later</span>}
+          {/* Footer stays pinned to the bottom of the panel whatever the content above (review feedback). */}
+          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 12, padding: "16px 32px 24px", boxShadow: "inset 0 1px 0 rgba(13,12,12,.08)", background: "var(--paper)" }}>
+            {ci < CARDS.length && (
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+                <span style={{ font: "300 44px/1 var(--font-sans)" }}>{matchN}</span>
+                <span style={{ paddingBottom: 3, font: "400 15px/19px var(--font-sans)" }}>opportunities<br />match your picks</span>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "18px 20px 20px" }}>
-                <span style={{ font: "700 12px/16px var(--font-sans)", color: "rgb(98,90,89)" }}>{CARDS[ci].lb}</span>
-                <span style={{ font: "400 20px/27px var(--font-sans)", letterSpacing: "-.2px" }}>{CARDS[ci].q}</span>
-                <span style={{ font: "400 15px/21px var(--font-sans)", color: "rgb(48,42,40)" }}>{CARDS[ci].plain}</span>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
-              <button onClick={() => answer(false)} title="Not for me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "#fff", boxShadow: "0 0 0 1px rgba(13,12,12,.1),0 6px 16px rgba(30,18,12,.12)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-x" /></button>
-              <span style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 120 }}><span style={{ font: "700 13px/16px var(--font-sans)" }}>Interested?</span><span style={{ font: "400 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Swipe or tap</span></span>
-              <button onClick={() => answer(true)} title="Yes, show me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "var(--ink)", color: "var(--paper)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-check" /></button>
-            </div>
-            <span style={{ flex: 1 }} />
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
-              <span style={{ font: "300 44px/1 var(--font-sans)" }}>{matchN}</span>
-              <span style={{ paddingBottom: 3, font: "400 15px/19px var(--font-sans)" }}>opportunities<br />match your picks</span>
-            </div>
+            )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <button onClick={() => { setAns({}); setCi(0); }} className="btn-ghost" style={{ height: 40, padding: "0 12px", font: "700 14px/18px var(--font-sans)" }}><i className="ph-bold ph-arrow-counter-clockwise" /> Restart</button>
-              {minMet
+              {minMet || ci >= CARDS.length
                 ? <button className="btn-dark" style={{ height: 40, fontSize: 14, animation: "fadeIn .25s ease both" }} onClick={() => finish()}><i className="ph-bold ph-sparkle" />Build my feed</button>
                 : <button className="btn-soft" style={{ height: 40, fontSize: 14 }} onClick={() => finish(true)}>Skip for now, show me everything</button>}
             </div>
-          </> : (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, textAlign: "center" }}>
-              <span style={{ font: "300 96px/1 var(--font-sans)", letterSpacing: "-3px", animation: "countUp .6s cubic-bezier(.2,.8,.2,1) both" }}>{matchN}</span>
-              <span style={{ font: "400 18px/24px var(--font-sans)" }}>opportunities match your picks</span>
-              <span style={{ maxWidth: 320, font: "400 14px/20px var(--font-sans)", color: "rgb(98,90,89)" }}>They&apos;re lit up on the map. We&apos;ll build your feed around them.</span>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 20, animation: "fadeIn .4s ease .4s both" }}>
-                <button className="btn-dark" onClick={() => finish()}><i className="ph-bold ph-sparkle" />Build my feed</button>
-                <button onClick={() => { setAns({}); setCi(0); }} className="btn-ghost" style={{ height: 40, padding: "0 12px", font: "700 14px/18px var(--font-sans)" }}><i className="ph-bold ph-arrow-counter-clockwise" /> Restart</button>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </>}
     </>
@@ -338,6 +385,7 @@ function Freebie({ k, l, onBack, onNext }: { k: "comps" | "ub" | "roi"; l: Listi
   return <>
     <div style={{ ...panel, top: "auto", bottom: PAD, gap: 14 }}>
       <div style={{ display: "flex", gap: 5 }}>{[0, 1, 2].map(d => <span key={d} style={{ height: 4, width: d === i ? 22 : 16, borderRadius: 9999, background: d === i ? "var(--clay-dark)" : "rgba(147,89,75,.25)" }} />)}</div>
+      <FreebieArt k={k} />
       <span style={kickS}>{D.kick}</span>
       <span style={titleS}>{D.title}</span>
       <span style={bodyS}>{D.body}</span>
@@ -394,5 +442,51 @@ function GoogleG() {
       <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
       <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Illustrations (review feedback). Isometric 3D renders from the Breezify Core
+// Figma (node 7612:60: comps, build potential, ROI, alerts) on a light card,
+// paired with each signal's yellow icon chip so scene, icon and copy line up.
+const ISO: Record<string, string> = { exp: "alerts", wd: "comps", stale: "alerts", ub: "build", roi: "roi", fc: "comps", drop: "roi" };
+
+function OppCard({ c }: { c: (typeof CARDS)[number] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", borderRadius: 24, overflow: "hidden", background: "linear-gradient(180deg,rgb(250,247,243) 0%,rgb(243,236,230) 100%)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.06),0 12px 30px rgba(30,18,12,.12)" }}>
+      <div style={{ position: "relative", height: 196 }}>
+        <span style={{ position: "absolute", left: 16, top: 16, zIndex: 2, display: "flex", alignItems: "center", gap: 8, height: 30, padding: "0 12px 0 4px", borderRadius: 9999, background: "rgba(253,252,252,.9)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.14)", font: "400 13px/30px var(--font-sans)", whiteSpace: "nowrap" }}>
+          <span style={{ width: 22, height: 22, borderRadius: 9999, background: "rgb(255,209,41)", boxShadow: "0 0 0 1.5px var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ph-bold ph-${c.ic}`} style={{ fontSize: 12 }} /></span>{c.lb}
+        </span>
+        {c.soon && <span style={{ position: "absolute", right: 14, top: 18, zIndex: 2, height: 24, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.72)", font: "400 11px/24px var(--font-sans)", color: "#fff" }}>New dataset · may launch later</span>}
+        <span style={{ position: "absolute", left: "50%", bottom: 22, width: 220, height: 34, transform: "translateX(-46%)", borderRadius: "50%", background: "radial-gradient(closest-side,rgba(120,92,78,.18),rgba(120,92,78,0))" }} />
+        <img src={`/iso/${ISO[c.k] || "comps"}.png`} alt="" draggable={false} style={{ position: "absolute", left: "50%", bottom: 10, width: 250, transform: "translateX(-44%)", pointerEvents: "none", mixBlendMode: "multiply", animation: "isoFloat .6s cubic-bezier(.2,.8,.2,1) backwards" }} />
+        <span style={{ position: "absolute", left: 16, bottom: 14, zIndex: 2, height: 26, padding: "0 10px", borderRadius: 9999, background: "var(--paper)", boxShadow: "0 4px 12px rgba(30,18,12,.12)", font: "700 12px/26px var(--font-sans)", whiteSpace: "nowrap" }}>{c.tag}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "16px 20px 20px", background: "rgba(253,252,252,.7)" }}>
+        <span style={{ font: "700 19px/25px var(--font-sans)", letterSpacing: "-.2px", textWrap: "balance" } as React.CSSProperties}>{c.q}</span>
+        <span style={{ font: "400 15px/21px var(--font-sans)", color: "rgb(48,42,40)" }}>{c.plain}</span>
+      </div>
+    </div>
+  );
+}
+
+// Freebie carousel art above the heading: AI comps star (canvas sparkle.gif),
+// Underbuilt isometric render, ROI graduated meter (V5 canvas gauge).
+function FreebieArt({ k }: { k: "comps" | "ub" | "roi" }) {
+  const box: React.CSSProperties = { flex: "none", height: 132, display: "flex", alignItems: "center", justifyContent: "flex-start", animation: "fadeIn .4s ease backwards" };
+  if (k === "comps") return <div key={k} style={box}><img src="/iso/sparkle.gif" alt="" style={{ width: 132, height: 132, margin: "0 0 0 -24px" }} /></div>;
+  if (k === "ub") return <div key={k} style={box}><img src="/iso/build.png" alt="" style={{ height: 132, margin: "0 0 0 -10px", mixBlendMode: "multiply", animation: "isoFloat .6s cubic-bezier(.2,.8,.2,1) backwards" }} /></div>;
+  const A = [[46, 126, 187], [124, 175, 209], [173, 209, 227], [247, 236, 178], [249, 203, 110], [240, 146, 78], [233, 86, 58], [206, 25, 25]], n = 19;
+  const at = (t: number) => { const x = t * (A.length - 1), i = Math.min(A.length - 2, Math.floor(x)), f = x - i, a = A[i], b = A[i + 1]; return `rgb(${a.map((v, q) => Math.round(v + (b[q] - v) * f)).join(",")})`; };
+  return (
+    <div key={k} style={box}>
+      <div style={{ position: "relative", width: 118, height: 64, transform: "scale(1.6)", transformOrigin: "0 50%" }}>
+        {Array.from({ length: n }, (_, i) => (
+          <span key={i} style={{ position: "absolute", left: "50%", top: 6, width: 5, height: 13, borderRadius: 2.5, transformOrigin: "50% 52px", transform: `translateX(-50%) rotate(${(-90 + i * (180 / (n - 1))).toFixed(2)}deg)`, animation: `segLight .14s linear ${(0.5 + i * 0.058).toFixed(3)}s both`, background: at(i / (n - 1)) }} />
+        ))}
+        <span style={{ position: "absolute", left: "50%", top: 14, width: 7, height: 44, transformOrigin: "50% 44px", transform: "translateX(-50%) rotate(52deg)", animation: "needleSwing 1.15s cubic-bezier(.2,.8,.2,1) .5s both", background: "linear-gradient(180deg,rgb(233,86,58),rgb(226,71,45))", clipPath: "polygon(43% 0,57% 0,100% 100%,0 100%)" }} />
+      </div>
+    </div>
   );
 }

@@ -7,7 +7,7 @@ import { Listing, OPP } from "@/lib/fake";
 // ringed in the type colour. `lit` controls which are shown at full strength;
 // the rest fade. The fade-in animation only fills backwards so it doesn't pin
 // opacity at 1 and override the fade.
-export function OppPins({ items, shown, lit, selId, onPick, labels }: { items: Listing[]; shown: (l: Listing, i: number) => boolean; lit?: (l: Listing) => boolean; selId?: number | null; onPick?: (l: Listing) => void; labels?: boolean }) {
+export function OppPins({ items, shown, lit, selId, onPick, labels, delay }: { items: Listing[]; shown: (l: Listing, i: number) => boolean; lit?: (l: Listing) => boolean; selId?: number | null; onPick?: (l: Listing) => void; labels?: boolean; delay?: (l: Listing) => number }) {
   const { map, tick } = useMapCtx();
   void tick;
   if (!map) return null;
@@ -19,7 +19,7 @@ export function OppPins({ items, shown, lit, selId, onPick, labels }: { items: L
         const on = lit ? lit(l) : true, sel = selId === l.id;
         return (
           <button key={l.id} onClick={e => { e.stopPropagation(); onPick?.(l); }}
-            style={{ position: "absolute", left: p.x, top: p.y, transform: "translate(-50%,-50%)", zIndex: sel ? 30 : 20, display: "flex", alignItems: "center", gap: 6, padding: 0, border: "none", background: "none", cursor: onPick ? "pointer" : "default", pointerEvents: "auto", opacity: on ? 1 : 0.3, filter: on ? "none" : "saturate(.4)", transition: "opacity .3s, filter .3s", animation: "fadeIn .35s ease backwards" }}>
+            style={{ position: "absolute", left: p.x, top: p.y, transform: "translate(-50%,-50%)", zIndex: sel ? 30 : 20, display: "flex", alignItems: "center", gap: 6, padding: 0, border: "none", background: "none", cursor: onPick ? "pointer" : "default", pointerEvents: "auto", opacity: on ? 1 : 0.3, filter: on ? "none" : "saturate(.4)", transition: "opacity .3s, filter .3s", animation: delay ? `wavePop .55s cubic-bezier(.2,.8,.2,1) ${delay(l)}ms backwards` : "fadeIn .35s ease backwards" }}>
             <span style={{ position: "relative", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>
               {on && <span style={{ position: "absolute", inset: 4, borderRadius: 9999, background: `rgba(${OPP[l.opp].col},.45)`, animation: "pulse 2.2s ease-out infinite" }} />}
               <span style={{ position: "relative", width: sel ? 34 : 28, height: sel ? 34 : 28, borderRadius: 9999, background: sel ? "var(--ink)" : "rgb(255,209,41)", boxShadow: `0 0 0 2.5px rgb(${OPP[l.opp].col}),0 4px 10px rgba(30,18,12,.25)`, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .2s" }}>
