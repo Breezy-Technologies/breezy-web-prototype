@@ -242,7 +242,7 @@ export default function Onboarding() {
         {/* While cards are showing, light up only the pins for the current card's type so users can focus on one kind at a time; once done, light their picks. */}
         <OppPins items={opps} shown={() => true} lit={l => ci < CARDS.length ? l.opp === CARDS[ci].k : answered === 0 || !!ans[l.opp]} />
         <div style={{ ...panel, gap: 0, overflow: "hidden", padding: 0 }}>
-          <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 18, padding: "32px 32px 20px" }}>
+          <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, padding: "26px 32px 16px" }}>
             <span style={{ font: "700 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Step {STEPS.length} of {STEPS.length} · Personalise</span>
             <span style={{ font: "300 30px/36px var(--font-sans)", letterSpacing: "-.02em" }}>What should Breezy look out for?</span>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -446,24 +446,38 @@ function GoogleG() {
 }
 
 // ---------------------------------------------------------------------------
-// Illustrations (review feedback). Isometric 3D renders from the Breezify Core
-// Figma (node 7612:60: comps, build potential, ROI, alerts) on a light card,
-// paired with each signal's yellow icon chip so scene, icon and copy line up.
-const ISO: Record<string, string> = { exp: "alerts", wd: "comps", stale: "alerts", ub: "build", roi: "roi", fc: "comps", drop: "roi" };
+// Personalisation card illustrations (review feedback). Isometric 3D renders in
+// the Breezify Core Figma style (node 7612:60); one PNG per signal. The whole
+// card takes the render's background colour, and the render's edges are
+// feathered into it so there's no seam.
+const CARD_ART: Record<string, { src: string; bg: string; w?: number }> = {
+  exp: { src: "/iso/card-exp.png", bg: "rgb(239,235,228)" },     // greyed-out house + hourglass
+  wd: { src: "/iso/card-wd.png", bg: "rgb(233,229,223)" },       // sunken plot, glass ghost of the house
+  stale: { src: "/iso/card-stale.png", bg: "rgb(237,230,220)" }, // greyed, rusted building
+  ub: { src: "/iso/build.png", bg: "rgb(255,255,255)", w: 236 },         // timber frame extension (Figma)
+  roi: { src: "/iso/card-roi.png", bg: "rgb(230,222,214)" },     // rising arrow in front
+  fc: { src: "/iso/card-fc.png", bg: "rgb(234,229,220)" },       // CLOSURE tape
+  drop: { src: "/iso/card-drop.png", bg: "rgb(231,222,215)" },   // dropping arrow
+};
 
+// On first load the illustration and the content animate independently: the
+// render floats up and settles, then the text rises in a beat later.
 function OppCard({ c }: { c: (typeof CARDS)[number] }) {
+  const a0 = CARD_ART[c.k] || CARD_ART.ub, art = { ...a0, w: a0.w || 262 };
   return (
-    <div style={{ display: "flex", flexDirection: "column", borderRadius: 24, overflow: "hidden", background: "linear-gradient(180deg,rgb(250,247,243) 0%,rgb(243,236,230) 100%)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.06),0 12px 30px rgba(30,18,12,.12)" }}>
-      <div style={{ position: "relative", height: 196 }}>
-        <span style={{ position: "absolute", left: 16, top: 16, zIndex: 2, display: "flex", alignItems: "center", gap: 8, height: 30, padding: "0 12px 0 4px", borderRadius: 9999, background: "rgba(253,252,252,.9)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.14)", font: "400 13px/30px var(--font-sans)", whiteSpace: "nowrap" }}>
+    <div style={{ display: "flex", flexDirection: "column", borderRadius: 24, overflow: "hidden", background: art.bg, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.05),0 12px 30px rgba(30,18,12,.12)" }}>
+      <div style={{ position: "relative", height: 176 }}>
+        <img src={art.src} alt="" draggable={false}
+          style={{ position: "absolute", left: "50%", top: "56%", width: art.w, translate: "-50% -50%", pointerEvents: "none",
+            WebkitMaskImage: "radial-gradient(ellipse 62% 64% at 50% 52%,#000 62%,transparent 100%)", maskImage: "radial-gradient(ellipse 62% 64% at 50% 52%,#000 62%,transparent 100%)",
+            animation: "cardArtIn .7s cubic-bezier(.2,.8,.2,1) .05s backwards" }} />
+        <span style={{ position: "absolute", left: 16, top: 16, zIndex: 2, display: "flex", alignItems: "center", gap: 8, height: 30, padding: "0 12px 0 4px", borderRadius: 9999, background: "rgba(253,252,252,.85)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.12)", font: "400 13px/30px var(--font-sans)", whiteSpace: "nowrap", animation: "cardTextIn .45s cubic-bezier(.2,.8,.2,1) .25s backwards" }}>
           <span style={{ width: 22, height: 22, borderRadius: 9999, background: "rgb(255,209,41)", boxShadow: "0 0 0 1.5px var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ph-bold ph-${c.ic}`} style={{ fontSize: 12 }} /></span>{c.lb}
         </span>
-        {c.soon && <span style={{ position: "absolute", right: 14, top: 18, zIndex: 2, height: 24, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.72)", font: "400 11px/24px var(--font-sans)", color: "#fff" }}>New dataset · may launch later</span>}
-        <span style={{ position: "absolute", left: "50%", bottom: 22, width: 220, height: 34, transform: "translateX(-46%)", borderRadius: "50%", background: "radial-gradient(closest-side,rgba(120,92,78,.18),rgba(120,92,78,0))" }} />
-        <img src={`/iso/${ISO[c.k] || "comps"}.png`} alt="" draggable={false} style={{ position: "absolute", left: "50%", bottom: 10, width: 250, transform: "translateX(-44%)", pointerEvents: "none", mixBlendMode: "multiply", animation: "isoFloat .6s cubic-bezier(.2,.8,.2,1) backwards" }} />
-        <span style={{ position: "absolute", left: 16, bottom: 14, zIndex: 2, height: 26, padding: "0 10px", borderRadius: 9999, background: "var(--paper)", boxShadow: "0 4px 12px rgba(30,18,12,.12)", font: "700 12px/26px var(--font-sans)", whiteSpace: "nowrap" }}>{c.tag}</span>
+        {c.soon && <span style={{ position: "absolute", right: 14, top: 18, zIndex: 2, height: 24, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.72)", font: "400 11px/24px var(--font-sans)", color: "#fff", animation: "cardTextIn .45s cubic-bezier(.2,.8,.2,1) .3s backwards" }}>New dataset · may launch later</span>}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "16px 20px 20px", background: "rgba(253,252,252,.7)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "4px 20px 20px", animation: "cardTextIn .5s cubic-bezier(.2,.8,.2,1) .35s backwards" }}>
+        <span style={{ alignSelf: "flex-start", height: 26, padding: "0 10px", borderRadius: 9999, background: "rgba(253,252,252,.85)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.1)", font: "700 12px/26px var(--font-sans)", whiteSpace: "nowrap" }}>{c.tag}</span>
         <span style={{ font: "700 19px/25px var(--font-sans)", letterSpacing: "-.2px", textWrap: "balance" } as React.CSSProperties}>{c.q}</span>
         <span style={{ font: "400 15px/21px var(--font-sans)", color: "rgb(48,42,40)" }}>{c.plain}</span>
       </div>
