@@ -243,15 +243,17 @@ export default function Onboarding() {
         <OppPins items={opps} shown={() => true} lit={l => ci < CARDS.length ? l.opp === CARDS[ci].k : answered === 0 || !!ans[l.opp]} />
         <div style={{ ...panel, gap: 0, overflow: "hidden", padding: 0 }}>
           <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, padding: "26px 32px 16px" }}>
-            <span style={{ font: "700 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Step {STEPS.length} of {STEPS.length} · Personalise</span>
             <span style={{ font: "300 30px/36px var(--font-sans)", letterSpacing: "-.02em" }}>What should Breezy look out for?</span>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ flex: 1, height: 6, borderRadius: 9999, background: "rgba(18,18,18,.08)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${Math.min(1, answered / 5) * 100}%`, background: minMet ? "rgb(49,140,96)" : "var(--clay)", transition: "width .3s" }} /></span>
               <span style={{ font: "700 13px/18px var(--font-sans)" }}>{Math.min(answered, CARDS.length)} / {CARDS.length}</span>
             </div>
-            <span style={{ marginTop: -10, font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{minMet ? "Nice — that's enough to build your feed." : `Answer at least ${5 - answered} more to tune your feed.`}</span>
+            <div style={{ marginTop: -8, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>
+              <span>{minMet ? "Nice — that's enough to build your feed." : `Answer at least ${5 - answered} more to tune your feed.`}</span>
+              <span style={{ flex: "none", color: "var(--ink)" }}><b style={{ font: "700 13px/18px var(--font-sans)" }}>{matchN}</b> matches</span>
+            </div>
             {ci < CARDS.length ? <>
-              <div key={ci} {...dragProps} style={{ flex: "none", position: "relative", touchAction: "none", userSelect: "none", cursor: drag ? "grabbing" : "grab",
+              <div key={ci} {...dragProps} style={{ flex: "1 1 0", minHeight: 330, maxHeight: 540, display: "flex", flexDirection: "column", position: "relative", touchAction: "none", userSelect: "none", cursor: drag ? "grabbing" : "grab",
                 transform: drag ? `translateX(${drag.dx}px) rotate(${drag.dx / 22}deg)` : undefined, transition: drag ? "none" : "transform .25s cubic-bezier(.2,.8,.2,1)",
                 animation: swipe ? `cardSwipe${swipe} .28s ease-in both` : "riseIn .3s ease backwards" }}>
                 <OppCard c={CARDS[ci]} />
@@ -263,9 +265,9 @@ export default function Onboarding() {
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
-                <button onClick={() => answer(false)} title="Not for me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "#fff", boxShadow: "0 0 0 1px rgba(13,12,12,.1),0 6px 16px rgba(30,18,12,.12)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-x" /></button>
+                <button onClick={() => answer(false)} title="Not for me" style={{ width: 56, height: 56, border: "none", borderRadius: 9999, background: "#fff", boxShadow: "0 0 0 1px rgba(13,12,12,.1),0 6px 16px rgba(30,18,12,.12)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-x" /></button>
                 <span style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 120 }}><span style={{ font: "700 13px/16px var(--font-sans)" }}>Interested?</span><span style={{ font: "400 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>Swipe or tap</span></span>
-                <button onClick={() => answer(true)} title="Yes, show me" style={{ width: 64, height: 64, border: "none", borderRadius: 9999, background: "var(--ink)", color: "var(--paper)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-check" /></button>
+                <button onClick={() => answer(true)} title="Yes, show me" style={{ width: 56, height: 56, border: "none", borderRadius: 9999, background: "var(--ink)", color: "var(--paper)", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}><i className="ph-bold ph-check" /></button>
               </div>
             </> : (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, textAlign: "center" }}>
@@ -277,12 +279,6 @@ export default function Onboarding() {
           </div>
           {/* Footer stays pinned to the bottom of the panel whatever the content above (review feedback). */}
           <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 12, padding: "16px 32px 24px", boxShadow: "inset 0 1px 0 rgba(13,12,12,.08)", background: "var(--paper)" }}>
-            {ci < CARDS.length && (
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
-                <span style={{ font: "300 44px/1 var(--font-sans)" }}>{matchN}</span>
-                <span style={{ paddingBottom: 3, font: "400 15px/19px var(--font-sans)" }}>opportunities<br />match your picks</span>
-              </div>
-            )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <button onClick={() => { setAns({}); setCi(0); }} className="btn-ghost" style={{ height: 40, padding: "0 12px", font: "700 14px/18px var(--font-sans)" }}><i className="ph-bold ph-arrow-counter-clockwise" /> Restart</button>
               {minMet || ci >= CARDS.length
@@ -463,12 +459,12 @@ const CARD_ART: Record<string, { src: string; bg: string; w?: number }> = {
 // On first load the illustration and the content animate independently: the
 // render floats up and settles, then the text rises in a beat later.
 function OppCard({ c }: { c: (typeof CARDS)[number] }) {
-  const a0 = CARD_ART[c.k] || CARD_ART.ub, art = { ...a0, w: a0.w || 262 };
+  const a0 = CARD_ART[c.k] || CARD_ART.ub, art = { ...a0, h: a0.w ? 84 : 92 }; // render height as a % of the illustration area
   return (
-    <div style={{ display: "flex", flexDirection: "column", borderRadius: 24, overflow: "hidden", background: art.bg, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.05),0 12px 30px rgba(30,18,12,.12)" }}>
-      <div style={{ position: "relative", height: 176 }}>
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", borderRadius: 24, overflow: "hidden", background: art.bg, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.05),0 12px 30px rgba(30,18,12,.12)" }}>
+      <div style={{ position: "relative", flex: 1, minHeight: 180 }}>
         <img src={art.src} alt="" draggable={false}
-          style={{ position: "absolute", left: "50%", top: "56%", width: art.w, translate: "-50% -50%", pointerEvents: "none",
+          style={{ position: "absolute", left: "50%", top: "56%", height: `${art.h}%`, aspectRatio: "3 / 2", maxWidth: "104%", translate: "-50% -50%", pointerEvents: "none",
             WebkitMaskImage: "radial-gradient(ellipse 62% 64% at 50% 52%,#000 62%,transparent 100%)", maskImage: "radial-gradient(ellipse 62% 64% at 50% 52%,#000 62%,transparent 100%)",
             animation: "cardArtIn .7s cubic-bezier(.2,.8,.2,1) .05s backwards" }} />
         <span style={{ position: "absolute", left: 16, top: 16, zIndex: 2, display: "flex", alignItems: "center", gap: 8, height: 30, padding: "0 12px 0 4px", borderRadius: 9999, background: "rgba(253,252,252,.85)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.12)", font: "400 13px/30px var(--font-sans)", whiteSpace: "nowrap", animation: "cardTextIn .45s cubic-bezier(.2,.8,.2,1) .25s backwards" }}>
