@@ -175,7 +175,7 @@ export default function HomeWeb() {
   const detailOpen = !!sel;
   // Sheets stacked over the results column (`depth`): the save-search sheet or "All
   // filters" on top, the saved-properties sheet under it. Each one steps the column back.
-  const svOn = view === "results" && savedOpen && picked.length > 0 && !savedOut;
+  const svOn = savedOpen && picked.length > 0 && !savedOut;
   const topOn = (view === "results" && ((!!fs.fd && !fs.panelOut) || ss.on)) || (rp.open && !rp.out);
   const depth = (svOn ? 1 : 0) + (topOn ? 1 : 0);
   const layerOn = depth > 0;
@@ -202,7 +202,8 @@ export default function HomeWeb() {
           {searching ? null : view === "home"
             ? <HomeCard name={user.name} forYou={forYou} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
-                picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} />
+                picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals}
+                onOpenSaved={() => { setSavedOut(false); setSavedOpen(true); }} />
             : (
               // The results column steps back (scale + dim) while a sheet sits on top of it.
               <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: depth > 1 ? "scale(.88)" : depth ? "scale(.94)" : "none", filter: depth > 1 ? "brightness(.93)" : depth ? "brightness(.955)" : "none" }}>
@@ -217,9 +218,10 @@ export default function HomeWeb() {
                   picked={picked} onOpenSaved={() => { setSortOpen(false); setSavedOut(false); setSavedOpen(true); }} onSharePicked={() => sh.sharePicked()} />
               </div>
             )}
-          {view === "results" && savedOpen && picked.length > 0 && (
+          {/* Saved properties sheet: from Results, and from Home's "+" footer (review feedback). */}
+          {savedOpen && picked.length > 0 && (
             <SavedSheet picked={picked} out={savedOut} onBack={closeSaved} onOpen={p => openSavedProp(p.l)}
-              onRemove={p => sv.toggleProp(p.l)} onClear={() => { sv.clearPicked(); setSavedOpen(false); }} />
+              onRemove={p => sv.toggleProp(p.l)} onClear={() => { sv.clearPicked(); setSavedOpen(false); }} onShare={() => sh.sharePicked()} />
           )}
           {view === "results" && ss.layers}
           <ReportsSheet rp={rp} onOpen={r => { rp.close(); openComps(r.l); }} />

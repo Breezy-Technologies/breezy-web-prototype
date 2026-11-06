@@ -126,8 +126,8 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
   );
 }
 
-export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onTab, onSignals }: {
-  name: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void;
+export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals }: {
+  name: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void; onOpenSaved?: () => void;
   onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void;
   onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
@@ -209,7 +209,7 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
             {tab === "Properties" && propList(props.slice(0, 3), false)}
           </div>
           {/* Homes saved with "+" from the feed: thumbnails open the Properties tab, Share opens the share report (review feedback). */}
-          {tab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => setTab("Properties")} onShare={onSharePicked} />}
+          {tab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved ? onOpenSaved() : setTab("Properties")} onShare={onSharePicked} />}
           {tab !== "For you" && (tab === "Properties" ? props.length > 0 : searches.length > 0) && (
             <div style={{ flex: "none", marginTop: 20, display: "flex", alignItems: "center", gap: 16, padding: "12px 20px 20px", boxShadow: "inset 0 1px 0 rgba(13,12,12,.16)" }}>
               <button onClick={() => { setFromH(cardRef.current?.offsetHeight || 520); setFullTab(tab === "Properties" ? "Properties" : "Searches"); setFull(true); }} className="btn-soft" style={{ flex: 1, height: 43 }}>View all</button>
@@ -249,7 +249,7 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
             {fullTab === "Searches" && searchList(searches, true)}
             {fullTab === "Properties" && propList(props, true)}
           </div>
-          {fullTab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => setFullTab("Properties")} onShare={onSharePicked} />}
+          {fullTab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved ? onOpenSaved() : setFullTab("Properties")} onShare={onSharePicked} />}
         </div>
       )}
 
