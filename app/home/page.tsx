@@ -235,11 +235,19 @@ export default function HomeWeb() {
   needsRef.current = needsArea;
   useEffect(() => {
     if (!map) return;
-    let user = false;
-    const start = (e: any) => { user = !!(e.originalEvent || e.bzUser); };
+    // Drags carry `originalEvent`; scroll / pinch / keyboard zoom are eased and don't, so a
+    // wheel, touch or key on the map marks the next ~600 ms of camera moves as the user's.
+    let user = false, intent = 0;
+    const mark = () => { intent = Date.now() + 600; };
+    const el = map.getCanvasContainer();
+    const start = (e: any) => { user = !!(e.originalEvent || e.bzUser) || Date.now() < intent; };
     const end = (e: any) => { if (user || e.originalEvent || e.bzUser) setAreaPill(needsRef.current()); user = false; };
     map.on("movestart", start); map.on("moveend", end);
-    return () => { map.off("movestart", start); map.off("moveend", end); };
+    el.addEventListener("wheel", mark, { passive: true }); el.addEventListener("touchstart", mark, { passive: true }); el.addEventListener("keydown", mark);
+    return () => {
+      map.off("movestart", start); map.off("moveend", end);
+      el.removeEventListener("wheel", mark); el.removeEventListener("touchstart", mark); el.removeEventListener("keydown", mark);
+    };
   }, [map]);
   const searchThisArea = () => {
     if (!map) return;

@@ -52,7 +52,9 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
 - ⬜ Remove confirm — `onRemoveConfirm`, `onRemoveCancel`
 
 ### Area search
-- ⬜ "Search this area" pill (trigger when viewport ~50% empty of pins) + draw area — `onTryArea`, `onAddArea`, `onShowNearest`, `onPickedClear`
+- 🟡 "Search this area" pill + draw area — `onTryArea`, `onAddArea`, `onShowNearest`, `onPickedClear`. The canvas has no pill, so it follows Expedia: a white pill top-centre of the visible map under the filter bar (`app/home/page.tsx`). It shows after a user pan / zoom (Home or Results; never after the app's own camera moves) when the middle of the view has left the searched area or more than half of a 4 × 3 grid over the visible map has no pins. Clicking it searches the visible box (`viewportPlace` in `lib/places.ts`, listings deterministic per box), the field reads "Map area", the outline is cleared. ⬜ Draw area.
+- ✅ (not in the canvas) Multi-column results: 1 / 2 / 3 toggle in the Results header when the window is ≥ 1600 / ≥ 2100 px wide (localStorage `bz-results-cols`); the column, filter bar, detail panel and camera shift with it.
+- ✅ (not in the canvas) "Create comps" next to "Save search" when the Sold status filter is on: opens a sold-comps preview (`AreaCompsPreview` in `CompsFlow.tsx`, the comps result layout) with "Save report" → Reports.
 - ✅ "No property found" toast with neutral black info icon (sprint item): picking an address outside coverage from the search field shows it in `Toast`'s `info` tone. (The canvas has no such toast; when "Search this area" lands, reuse the same `showToast("No property found", "info")`.)
 
 ### Share
