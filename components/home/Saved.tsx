@@ -154,7 +154,7 @@ function SaveSearchSheet({ st, set, out, chips, onClose, onSave, onRemove, onCon
   const box = "flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16)";
   return (
     <div style={css("position:absolute;left:0;right:0;top:76px;bottom:0;z-index:4;display:flex;flex-direction:column;border-radius:24px;background:rgb(255,255,255);box-shadow:inset 0 0 0 1px rgba(13,12,12,.1);overflow:hidden;pointer-events:auto;animation:" + sheetAnim(out))}>
-      <div style={css("flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 8px 20px")}>
+      <div style={css("flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 16px 8px 24px")}>
         <span style={css("font:700 15px/20px var(--font-sans);color:rgb(18,18,18)")}>{st.edit ? "Manage search" : "Save search"}</span>
         <button onClick={onClose} title="Close" className="sv-grey" style={css("flex:none;width:32px;height:32px;border:none;border-radius:9999px;background:rgba(13,12,12,.05);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>{X12}</button>
       </div>
@@ -468,27 +468,33 @@ function AlertsPanel({ left, tmp, setTmp, hadAlerts, out, onClose, onSave, onRes
   const row = "display:flex;align-items:center;gap:12px;width:100%;padding:16px;border:none;cursor:pointer;text-align:left";
   const lbl = (label: string, sub: string) => (
     <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:4px")}>
-      <span style={css("font:400 15px/20px var(--font-sans);color:rgb(17,16,16)")}>{label}</span>
-      <span style={css("font:400 12px/1.26 var(--font-sans);color:rgb(73,67,65);letter-spacing:.25px;text-wrap:pretty")}>{sub}</span>
+      <span style={css("font:400 16px/22px var(--font-sans);color:rgb(17,16,16)")}>{label}</span>
+      <span style={css("font:400 13px/18px var(--font-sans);color:rgb(73,67,65);letter-spacing:.25px;text-wrap:pretty")}>{sub}</span>
     </span>
   );
+  const H = "font:700 17px/22px var(--font-sans);color:rgb(17,16,16)";
+  // Price drop / bump threshold, stored as opts[id] = ["N%"]; older chip values map across.
+  const pct = (id: string) => { const v = ((tmp.opts || {})[id] || [])[0] || ""; const n = parseInt(v, 10); return isFinite(n) && n > 0 ? n : 1; };
+  const setPct = (id: string, n: number) => setTmp(x => ({ ...x, opts: { ...(x.opts || {}), [id]: [Math.max(1, Math.min(50, n)) + "%"] } }));
   return (
     <div style={css("position:absolute;left:" + left + "px;top:24px;bottom:12px;z-index:7;width:420px;max-width:calc(100% - " + (left + 12) + "px);display:flex;flex-direction:column;border-radius:24px;overflow:hidden;background:rgb(255,255,255);box-shadow:inset 0 0 0 1px rgba(13,12,12,.1);pointer-events:auto;animation:" + (out ? "bzSheetOut .2s cubic-bezier(.4,0,1,1) both" : "bzSheetIn .38s cubic-bezier(.2,.8,.2,1) backwards"))}>
       <div style={css("flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 8px 20px")}>
-        <span style={css("font:700 15px/20px var(--font-sans);color:rgb(18,18,18)")}>Set alerts</span>
+        <span style={css(H)}>Set custom alerts</span>
         <button onClick={onClose} title="Close" className="sv-grey" style={css("flex:none;width:32px;height:32px;border:none;border-radius:9999px;background:rgba(13,12,12,.05);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>{X12}</button>
       </div>
       <div className="no-scrollbar" style={css("flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:32px;padding:24px 20px 24px")}>
         <div style={css("display:flex;flex-direction:column;gap:16px")}>
-          <span style={css("font:700 15px/20px var(--font-sans);color:rgb(17,16,16)")}>Watch for any change</span>
+          <span style={css(H)}>Watch for any change</span>
           {/* alAny.toggle: all on / all off, keeping the option picks */}
-          <button onClick={() => setTmp(t => ALERT_DEFS.reduce((m, d) => { m[d[0]] = !anyOn; return m; }, { opts: t.opts } as AlertSet))} style={css(row + ";border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16)")}>
-            {lbl("Any change", "When there’s any change to this property.")}
-            <span style={any.track}><span style={any.knob} /></span>
+          <button onClick={() => setTmp(t => ALERT_DEFS.reduce((m, d) => { m[d[0]] = !anyOn; return m; }, { opts: t.opts } as AlertSet))} style={css(row + ";padding:20px;border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16)")}>
+            {lbl("Any activity", "When there’s any activity for a listing.")}
+            {anyOn
+              ? <span style={css("flex:none;height:32px;padding:0 14px;border-radius:9999px;background:rgb(221,237,232);font:400 15px/32px var(--font-sans);color:rgb(49,104,89)")}>Active</span>
+              : <span style={css("flex:none;height:32px;padding:0 14px;border-radius:9999px;box-shadow:inset 0 0 0 1px rgba(18,18,18,.24);font:400 15px/32px var(--font-sans);color:rgb(18,18,18)")}>Turn on</span>}
           </button>
         </div>
         <div style={css("display:flex;flex-direction:column;gap:16px")}>
-          <span style={css("font:700 15px/20px var(--font-sans);color:rgb(17,16,16)")}>Choose specific alerts</span>
+          <span style={css(H)}>Choose specific alerts</span>
           <div style={css("display:flex;flex-direction:column;gap:8px")}>
             {ALERT_DEFS.map(([id, label, sub]) => {
               const O = ALERT_OPTS[id], on = !!tmp[id], t = tg(on);
@@ -498,11 +504,29 @@ function AlertsPanel({ left, tmp, setTmp, hadAlerts, out, onClose, onSave, onRes
               const pick = (o: string) => { const act = sel.includes(o); setSel(O!.type === "one" ? [o] : act ? (sel.length > 1 ? sel.filter(x => x !== o) : sel) : sel.concat(o)); };
               return (
                 <div key={id} style={css("display:flex;flex-direction:column;border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16);overflow:hidden")}>
-                  <button onClick={() => setTmp(x => ({ ...x, [id]: !x[id] }))} style={css(row + ";background:none")}>
+                  <button onClick={() => setTmp(x => ({ ...x, [id]: !x[id] }))} style={css(row + ";padding:20px;background:none")}>
                     {lbl(label, sub)}
                     <span style={t.track}><span style={t.knob} /></span>
                   </button>
-                  {on && O && (
+                  {on && (id === "drop" || id === "bump") && (() => {
+                    const n = pct(id), up = id === "bump";
+                    const step = (dis: boolean): string => "flex:none;width:32px;height:32px;border:none;border-radius:9999px;display:flex;align-items:center;justify-content:center;font:300 22px/1 var(--font-sans);" + (dis ? "background:rgba(13,12,12,.04);color:rgba(18,18,18,.25);cursor:default" : "background:rgba(13,12,12,.08);color:rgb(18,18,18);cursor:pointer");
+                    return (
+                      <div style={css("display:flex;flex-direction:column;align-items:center;gap:20px;margin:0 16px 16px;padding:20px 16px;border-radius:20px;background:rgb(244,243,243);animation:panelDrop .22s cubic-bezier(.2,.8,.2,1) both")}>
+                        <div style={css("display:flex;align-items:center;gap:16px")}>
+                          <button onClick={() => setPct(id, n - 1)} disabled={n <= 1} title="Decrease" style={css(step(n <= 1))}>−</button>
+                          <span style={css("display:flex;align-items:center;gap:8px;min-width:64px;justify-content:center;font:700 15px/20px var(--font-sans);color:rgb(18,18,18)")}>
+                            <i className={`ph-bold ph-trend-${up ? "up" : "down"}`} style={{ fontSize: 18, color: up ? "rgb(70,155,112)" : "rgb(196,72,52)" }} />{n}%
+                          </span>
+                          <button onClick={() => setPct(id, n + 1)} disabled={n >= 50} title="Increase" style={css(step(n >= 50))}>+</button>
+                        </div>
+                        <span style={css("display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;font:400 14px/20px var(--font-sans);color:rgb(18,18,18)")}>
+                          Alert when<b style={css("font:700 14px/20px var(--font-sans)")}>Price {up ? "bumps" : "drops"} {n}% {up ? "above" : "below"} current price</b>
+                        </span>
+                      </div>
+                    );
+                  })()}
+                  {on && O && id !== "drop" && id !== "bump" && (
                     <div style={css("display:flex;flex-direction:column;gap:10px;margin:0 16px;padding:14px 0 16px;box-shadow:inset 0 .5px 0 rgba(18,18,18,.16);animation:panelDrop .22s cubic-bezier(.2,.8,.2,1) both")}>
                       <span style={css("font:400 12px/16px var(--font-sans);color:rgb(73,67,65);letter-spacing:.25px")}>{O.label}</span>
                       {O.type !== "multi" ? (
@@ -534,10 +558,9 @@ function AlertsPanel({ left, tmp, setTmp, hadAlerts, out, onClose, onSave, onRes
           </div>
         </div>
       </div>
-      <div style={css("flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;height:83px;box-sizing:border-box;padding:20px;background:rgb(255,255,255);box-shadow:inset 0 .5px 0 rgba(13,12,12,.16)")}>
-        <button onClick={onReset} className="sv-grey" style={css("flex:none;height:43px;padding:0 16px;border:none;border-radius:9999px;background:rgba(13,12,12,.06);font:700 15px/20px var(--font-sans);color:rgb(18,18,18);cursor:pointer")}>Reset to default</button>
+      <div style={css("flex:none;display:flex;align-items:center;justify-content:flex-end;gap:16px;height:83px;box-sizing:border-box;padding:20px;background:rgb(255,255,255);box-shadow:inset 0 .5px 0 rgba(13,12,12,.16)")}>
         <button onClick={onSave} className="fb-dark" style={css("flex:none;height:43px;padding:0 20px;border:none;border-radius:9999px;font:700 15px/20px var(--font-sans);color:rgb(253,252,252);background:rgb(18,18,18);transition:opacity .16s;cursor:"
-          + (nOn || hadAlerts ? "pointer;opacity:1" : "default;opacity:.32;pointer-events:none"))}>{nOn ? "Set " + nOn + (nOn === 1 ? " alert" : " alerts") : hadAlerts ? "Remove alerts" : "Set alerts"}</button>
+          + (nOn || hadAlerts ? "pointer;opacity:1" : "default;opacity:.32;pointer-events:none"))}>{!nOn && hadAlerts ? "Remove alerts" : "Save"}</button>
       </div>
     </div>
   );

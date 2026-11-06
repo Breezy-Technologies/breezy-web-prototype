@@ -47,7 +47,7 @@ export function HoverCard({ l, onKeep, onLeave, onOpen }: { l: Listing; onKeep: 
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px 12px" }}>
           <OwnerRow l={l} />
-          <QeRow l={l} />
+          {!l.noQe && <QeRow l={l} />}
         </div>
         <span style={{ position: "absolute", left: ax, [above ? "bottom" : "top"]: -8, width: 16, height: 9, marginLeft: -8, background: "var(--paper)", clipPath: above ? "polygon(0 0,100% 0,72% 78%,50% 100%,28% 78%)" : "polygon(50% 0,78% 26%,100% 100%,0 100%,22% 26%)" } as React.CSSProperties} />
       </div>

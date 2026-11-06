@@ -117,7 +117,7 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
           </div>
           <span style={{ marginTop: -6, font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)" }}>{hit!.listing.beds} Bed · {hit!.listing.lotAc} ac · Built {hit!.listing.built}</span>
           <OwnerRow l={hit!.listing} />
-          <QeRow l={hit!.listing} cta="Click for comps" />
+          {!hit!.listing.noQe && <QeRow l={hit!.listing} cta="Click for comps" />}
         </div>
       )}
     </MapOverlay>
