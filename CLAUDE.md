@@ -1,86 +1,215 @@
-# Breezy web prototype — context for Claude
+# Breezy web prototype: context for Claude
 
-This file carries over the context from the design + build sessions in Claude (Cowork). Claude Code reads `CLAUDE.md` automatically at the start of every session in this repo.
+Claude Code reads this file at the start of every session. It describes what the prototype does today, how it's built, and the rules the design reviews have settled. Keep it current: when a behaviour changes, update this file in the same commit.
 
 ## What this is
 
-A standalone Next.js 15 + React 19 + TypeScript app that showcases Breezy's **V5 onboarding and activation flow** (`/onboarding`) handing off seamlessly into the **Home Web** core experience (`/home`). Both routes share **one Mapbox GL map instance** that lives in the root layout (`components/map/MapProvider.tsx`), so camera, layers and the chosen area carry over with no reload.
+Breezy is a property-intelligence app for real-estate agents. It surfaces opportunities on a map: underbuilt lots, high ROI, price drops, and expired / withdrawn / stale listings (plus foreclosures in onboarding).
 
-Breezy is a property-intelligence app for real-estate agents. It surfaces opportunities on a map: underbuilt lots, high ROI, price drops, expired / withdrawn / stale listings.
+This repo is a standalone Next.js 15 + React 19 + TypeScript app. It shows two things:
 
-The source of truth for the UI design is the Claude Design canvas (pages "Home Web" and "Home Web V5 Prototype"). This repo is the coded version of it. A runnable copy of both pages lives in `design-reference/` (see its README). **Before building any Home Web UI, find the matching handlers in `design-reference/project/Home Web.dc.html` and port from there.** `design-reference/PORTING.md` tracks what is done.
+- the **V5 onboarding and activation flow** (`/onboarding`, also the `/` redirect);
+- the **Home Web** core experience it hands off to (`/home`).
 
-## Decisions already made
+Both routes share **one Mapbox GL map** that lives in the root layout (`components/map/MapProvider.tsx`). Camera, layers and the chosen area carry over with no reload. `window.__bzMap` exposes the map in the browser console.
 
-- **Map provider: Mapbox.** The devs already use it in production (dev.breezy.com). Not Google Maps.
-- **Parcels: Regrid** vector tiles (token pending). Until then, demo parcels are generated in `lib/map/layers.ts`.
-- **City / ZIP / county / state outlines: US Census TIGERweb**, free, via the server route `app/api/boundary/route.ts`. Mapbox Geocoding v6 handles search. The hand-drawn gazetteer in `lib/places.ts` is the offline fallback only.
-- **Breezy's own data stays fake** for now (`lib/fake.ts`): listings, opportunity types, owners, quick estimates, ROI / Underbuilt heat. It's deterministic per place. Each generator will later be swapped for a real service: listings API, JD's heat-map service, the owner data service, and Justin's quick-estimate endpoint.
-- Offline mode (no Mapbox token) uses georeferenced Mapbox light-v11 static images for Beverly Hills and Silver Lake (`public/map/*.jpg`), plus a generated fake-satellite set (`sat-*.jpg`). Keep it working for demos without network.
+**Source of truth for the UI:** the Claude Design canvas, pages "Home Web" and "Home Web V5 Prototype". A runnable copy lives in `design-reference/` (see its README). Before building any Home Web UI, find the matching handlers in `design-reference/project/Home Web.dc.html` and port from there. `design-reference/PORTING.md` tracks what's done. The canvas's Mapbox token sits in the gitignored `design-reference/project/local-config.js`, never in the committed file.
 
-## Current priority: get the live map right before more UI work
+## Data sources and their status
 
-1. Add `NEXT_PUBLIC_MAPBOX_TOKEN` to `.env.local` and confirm the live style loads. The app falls back to offline after a 4 s timeout or a style error. Then set `NEXT_PUBLIC_MAPBOX_STYLE` to the Breezy custom style (dev-breezy account) so it matches production. *Status (4 Nov): done. Production doesn't use a custom style: it's stock `mapbox://styles/mapbox/streets-v12` (light) and `mapbox://styles/mapbox/navigation-night-v1` (dark), on the dev-breezy production public token (keep it to prototypes). Dark mode recolours landmass #221d1b, water #234447, greenspace #405e44 and primary roads #343434. The prototype has no dark mode yet. `lib/map/theme.ts` (a Breezy palette over light-v11) is only active if the style is set back to light-v11.*
-2. Verify Mapbox search (`searchPlaces` in `lib/places.ts`) for city, ZIP, neighbourhood, county, state and address.
-3. Verify `/api/boundary` returns Census outlines for each search type. Check the layer-name matching against the live TIGERweb service metadata and tune `maxAllowableOffset` for large states. Make sure rings come back clockwise, because the inner-glow edge relies on a positive `line-offset`.
-4. When the Regrid token arrives: check the tile URL, `source-layer` name, the `promoteId` (`ll_uuid`) and the property fields used on hover (`address`, `owner`). Parcel hover / lift / click must work on real parcels. Building footprints can be added later. *Status (4 Nov): token added and checked. The tile URL template is right (confirmed via the TileJSON at `tiles.regrid.com/api/v1/parcels?token=`). Source layer `parcels` has fields `ll_uuid, owner, parcelnumb, address, path, fid, ogc_fid`, and hover shows the real address and owner. Limits: the token expires 4 Dec 2026, and its coverage is currently **Dallas only**, so LA (Silver Lake / Beverly Hills) parcels come back empty. Test around 32.7767, -96.7970 until LA County is added. Tiles carry no lot size or specs, so those stay fake.*
-5. Replace the viewport-generated fake heat hexes with something stable (e.g. H3 cells) so they don't shift between pans. Still fake values.
-6. Pins should come from a single listings source per area and refresh on "search this area" (see open design items).
+| Layer | Source | Status |
+|---|---|---|
+| Base map | Mapbox `streets-v12` (light) and `satellite-streets-v12`, on the dev-breezy **production public token** | Live. Keep the token to prototypes. Production has no custom style. Its dark mode is `navigation-night-v1` (landmass #221d1b, water #234447, greenspace #405e44, primary roads #343434); the prototype has no dark mode yet. `lib/map/theme.ts` (Breezy palette) only applies if the style is set back to `light-v11`. |
+| Parcels | Regrid vector tiles, source layer `parcels`, `promoteId: ll_uuid`, fields `owner, address, parcelnumb, path…` | Live on a **trial token: Dallas County only, expires 4 Dec 2026**, ~10k tiles. LA comes back empty, so demo around 32.7767, -96.7970. Tiles carry no lot size or specs, so those stay fake. Without the token, `lib/map/layers.ts` generates demo parcels. |
+| Area outlines | US Census TIGERweb through `app/api/boundary/route.ts` (city, ZIP, county, state) | Live. Outer rings come back **clockwise** and enclave holes **anticlockwise** (`lib/geo.ts`). The inner-glow edge depends on that: a positive `line-offset` means inside. `pointInRings` is even-odd, so holes count as outside. |
+| Search | Mapbox Geocoding v6 (`searchPlaces` / `searchPlacesStrict` in `lib/places.ts`) | Live. The hand-drawn gazetteer (Beverly Hills, Silver Lake, Dallas…) is the offline fallback. |
+| Coverage | `isCovered()` in `lib/places.ts` | California + Dallas. Outside that, the app shows an "unsupported area" state. |
+| Breezy data | `lib/fake.ts` | **Fake and deterministic per place / box:** listings, opportunity types, owners, quick estimates (some listings have `noQe`, i.e. no estimate), ROI (24–90) and Underbuilt heat, listing detail. Each generator will be swapped for a real service: the listings API, JD's heat-map service, the owner data service, and Justin's quick-estimate endpoint. |
+| Offline mode | No Mapbox token, a style error, or a 4 s timeout | Uses the georeferenced static images in `public/map/` (Beverly Hills, Silver Lake, plus a fake-satellite `sat-*` set). **Keep it working for demos without network.** |
 
-None of the external services (Mapbox, Regrid, Census) could be reached from the sandbox where this was built. So everything above is **wired but untested live**: expect small fixes on first run.
+Env keys are listed in `.env.example`, set locally in `.env.local`, and stored for deploys in the Vercel project settings. They are never committed. `lib/config.ts` reads them.
+
+## Onboarding (`/onboarding`): V5 flow, 8 steps
+
+`STEPS = where → radar → comps → ub → roi → heat → signup → cards`
+
+1. **where**: pick an area (search, or the Dallas chip). The outline draws with the inner-glow edge.
+2. **radar**: scan the area. Special opportunity pins (`OppPins`) pop in with a wave delay and a double pulse ring.
+3. **comps / ub / roi**: three "freebie" cards, each with its art (`FreebieArt`): the sparkle GIF for comps, the build render for Underbuilt, a graduated gauge for ROI. Flip cards show "Learn more".
+4. **heat**: heat map and market alerts are **merged** into one step, and the hexes reveal in a wave (`heatWave` / `heatWaveEnd`).
+5. **signup**: brand modal (bold clay count, centred text) with Google sign-in.
+6. **cards**: personalisation. One swipe card per signal (`OppCard`):
+   - Each card has an isometric render (`public/iso/card-*.png`) and a background tinted to match it.
+   - Art and text enter on a stagger. The card has a fixed height (330–540 px).
+   - Pointer-drag to swipe (110 px threshold). The footer stays pinned with Restart and Skip / Build my feed.
+   - Pins keep pulsing.
+
+The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
+
+## Home Web (`/home`)
+
+**Layout**
+- Side nav on the left, then the left column (Home card or Results), the detail panel (420 px) when a property is open, and the map behind everything.
+- Map controls sit bottom-right.
+
+**Home card** (`HomeCard.tsx`), always full height, with three tabs:
+- **For you:** the V5 feed (`ForYouFeed.tsx`), sorted by signal, with a signal filter dropdown and `SignalDot` badges.
+  - **Special pins** (yellow signal circles) appear on the map **only while For you is the visible tab**. They follow the feed's signal filter.
+  - A pin reverts to a plain white price pill once its detail has been opened ("seen").
+  - The "+" on a card picks the property. Picked properties show in the `PickedFooter`, and their thumbnails open the Saved sheet.
+- **Searches:** saved searches, each with an Active badge (pulsing green) and alerts.
+- **Properties:** saved properties.
+
+**Search** (`SearchBar.tsx`, the canvas search step)
+- Recent searches are stored in localStorage. Several areas can be picked as chips.
+- Results use `searchPlacesStrict`.
+- Error rows with Retry: "Unable to load search. Please retry." and "Search service timed out".
+- Empty state uses `/iso/empty-search.png` with "No recent searches".
+- When a property is open, the field shows its address with an × that deselects it.
+
+**Results** (`LeftPanel.tsx`)
+- Filters (`Filters.tsx`, `lib/filters.ts`) default to relaxed: any status, any type. The "All filters" badge counts every active filter.
+- Sort menu, and a 1 / 2 / 3 column toggle (`ColsToggle`). Widening the column pans the map so the same spot stays centred.
+- Footer:
+  - **Save search** (primary).
+  - When the **Recently sold** filter is on, **Create comps** becomes primary and Save search turns into a grey secondary.
+  - Once properties are picked, the footer shows only thumbnails + "Share n properties", with no Save search bell.
+
+**Search this area** (pill at the top centre of the visible map)
+- Shows only after a *user* pan / zoom, never after the app's own `easeTo` / `fitBounds`. Two triggers:
+  - the centre of the visible map has left the searched area;
+  - more than half of a 4 × 3 grid over the visible map has no pins.
+- Clicking it searches the visible box: the field reads "Map area", the outline clears, and the camera stays put.
+
+**Map and pins**
+- **Price pins** (`PricePins.tsx`) are white pills with a soft shadow. Pins that would overlap a higher-priority pin collapse into small blank pills underneath, and hover reveals the price. Priority: selected / hovered, then price drops, then new.
+- **Pin hover preview** (`HoverCard.tsx`):
+  - opens after ~220 ms and closes on hover-out;
+  - photo carousel (arrows, dots, n/total), address, price per ft², specs, an **owner** row and a **quick estimate** chip (hidden for `noQe` listings);
+  - "Get comps" is distinct from the quick estimate.
+- **Parcel hover, zoom ≥ 15.4** (`ParcelLift.tsx`):
+  - The parcel lifts off the map as a solid slab: drop shadow, stacked sides, an **opaque** top and the house number, with a dashed outline on the ground.
+  - With the heat map on, the slab keeps its heat colour; with it off, it's neutral.
+  - In satellite: the rest of the map dims, the slab top is the satellite image (Mapbox Static) with a yellow edge, and there are no colour washes.
+- **Detail zoom:** opening a property panel (from a pin, card or saved property) or clicking a parcel eases to **zoom 18** (`DETAIL_ZOOM`), centred in the visible map between the panels.
+- **Searched-area outline:** option 04, "inner glow edge". A thin clay line (rgb 147,89,75) plus a soft clay gradient inside the boundary; nothing outside. The glow widens with zoom while the line keeps a fixed width.
+- **Map controls**, bottom-right, from the bottom up: Layers (84 px card with thumbnail), zoom, my location, info. The Layers and info panels open to the left. Layers cover satellite, the heat map (ROI / Underbuilt hexes) and parcels.
+
+**Detail panel** (`DetailPanel.tsx`)
+- Photo carousel, address, specs row, then sticky tabs: **Summary / Specs / Records / Owners**.
+- Summary only:
+  - A floating **Quick estimate** card with the big number and a **Get comps** button.
+  - Max build + Profit potential tiles.
+  - An **Owner** section (56 px avatar, "View history" on the right), then the listing description. Owner contact lines copy on click.
+- **No estimate (`noQe`):** a banner with a "Get price estimate" CTA, which loads, then shows the estimate and a positive toast. There are two layout routes, **side CTA** and **full-width CTA**, switched from the Dev menu (localStorage `bz-qe-route`). *Waiting on William to choose (Vercel thread K9edXzqfVf9j).*
+- "View more" buttons have no arrows.
+- Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). After reveal, it becomes Call owner + an email icon.
+
+**Flows and sheets**
+- **Get comps** (`CompsFlow.tsx`): "Review the subject property data", then the full-screen "Let AI do the work" takeover, then the analysis, then results. A report that has already been run reopens straight on its result (cached). Area comps come from Create comps (`AreaCompsPreview`).
+- **Saved** (`Saved.tsx`, `SavedState.tsx`): save-search sheet, `SaveToggle`, the Saved sheet (opens from Home and Results).
+- **Alerts panel**, "Set custom alerts":
+  - "Any activity" with an Active / Turn on pill.
+  - Price drop / bump use a % stepper ("Alert when · Price drops N% below current price").
+  - One Save button.
+- **Share** (`Share.tsx`): share one property or the picked set.
+- **Reports** (`Reports.tsx`): comps and area reports.
+- **Toasts** (`Toast.tsx`), bottom centre, tones neutral / positive / negative. "No property found" uses the neutral black info icon.
+
+**Developer menu** (side nav), to preview states on demand:
+- Restart onboarding
+- Snackbars (neutral / positive / negative)
+- Search failed / timed out / no recents
+- Property with no estimate
+- No-estimate banner side / full
+
+## Special-pin colour routes (exploration, not yet decided)
+
+A floating **"Pins: …" switcher** (`components/PinPalette.tsx`) sits at the bottom-right of both routes. It changes the colour of every yellow signal circle (`SignalDot`). White price pills never change. The choice is saved in localStorage (`bz-pin-route`) and shared through a window event. Logic lives in `lib/pinColors.ts`.
+
+- Every circle gets a light radial gradient of its shade. The icon goes dark or light by luminance. **Selected is always black with a white icon.**
+- Onboarding pins are 38 px (44 px selected) with a pulse ring in the pin colour. On Home they are 22 px.
+
+| Route | Logic |
+|---|---|
+| Yellow | Today's single Breezy yellow (baseline). |
+| Hot → cold | By how active the listing is: price drop > ROI > Underbuilt > stale > expired > withdrawn, red-orange to blue. |
+| Brand range | Breezy yellow → deep clay. |
+| Seller vs value | Warm = call the owner (drop, stale, expired, withdrawn); cool = pitch the upside (ROI, Underbuilt). Shade = urgency. |
+| Freshness | Per pin: vivid when new, fading with age (`1 − dom/150`). |
+| Family + freshness | Seller / value colour, with strength set by freshness. |
+| Upside $ | Per pin: estimated profit (price × ROI), pale gold → deep green. |
+| Match heat layer | Per pin: the ROI heat-map colour under the pin. |
 
 ## Design rules (from review feedback; keep them)
 
-- **Side nav:** collapse toggle at the top, with the Breezy wordmark next to it when expanded and only the toggle when collapsed. Items: Map (active, dark pill), Comps, Underbuilt, AI Notes, Assistant, all 3D-style icons in `public/nav`. The footer has Upgrade to team, Reports, Settings and the avatar. No News item.
-- **Price pins:** white pills with a soft drop shadow so overlaps read. Pins that would overlap a higher-priority pin collapse into small blank pills underneath, and hover reveals the price. Priority order: selected / hovered first, then price drops, then new.
-- **Pin hover preview:** opens after ~220 ms and dismisses on hover-out. It has a scrollable photo carousel (arrows, dots, n/total), address, price per ft², specs, an **owner** row and a **quick estimate** chip, with "Get comps" shown as distinct from the quick estimate.
-- **Parcel hover (zoom ≥ 15.4):** the parcel lifts off the map as a solid slab with a drop shadow, stacked sides, an **opaque** top and the house number. With the heat map on, the slab keeps the parcel's **heat colour**; with it off, it's neutral. In satellite: the rest of the map dims, the slab has a yellow edge, and there are no colour washes.
-- **Detail panel:** photo carousel, address, specs row, and sticky tabs (Summary / Specs / Records / Owners). Summary only: a floating **Quick estimate** card with the big number and a "Get comps" button. Max build + Profit potential tiles. A separate **Owner** section titled "Owner" with "View history" on the right and a 56 px avatar. Then the listing description. "View more" buttons have no arrows. The footer is alert + share icons with a primary **Contact owner** button (no "1 credit" text); after reveal it becomes Call owner + an email icon.
-- **Search field:** when a property is open it shows the address with an × that deselects it.
-- **Get comps:** first "Review the subject property data", then the full-screen "Let AI do the work" takeover, then the analysis, then results.
-- **Searched area outline:** option 04 "inner glow edge". A thin clay line (rgb 147,89,75) plus a soft clay gradient inside the boundary; nothing is drawn outside. The glow widens with zoom; the line stays a fixed width.
-- **Map controls:** bottom-right column, from the bottom up: Layers (84 px card with thumbnail), zoom, my location, info. Layers and info panels open to the left.
-- Colours: ink rgb(18,18,18), paper rgb(253,252,252), clay rgb(175,127,113), nav background rgb(245,243,243). Font: Akkurat LL (`public/fonts`). Icons: Phosphor (`public/vendor/phosphor`).
+- **Side nav:**
+  - Collapse toggle at the top, with the Breezy wordmark next to it when expanded.
+  - Items: Map, Comps, Underbuilt, AI Notes, Assistant. **No News.**
+  - Icons are transparent isometric PNG / SVG in `public/nav` (`map-iso`, `comps-iso`, `radar`, `ai-notes-new`, `assistant`), optically equalised by `ICON_SCALE`.
+  - The active item has a **dark pill**. Icons never fade.
+  - Footer: Upgrade to team, Reports, Settings, Dev menu, avatar.
+- **Illustrations:** isometric "skeuomorphic" scenes in the Breezify Core Figma style (file `N81mxdVxHzi9rmqU2qw0xn`, node 7612:60), in `public/iso/`. Full-resolution copies for the team are in `~/Downloads/Breezy-isometric-illustrations/`.
+- **Colours:** ink rgb(18,18,18), paper rgb(253,252,252), clay rgb(175,127,113), deep clay rgb(147,89,75), nav background rgb(245,243,243), Breezy yellow rgb(255,209,41).
+- **Type and icons:** Akkurat LL (`public/fonts`); Phosphor icons (`public/vendor/phosphor`).
+- Match the canvas. When something isn't specified there, follow these rules rather than inventing a new pattern.
 
-## Open design items (from the 30 Oct End of Sprint Demo)
+## Open items
 
-- "Search this area" button and the draw-area tool. The trigger fires when the viewport is roughly 50% empty of pins; William is sharing the zone diagram from Figma. The draw tool's placement is still to be decided.
-- The "No property found" toast should use a neutral black info icon, not a checkmark.
-- Make saved reports easier to reach, like on mobile.
-- Welcome-panel polish: rounder corners, no bottom padding between list items, and piece-by-piece skeleton loading.
-- A comps result that has already been run should open straight away (cached).
-- The "New match" badge should clear on first interaction.
-- Onboarding and activation designs are due 7 Nov to unblock the China team; the full engineering handoff is end of November.
+- **No-estimate banner:** choose side vs full-width CTA.
+- **Pin colour route:** pick one (or keep yellow) and remove the switcher.
+- Draw-area tool: placement still undecided. The "Search this area" zone diagram is coming from William's Figma.
+- Make saved reports easier to reach, as on mobile.
+- Welcome-panel polish: rounder corners, no bottom padding between list items, skeleton loading piece by piece.
+- "New match" badge should clear on first interaction.
+- Heat hexes are still viewport-generated. Move them to stable cells (e.g. H3) so they don't shift between pans.
+- Pins should come from one listings source per area, refreshed on "Search this area".
+- Regrid: ask for LA County coverage before the trial ends (4 Dec 2026).
+- Dark mode (production's `navigation-night-v1` palette).
+- Onboarding and activation designs were due 7 Nov to unblock the China team. The full engineering handoff is end of November.
 
-## Map
+## Code map
 
 ```
-app/layout.tsx              root layout → AppStateProvider → MapProvider (shared map)
-app/onboarding/page.tsx     V5 flow: where → radar → comps → ub → roi → heat → alerts → signup → cards
-app/home/page.tsx           Home Web
-app/api/boundary/route.ts   Census TIGERweb lookup
-components/AppState.tsx     place, outline rings, listings, picks, onboarded (sessionStorage)
+app/layout.tsx              root layout → AppStateProvider → SavedProvider → MapProvider (shared map)
+app/page.tsx                redirects to /onboarding
+app/onboarding/page.tsx     V5 flow (8 steps), OppCard swipe cards, FreebieArt, signup modal
+app/home/page.tsx           Home Web: layout, views (home / results), search this area, detail zoom, Dev menu
+app/api/boundary/route.ts   Census TIGERweb lookup (winding + holes)
+components/AppState.tsx     place / areas, outline rings, listings, picks, onboarded (sessionStorage)
+components/SavedState.tsx   saved searches + properties, alert definitions
+components/PinPalette.tsx   SignalDot, pulse colour, PinRouteSwitcher
 components/map/             MapProvider (inset, mode, heat, area), Overlay (portal into the map)
-components/home/            SideNav, SearchBar, LeftPanel, PricePins, HoverCard, ParcelLift, DetailPanel, MapControls, CompsFlow
+components/home/            SideNav (+DevMenu), SearchBar, HomeCard, ForYouFeed, LeftPanel, Filters,
+                            PricePins, HoverCard, ParcelLift, DetailPanel, MapControls, CompsFlow,
+                            Saved, Share, Reports, Toast
 components/onboarding/      OppPins
+lib/config.ts               env-driven config, isLiveMap / hasRegrid
 lib/map/style.ts            live vs offline styles
-lib/map/theme.ts            optional Breezy palette over light-v11 (inactive on streets-v12)
-lib/map/layers.ts           heat hexes, parcels (Regrid or demo), area inner-glow layers
-lib/places.ts               search + boundaries + offline gazetteer
-lib/fake.ts                 demo data
+lib/map/layers.ts           heat hexes (+ wave reveal), parcels (Regrid or demo), area inner-glow layers
+lib/map/theme.ts            optional Breezy palette over light-v11 (inactive)
+lib/places.ts               search, boundaries, gazetteer, viewportPlace, isCovered
+lib/geo.ts                  ring winding, bbox, point-in-rings
+lib/fake.ts                 demo data (listings, detail, owners, estimates, heat)
+lib/filters.ts              filter model and defaults
+lib/pinColors.ts            pin colour routes
+lib/css.ts                  converts canvas style strings to React styles
 ```
 
-`window.__bzMap` exposes the map instance in the browser console for debugging.
+## Workflow
 
-## Reviewing and comments
-
-- Repo: `Breezy-Technologies/breezy-web-prototype`, linked to the Vercel project `breezy-web-prototype` (team `breezy18`). Env keys live in Vercel project settings, never in git.
-- `main` is the demo: https://breezy-web-prototype.vercel.app (public, comment toolbar off).
-- Each change goes on its own branch. Vercel builds a preview at `breezy-web-prototype-git-<branch>-breezy18.vercel.app`; it needs a Vercel sign-in, and the comment toolbar is on.
-- Reviewers comment on the preview with the Vercel toolbar. Claude reads the open threads (Vercel MCP `list_toolbar_threads`), fixes the issues on the branch, replies in each thread and resolves it. Merge to `main` once the branch is approved.
+- **Repo:** `Breezy-Technologies/breezy-web-prototype`, linked to the Vercel project `breezy-web-prototype` (team `breezy18`).
+- **`main` is the demo:** https://breezy-web-prototype.vercel.app. William has asked for **changes to go straight to `main`**. Use a branch only for larger explorations (Vercel then builds `breezy-web-prototype-git-<branch>-breezy18.vercel.app`, behind a Vercel sign-in).
+- **Review loop:**
+  1. William comments with the Vercel toolbar.
+  2. Claude reads the open threads (Vercel MCP `list_toolbar_threads`), fixes the issues, and pushes.
+  3. Claude replies in each thread with the commit, then resolves it. Threads waiting on a decision stay open.
+- Before committing, run `npx tsc --noEmit` (ignore stale `.next/` type errors).
+- Dev server: `npx next dev -p 3000`.
 
 ## Working agreements
 
 - Keep the offline demo path working whenever live services are added.
-- Keep env keys in `.env.local` only, never committed. Lock the Mapbox token to the prototype's domain.
-- Match the canvas designs. When something isn't specified there, follow the rules above rather than inventing a new pattern.
+- Env keys stay in `.env.local` and the Vercel settings, never in git. The Mapbox token is production's public token: use it for prototypes only, locked to the prototype's domain.
+- Breezy's own data stays fake until the real services are ready. Swap one generator at a time.
+- Update this file when product logic or the prototype's state changes.
