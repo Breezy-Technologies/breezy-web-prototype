@@ -3,6 +3,7 @@ import { useMemo, useRef } from "react";
 import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
 import { Listing, OPP, shortPrice } from "@/lib/fake";
+import { SignalDot } from "../PinPalette";
 
 const DROP = "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 4px 12px rgba(30,18,12,.16)";
 
@@ -74,9 +75,7 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
               }}
             >
               {sig && (
-                <span style={{ flex: "none", width: 22, height: 22, borderRadius: 9999, background: "rgb(255,209,41)", boxShadow: `0 0 0 1.5px ${dark ? "var(--paper)" : "var(--ink)"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <i className={`ph-bold ph-${OPP[l.opp].ic}`} style={{ fontSize: 12, color: "var(--ink)" }} />
-                </span>
+                <SignalDot type={l.opp} size={22} icon={12} selected={dark} ring={dark ? "rgb(253,252,252)" : "rgb(18,18,18)"} />
               )}
               {!isBlank && !sig && l.opp === "drop" && <i className="ph-fill ph-bell-simple" style={{ fontSize: 13, color: dark ? "var(--paper)" : "rgb(249,60,45)" }} />}
               {!isBlank && <span style={{ font: "700 14px/1.26 var(--font-sans)", color: dark ? "var(--paper)" : "var(--ink)" }}>{lab}</span>}

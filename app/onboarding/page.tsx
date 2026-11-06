@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMapCtx } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
 import { OppPins } from "@/components/onboarding/OppPins";
+import { PinRouteSwitcher, SignalDot } from "@/components/PinPalette";
 import { MapOverlay } from "@/components/map/Overlay";
 import { Place, GAZETTEER, searchPlaces } from "@/lib/places";
 import { Listing, OPP, OPP_TYPES, OppType, fullPrice, shortPrice } from "@/lib/fake";
@@ -156,6 +157,7 @@ export default function Onboarding() {
 
   return (
     <>
+      <PinRouteSwitcher style={{ right: 20, bottom: 20 }} />
       {/* Step counter */}
       <div style={{ position: "fixed", left: "50%", top: 20, transform: "translateX(-50%)", zIndex: 45, display: "flex", alignItems: "center", gap: 10, height: 36, padding: "0 14px", borderRadius: 9999, background: "var(--paper)", boxShadow: "0 6px 18px rgba(30,18,12,.12)" }}>
         <span style={{ width: 20, height: 16, background: "linear-gradient(180deg,rgb(191,160,151),rgb(175,127,113))", WebkitMask: "url(/brand/brandmark.svg) center/contain no-repeat", mask: "url(/brand/brandmark.svg) center/contain no-repeat" }} />
@@ -168,7 +170,7 @@ export default function Onboarding() {
 
       {step === "radar" && <>
         <RadarSweep active={rN < opps.length} />
-        <OppPins items={opps} shown={(_, i) => i < rN} lit={l => !rHover || l.opp === rHover} selId={rSel?.id} onPick={setRSel} />
+        <OppPins pulse items={opps} shown={(_, i) => i < rN} lit={l => !rHover || l.opp === rHover} selId={rSel?.id} onPick={setRSel} />
         <div style={panel}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ font: "700 13px/16px var(--font-sans)", color: "var(--clay-dark)" }}>{app.place.label}</span>
@@ -188,7 +190,7 @@ export default function Onboarding() {
             {OPP_TYPES.map(t => (
               <div key={t} onMouseEnter={() => setRHover(t)} onMouseLeave={() => setRHover(h => (h === t ? null : h))} className="hover-row"
                 style={{ display: "flex", alignItems: "center", gap: 12, height: 44, margin: "0 -8px", padding: "0 8px", borderRadius: 10, cursor: "default", boxShadow: "inset 0 -1px 0 rgba(13,12,12,.06)" }}>
-                <span style={{ width: 28, height: 28, borderRadius: 9999, background: "rgb(255,209,41)", boxShadow: `0 0 0 2.5px rgb(${OPP[t].col})`, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ph-bold ph-${OPP[t].ic}`} style={{ fontSize: 15 }} /></span>
+                <SignalDot type={t} size={28} icon={15} ring="rgb(253,252,252)" ringW={2} shadow="0 2px 6px rgba(30,18,12,.18)" />
                 <span style={{ flex: 1, font: "400 15px/20px var(--font-sans)" }}>{OPP[t].pl}</span>
                 <span style={{ font: "700 17px/20px var(--font-sans)", fontVariantNumeric: "tabular-nums" }}>{counts[t] || 0}</span>
               </div>
@@ -240,7 +242,7 @@ export default function Onboarding() {
 
       {step === "cards" && <>
         {/* While cards are showing, light up only the pins for the current card's type so users can focus on one kind at a time; once done, light their picks. */}
-        <OppPins items={opps} shown={() => true} lit={l => ci < CARDS.length ? l.opp === CARDS[ci].k : answered === 0 || !!ans[l.opp]} />
+        <OppPins pulse items={opps} shown={() => true} lit={l => ci < CARDS.length ? l.opp === CARDS[ci].k : answered === 0 || !!ans[l.opp]} />
         <div style={{ ...panel, gap: 0, overflow: "hidden", padding: 0 }}>
           <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, padding: "26px 32px 16px" }}>
             <span style={{ font: "300 30px/36px var(--font-sans)", letterSpacing: "-.02em" }}>What should Breezy look out for?</span>
@@ -354,7 +356,7 @@ function PinWhy({ l, onClose, onMore }: { l: Listing; onClose: () => void; onMor
       <div style={{ position: "absolute", left: p.x, top: p.y - 26, transform: "translate(-50%,-100%)", width: 300, borderRadius: 20, overflow: "hidden", background: "var(--paper)", boxShadow: "0 18px 40px rgba(30,18,12,.22)", pointerEvents: "auto", animation: "hvPop .22s ease both" }}>
         <div style={{ position: "relative", height: 120, background: `url(${l.photos[0]}) center/cover` }}>
           <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px 0 4px", borderRadius: 9999, background: "rgba(253,252,252,.94)", font: "700 12px/28px var(--font-sans)" }}>
-            <span style={{ width: 20, height: 20, borderRadius: 9999, background: "rgb(255,209,41)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ph-bold ph-${OPP[l.opp].ic}`} style={{ fontSize: 12 }} /></span>{OPP[l.opp].lb}
+            <SignalDot type={l.opp} size={20} icon={12} ringW={0} />{OPP[l.opp].lb}
           </span>
           <button onClick={onClose} title="Close" style={{ position: "absolute", right: 10, top: 10, width: 28, height: 28, border: "none", borderRadius: 9999, background: "var(--paper)", cursor: "pointer" }}><i className="ph-bold ph-x" /></button>
         </div>
@@ -468,7 +470,7 @@ function OppCard({ c }: { c: (typeof CARDS)[number] }) {
             WebkitMaskImage: "radial-gradient(ellipse 62% 64% at 50% 52%,#000 62%,transparent 100%)", maskImage: "radial-gradient(ellipse 62% 64% at 50% 52%,#000 62%,transparent 100%)",
             animation: "cardArtIn .7s cubic-bezier(.2,.8,.2,1) .05s backwards" }} />
         <span style={{ position: "absolute", left: 16, top: 16, zIndex: 2, display: "flex", alignItems: "center", gap: 8, height: 30, padding: "0 12px 0 4px", borderRadius: 9999, background: "rgba(253,252,252,.85)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.12)", font: "400 13px/30px var(--font-sans)", whiteSpace: "nowrap", animation: "cardTextIn .45s cubic-bezier(.2,.8,.2,1) .25s backwards" }}>
-          <span style={{ width: 22, height: 22, borderRadius: 9999, background: "rgb(255,209,41)", boxShadow: "0 0 0 1.5px var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ph-bold ph-${c.ic}`} style={{ fontSize: 12 }} /></span>{c.lb}
+          {c.k === "fc" ? <span style={{ width: 22, height: 22, borderRadius: 9999, background: "rgb(240,237,235)", boxShadow: "0 0 0 1.5px var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ph-bold ph-${c.ic}`} style={{ fontSize: 12 }} /></span> : <SignalDot type={c.k as OppType} size={22} icon={12} />}{c.lb}
         </span>
         {c.soon && <span style={{ position: "absolute", right: 14, top: 18, zIndex: 2, height: 24, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.72)", font: "400 11px/24px var(--font-sans)", color: "#fff", animation: "cardTextIn .45s cubic-bezier(.2,.8,.2,1) .3s backwards" }}>New dataset · may launch later</span>}
       </div>

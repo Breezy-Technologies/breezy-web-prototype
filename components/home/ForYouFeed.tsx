@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Listing, OPP, OppType, fullPrice } from "@/lib/fake";
 import { useSaved } from "@/components/SavedState";
 import { SaveToggle } from "./Saved";
+import { SignalDot } from "../PinPalette";
 
 const INK = "rgb(18,18,18)";
 type Item = { c: OppType | null; lb: string; ic: string };
@@ -21,7 +22,6 @@ const GROUPS: [string, Item[]][] = [
   ["Neighbourhood", [["Neighbour just sold", "house-line"], ["New permit nearby", "file-text"], ["Zoning change", "map-trifold"]].map(([lb, ic]) => ({ c: null, lb, ic }))],
 ];
 
-const signalChip = (size: number): React.CSSProperties => ({ flex: "none", width: size, height: size, borderRadius: 9999, background: "rgb(255,209,41)", boxShadow: `0 0 0 1.5px ${INK}`, display: "flex", alignItems: "center", justifyContent: "center" });
 
 function FeedCard({ l, fresh, onOpen, onHover }: { l: Listing; fresh: boolean; onOpen: () => void; onHover: (on: boolean) => void }) {
   const sv = useSaved();
@@ -31,7 +31,7 @@ function FeedCard({ l, fresh, onOpen, onHover }: { l: Listing; fresh: boolean; o
       <div style={{ position: "relative", flex: "none", height: 244, borderRadius: 20, overflow: "hidden", background: "rgb(241,231,228)" }}>
         <span style={{ position: "absolute", inset: 0, background: `url('${l.photos[0]}') center/cover no-repeat` }} />
         <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px 0 6px", borderRadius: 9999, background: "rgba(243,242,241,.88)", backdropFilter: "blur(12px)", font: "400 13px/16px var(--font-sans)", color: "rgb(17,16,16)", whiteSpace: "nowrap" }}>
-          <span style={signalChip(18)}><i className={`ph-bold ph-${OPP[l.opp].ic}`} style={{ fontSize: 11, color: INK }} /></span>
+          <SignalDot type={l.opp} size={18} icon={11} />
           {fresh && <span style={{ flex: "none", width: 8, height: 8, borderRadius: 9999, background: "rgb(214,53,41)" }} />}
           {OPP[l.opp].lb}
         </span>
@@ -114,9 +114,9 @@ export function ForYouFeed({ items, seen, onOpen, onHover, onSignals }: { items:
                         <span style={{ flex: "none", width: 18, height: 18, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", ...(on ? { background: INK } : { boxShadow: `inset 0 0 0 1.5px rgba(13,12,12,${soon ? 0.15 : 0.3})` }) }}>
                           <i className="ph-bold ph-check" style={{ fontSize: 11, color: "rgb(253,252,252)" }} />
                         </span>
-                        <span style={soon ? { flex: "none", width: 24, height: 24, borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgb(240,237,235)", opacity: 0.6 } : signalChip(24)}>
-                          <i className={`ph-bold ph-${it.ic}`} style={{ fontSize: 12, color: INK }} />
-                        </span>
+                        {soon
+                          ? <span style={{ flex: "none", width: 24, height: 24, borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgb(240,237,235)", opacity: 0.6 }}><i className={`ph-bold ph-${it.ic}`} style={{ fontSize: 12, color: INK }} /></span>
+                          : <SignalDot type={it.c!} size={24} icon={12} />}
                         <span style={{ flex: 1, minWidth: 0, font: "400 14px/18px var(--font-sans)", color: soon ? "rgb(160,150,145)" : INK }}>{it.lb}</span>
                         {soon
                           ? <span style={{ flex: "none", height: 20, padding: "0 7px", borderRadius: 9999, background: "rgb(240,237,235)", font: "700 10px/20px var(--font-sans)", color: "rgb(129,117,111)" }}>Soon</span>
