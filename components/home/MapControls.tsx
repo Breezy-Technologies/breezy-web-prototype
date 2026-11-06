@@ -11,6 +11,7 @@ const hexThumb = (kind: "roi" | "ub") => {
 };
 
 // Bottom-right column, bottom to top: Layers, zoom, my location, info.
+// Zoom buttons tag their camera events `bzUser` so "Search this area" treats them as user moves.
 export function MapControls({ onLocate }: { onLocate: () => void }) {
   const { map, heat, setHeat, mode, setMode } = useMapCtx();
   const [open, setOpen] = useState(false);
@@ -34,8 +35,8 @@ export function MapControls({ onLocate }: { onLocate: () => void }) {
       </div>
       <button style={{ ...round, background: "var(--ink)", color: "var(--paper)" }} title="My location" onClick={onLocate}><i className="ph-fill ph-navigation-arrow" /></button>
       <div style={{ display: "flex", flexDirection: "column", borderRadius: 9999, background: "var(--paper)", boxShadow: "0 2px 10px rgba(30,18,12,.14)", overflow: "hidden" }}>
-        <button style={{ ...round, boxShadow: "none" }} title="Zoom in" onClick={() => map?.zoomIn({ duration: 400 })}><i className="ph-bold ph-plus" /></button>
-        <button style={{ ...round, boxShadow: "none" }} title="Zoom out" onClick={() => map?.zoomOut({ duration: 400 })}><i className="ph-bold ph-minus" /></button>
+        <button style={{ ...round, boxShadow: "none" }} title="Zoom in" onClick={() => map?.zoomIn({ duration: 400 }, { bzUser: true })}><i className="ph-bold ph-plus" /></button>
+        <button style={{ ...round, boxShadow: "none" }} title="Zoom out" onClick={() => map?.zoomOut({ duration: 400 }, { bzUser: true })}><i className="ph-bold ph-minus" /></button>
       </div>
       <div style={{ position: "relative" }} onMouseEnter={() => { clearTimeout(t.current); setOpen(true); }} onMouseLeave={() => { t.current = setTimeout(() => setOpen(false), 260); }}>
         <button title="Map layers" onClick={() => setOpen(v => !v)} style={{ width: 84, height: 105, padding: 6, border: "none", borderRadius: 18, background: "var(--paper)", boxShadow: "0 2px 10px rgba(30,18,12,.14)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>

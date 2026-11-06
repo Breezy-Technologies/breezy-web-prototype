@@ -14,17 +14,24 @@ import { HoverCard } from "@/components/home/HoverCard";
 import { ParcelLift, ParcelHit } from "@/components/home/ParcelLift";
 import { DetailPanel } from "@/components/home/DetailPanel";
 import { MapControls } from "@/components/home/MapControls";
-import { CompsFlow } from "@/components/home/CompsFlow";
+import { AreaCompsPreview, CompsFlow } from "@/components/home/CompsFlow";
 import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
-import { ReportsSheet, useReports } from "@/components/home/Reports";
+import { AreaReport, ReportsSheet, useReports } from "@/components/home/Reports";
 import { Listing, OppType, makeListings } from "@/lib/fake";
 import { SortKey, homeOk, sortListings } from "@/lib/filters";
-import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces } from "@/lib/places";
-import { ringBBox } from "@/lib/geo";
+import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
+import { BBox, LngLat, pointInRings, ringBBox } from "@/lib/geo";
 
-const COL = 388, GAP = 12;
+const GAP = 12;
+// Results column width per layout (1 / 2 / 3 columns of cards); Home and 1 column stay 388.
+const COL_W = [388, 388, 664, 940];
+// Window width needed for 2 and 3 columns (the map still keeps ~800 px next to them).
+const colsFit = (w: number) => (w >= 2100 ? 3 : w >= 1600 ? 2 : 1);
+const COLS_KEY = "bz-results-cols";
+// Top of the visible map below the filter bar (search-this-area pill and viewport box).
+const BAR_BOTTOM = 70;
 
 export default function HomeWeb() {
   const router = useRouter();
@@ -32,6 +39,15 @@ export default function HomeWeb() {
   const { place, rings, listings, picks, user, choosePlace, chooseAreas, areas, onboarded, restartOnboarding } = useApp();
   const [navX, setNavX] = useState(false);
   const [view, setView] = useState<"home" | "results">("home");
+  // Multi-column results: the user's choice (persisted), capped by what the window fits.
+  const [winW, setWinW] = useState(0);
+  useEffect(() => { const f = () => setWinW(window.innerWidth); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
+  const [colsPref, setColsPref] = useState(1);
+  useEffect(() => { try { const v = Number(localStorage.getItem(COLS_KEY)); if (v === 2 || v === 3) setColsPref(v); } catch {} }, []);
+  const pickCols = (n: number) => { setColsPref(n); try { localStorage.setItem(COLS_KEY, String(n)); } catch {} };
+  const maxCols = colsFit(winW);
+  const cols = view === "results" ? Math.min(colsPref, maxCols) : 1;
+  const COL = COL_W[cols];
   const [selId, setSelId] = useState<number | null>(null);
   const [parcel, setParcel] = useState<ParcelHit | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
@@ -87,8 +103,17 @@ export default function HomeWeb() {
   useEffect(() => {
     if (!map || !ready) return;
     if (!firstFit.current) { firstFit.current = true; if (onboarded) return; }
+    // "Search this area" searched what's on screen: the camera stays where the user put it.
+    if (place.kind === "area") return;
     fit(GAP + COL + GAP);
   }, [map, ready, place.id, rings]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Widening / narrowing the results column keeps the same spot in the middle of the
+  // visible map (programmatic pan, so it never raises "Search this area").
+  const prevCol = useRef(COL);
+  useEffect(() => {
+    const d = COL - prevCol.current; prevCol.current = COL;
+    if (map && ready && d) map.panBy([-d / 2, 0], { duration: 450 });
+  }, [COL]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sel = selId != null ? listings.find(l => l.id === selId) || null : parcel ? parcel.listing : soloL;
   const hover = hoverId != null ? listings.find(l => l.id === hoverId) || null : null;
@@ -115,12 +140,12 @@ export default function HomeWeb() {
     if (l && map) map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 15), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
   };
   const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); };
-  const goPlace = async (p: Place) => { closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
+  const goPlace = async (p: Place) => { setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
   // `_commitAreas`: results for the field's area(s); leaves the active saved search.
   // Each chip resolves to a Place (live geocoding / gazetteer; "Current location" via
   // geolocation), then they go to `chooseAreas` together (outlines + listings for all).
   const commitAreas = async (list: Area[]) => {
-    sv.setActive(null); closeDetail(); setSearching(false); setView("results"); setUnsup(null);
+    sv.setActive(null); closeDetail(); setSearching(false); setView("results"); setUnsup(null); setAreaPill(false);
     const ps = await Promise.all(list.map(a => resolveArea(a, place.center)));
     const ok = ps.filter((p): p is Place => !!p);
     const missed = list.filter((_, k) => !ps[k]);
@@ -139,7 +164,7 @@ export default function HomeWeb() {
     openSavedProp({ ...l, lng, lat, addr: p.name });
   };
   // `onClearSearch` from the search step: back to Home with no area query.
-  const clearSearch = () => { sv.setActive(null); closeDetail(); setUnsup(null); setView("home"); setSortOpen(false); setSavedOpen(false); };
+  const clearSearch = () => { setAreaPill(false); sv.setActive(null); closeDetail(); setUnsup(null); setView("home"); setSortOpen(false); setSavedOpen(false); };
   const fieldAreas: Area[] = view !== "results" ? [] : unsup && !unsup.placed ? [{ label: unsup.label }] : areas.map(p => ({ label: p.label, place: p }));
   const multi = areas.length > 1;
   const areaMeta = multi ? areas.map(a => a.label.split(",")[0]).slice(0, -1).join(", ") + " & " + areas[areas.length - 1].label.split(",")[0] : place.label;
@@ -173,12 +198,84 @@ export default function HomeWeb() {
   const openComps = (l: Listing) => { setCompsCached(rp.has(l)); setComps(l); };
 
   const detailOpen = !!sel;
+
+  // ---- "Search this area" (Expedia-style pill, top centre of the map under the filter bar) ----
+  // After a user pan / zoom (drag, scroll, pinch, keyboard or the zoom buttons; never the
+  // app's own fitBounds / easeTo), the pill shows when the middle of the visible map has
+  // left the searched area, or when more than half of the visible map has no pins
+  // (CLAUDE.md open item). Clicking it searches the visible viewport: listings regenerate
+  // for that box (deterministic per box), the field reads "Map area", and the outline is
+  // cleared (the inner-glow edge is kept for real boundaries; a box around the whole
+  // screen would just read as a vignette).
+  const [areaPill, setAreaPill] = useState(false);
+  const visRect = () => {
+    const c = map!.getContainer();
+    return { x0: GAP + COL + GAP + (detailOpen ? 420 + GAP : 0), y0: BAR_BOTTOM, x1: c.clientWidth, y1: c.clientHeight };
+  };
+  const needsArea = () => {
+    if (!map || searching || unsupOn && !unsup?.placed) return false;
+    const r = visRect();
+    if (r.x1 - r.x0 < 200 || r.y1 - r.y0 < 200) return false;
+    const mid = map.unproject([(r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2]);
+    const pt: LngLat = [mid.lng, mid.lat];
+    const bb = place.bbox;
+    const inArea = rings && rings.length && areas.length === 1 ? pointInRings(pt, rings)
+      : bb ? pt[0] >= bb[0] && pt[0] <= bb[2] && pt[1] >= bb[1] && pt[1] <= bb[3] : true;
+    if (!inArea) return true;
+    // Emptiness: split the visible map into a 4 × 3 grid and count cells with no pin.
+    const NX = 4, NY = 3, hit = new Set<number>();
+    pinListings.forEach(l => {
+      const p = map.project([l.lng, l.lat]);
+      if (p.x < r.x0 || p.x >= r.x1 || p.y < r.y0 || p.y >= r.y1) return;
+      hit.add(Math.floor((p.x - r.x0) / ((r.x1 - r.x0) / NX)) + NX * Math.floor((p.y - r.y0) / ((r.y1 - r.y0) / NY)));
+    });
+    return hit.size < (NX * NY) / 2;
+  };
+  const needsRef = useRef(needsArea);
+  needsRef.current = needsArea;
+  useEffect(() => {
+    if (!map) return;
+    // Drags carry `originalEvent`; scroll / pinch / keyboard zoom are eased and don't, so a
+    // wheel, touch or key on the map marks the next ~600 ms of camera moves as the user's.
+    let user = false, intent = 0;
+    const mark = () => { intent = Date.now() + 600; };
+    const el = map.getCanvasContainer();
+    const start = (e: any) => { user = !!(e.originalEvent || e.bzUser) || Date.now() < intent; };
+    const end = (e: any) => { if (user || e.originalEvent || e.bzUser) setAreaPill(needsRef.current()); user = false; };
+    map.on("movestart", start); map.on("moveend", end);
+    el.addEventListener("wheel", mark, { passive: true }); el.addEventListener("touchstart", mark, { passive: true }); el.addEventListener("keydown", mark);
+    return () => {
+      map.off("movestart", start); map.off("moveend", end);
+      el.removeEventListener("wheel", mark); el.removeEventListener("touchstart", mark); el.removeEventListener("keydown", mark);
+    };
+  }, [map]);
+  const searchThisArea = () => {
+    if (!map) return;
+    const r = visRect();
+    const a = map.unproject([r.x0, r.y0]), b = map.unproject([r.x1, r.y1]);
+    const bb: BBox = [Math.min(a.lng, b.lng), Math.min(a.lat, b.lat), Math.max(a.lng, b.lng), Math.max(a.lat, b.lat)];
+    const p = viewportPlace(bb);
+    setAreaPill(false); sv.setActive(null); closeDetail(); setSearching(false); setSortOpen(false);
+    setView("results");
+    setUnsup(isCovered(p) ? null : { label: "This area", placed: true });
+    chooseAreas([p]);
+  };
+
+  // ---- "Create comps" (Results footer, Sold filter on): a comps report from the sold results ----
+  const soldOn = !!fs.f.st["Recently sold"];
+  const soldResults = useMemo(() => results.filter(l => l.status === "Sold"), [results]);
+  const [areaComps, setAreaComps] = useState<AreaReport | null>(null);
+  const createComps = () => {
+    if (!soldResults.length) return;
+    setAreaComps({ title: active ? active.name : multi ? areaMeta : place.label.split(",")[0], comps: soldResults, center: place.center });
+  };
   // Sheets stacked over the results column (`depth`): the save-search sheet or "All
   // filters" on top, the saved-properties sheet under it. Each one steps the column back.
   const svOn = savedOpen && picked.length > 0 && !savedOut;
   const topOn = (view === "results" && ((!!fs.fd && !fs.panelOut) || ss.on)) || (rp.open && !rp.out);
   const depth = (svOn ? 1 : 0) + (topOn ? 1 : 0);
   const layerOn = depth > 0;
+  const pillOn = areaPill && !detailOpen && !searching && !comps && !areaComps && !layerOn && !savedOpen;
   const layerBack = () => { if (fs.fd) fs.closePanel(); if (ss.open) ss.requestClose(); if (savedOpen) closeSaved(); if (rp.open) rp.close(); };
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
@@ -232,7 +329,9 @@ export default function HomeWeb() {
                   sortOpen={sortOpen} onSortToggle={() => { setSortOpen(o => !o); fs.setDd(null); }}
                   onShowNearest={() => { fs.reset(); showToast("Showing nearest properties"); }} onResetFilters={fs.reset}
                   active={!!active} onManage={() => openSheet(active)} onFooterSearch={() => openSheet(active)}
-                  picked={picked} onOpenSaved={() => { setSortOpen(false); setSavedOut(false); setSavedOpen(true); }} onSharePicked={() => sh.sharePicked()} />
+                  picked={picked} onOpenSaved={() => { setSortOpen(false); setSavedOut(false); setSavedOpen(true); }} onSharePicked={() => sh.sharePicked()}
+                  cols={cols} maxCols={maxCols} onCols={pickCols}
+                  onCreateComps={soldOn && soldResults.length > 0 && !unsupOn ? createComps : undefined} />
               </div>
             )}
           {/* Saved properties sheet: from Results, and from Home's "+" footer (review feedback). */}
@@ -241,7 +340,7 @@ export default function HomeWeb() {
               onRemove={p => sv.toggleProp(p.l)} onClear={() => { sv.clearPicked(); setSavedOpen(false); }} onShare={() => sh.sharePicked()} />
           )}
           {view === "results" && ss.layers}
-          <ReportsSheet rp={rp} onOpen={r => { rp.close(); openComps(r.l); }} />
+          <ReportsSheet rp={rp} onOpen={r => { rp.close(); if (r.kind === "area" && r.comps) setAreaComps({ title: r.title || "", comps: r.comps, center: r.center || [r.l.lng, r.l.lat] }); else openComps(r.l); }} />
           {layerOn && <div onClick={layerBack} title="Back to results" style={{ position: "absolute", left: 0, right: 0, top: 64, bottom: 0, zIndex: 3, pointerEvents: "auto", cursor: "pointer" }} />}
         </div>
         {detailOpen && (
@@ -252,6 +351,14 @@ export default function HomeWeb() {
           </div>
         )}
         {detailOpen && alerts.panel(GAP + COL + GAP)}
+        {pillOn && (
+          // "Search this area": centred over the visible map, just under the filter bar.
+          <div style={{ position: "absolute", left: detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + GAP, right: 0, top: BAR_BOTTOM, zIndex: 2, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+            <button onClick={searchThisArea} className="fb-pill" style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 18px 0 16px", border: "none", borderRadius: 9999, background: "rgb(253,252,252)", boxShadow: "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 6px 18px rgba(30,18,12,.18)", font: "700 14px/20px var(--font-sans)", color: "rgb(18,18,18)", cursor: "pointer", whiteSpace: "nowrap", pointerEvents: "auto", animation: "panelDrop .24s cubic-bezier(.2,.8,.2,1) both" }}>
+              <i className="ph-bold ph-magnifying-glass" style={{ fontSize: 16 }} />Search this area
+            </button>
+          </div>
+        )}
         <FilterBar fs={fs} left={detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} />
         <FilterDropdown fs={fs} listings={listings} />
         <AllFiltersPanel fs={fs} top={view === "results" ? 88 : 76} listings={listings} onApply={() => { if (view === "home") { closeDetail(); setView("results"); } }} />
@@ -281,6 +388,8 @@ export default function HomeWeb() {
       }} />
       {comps && <CompsFlow key={comps.id + comps.addr} l={comps} cached={compsCached} onClose={() => setComps(null)}
         onDone={() => { if (!rp.has(comps)) showToast("Report saved to Reports"); rp.save(comps); }} onShare={() => shareOne(comps)} />}
+      {areaComps && <AreaCompsPreview key={areaComps.title + areaComps.comps.length} {...areaComps} saved={rp.hasArea(areaComps)} onClose={() => setAreaComps(null)}
+        onSave={() => { rp.saveArea(areaComps); showToast("Report saved to Reports"); }} />}
       {ss.modals}
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />

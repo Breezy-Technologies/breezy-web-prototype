@@ -61,7 +61,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
     setRings(all.length ? all : null);
     const n = ps.length > 1 ? Math.max(12, Math.round(40 / ps.length)) : 28;
-    setListings(ps.flatMap((p, k) => makeListings(p.id, p.center, p.bbox, rs[k], n, p.label).map(l => (k ? { ...l, id: l.id + k * 1000 } : l))));
+    // A "Search this area" viewport: listings spread over the whole box (bigger views get
+    // more homes, capped so a zoomed-out view doesn't flood the map).
+    const listFor = (p: Place, r: Ring[] | null) => {
+      if (p.kind !== "area" || !p.bbox) return makeListings(p.id, p.center, p.bbox, r, n, p.label);
+      const [w, s, e, nn] = p.bbox, sq = Math.min(1, ((e - w) * (nn - s)) / (0.06 * 0.045));
+      return makeListings(p.id, p.center, p.bbox, null, Math.max(10, Math.round(32 * Math.sqrt(sq))), "");
+    };
+    setListings(ps.flatMap((p, k) => listFor(p, rs[k]).map(l => (k ? { ...l, id: l.id + k * 1000 } : l))));
   }, []);
   const choosePlace = useCallback((p: Place) => chooseAreas([p]), [chooseAreas]);
 
