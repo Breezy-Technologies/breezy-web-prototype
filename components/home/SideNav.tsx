@@ -21,10 +21,12 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
         {MAIN.map(([k, ic]) => {
           const on = k === active;
           return (
-            <button key={k} title={k} onClick={() => onPick?.(k)} className={on ? "" : "btn-ghost"}
-              style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", background: on ? "rgb(52,47,46)" : undefined, boxShadow: on ? "inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(30,18,12,.18)" : "none" }}>
-              <span style={{ flex: "none", width: 28, height: 28, background: `url(${ic}) center/contain no-repeat` }} />
-              {expanded && <span style={{ font: "700 15px/20px var(--font-sans)", color: on ? "var(--paper)" : "rgb(77,71,69)" }}>{k}</span>}
+            // No background behind the icons (review feedback): the icons are trimmed to the same
+            // width; the active item reads through full-strength icon + ink label, others are softened.
+            <button key={k} title={k} onClick={() => onPick?.(k)} className="nav-item"
+              style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, background: "none", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden" }}>
+              <span style={{ flex: "none", width: 28, height: 28, background: `url(${ic}) center/contain no-repeat`, opacity: on ? 1 : 0.62, filter: on ? "none" : "saturate(.75)", transition: "opacity .15s, filter .15s" }} />
+              {expanded && <span style={{ font: "700 15px/20px var(--font-sans)", color: on ? "var(--ink)" : "rgb(129,117,111)" }}>{k}</span>}
             </button>
           );
         })}

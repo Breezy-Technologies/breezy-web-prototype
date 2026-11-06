@@ -123,3 +123,6 @@ input { font-family: inherit; }
 @keyframes wavePop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) } 60% { opacity: 1; transform: translate(-50%, -50%) scale(1.18) } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
 @keyframes cardArtIn { from { opacity: 0; translate: -50% calc(-50% + 22px); scale: .94 } to { opacity: 1; translate: -50% -50%; scale: 1 } }
 @keyframes cardTextIn { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+.nav-item:hover > span:first-child { opacity: 1 !important; filter: none !important }
+.nav-item:hover > span + span { color: var(--ink) !important }
+.qe-outline:hover { background: rgba(18,18,18,.05) !important }

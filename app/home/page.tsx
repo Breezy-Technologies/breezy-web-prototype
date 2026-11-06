@@ -12,7 +12,7 @@ import { Toast, useToast } from "@/components/home/Toast";
 import { PricePins } from "@/components/home/PricePins";
 import { HoverCard } from "@/components/home/HoverCard";
 import { ParcelLift, ParcelHit } from "@/components/home/ParcelLift";
-import { DetailPanel } from "@/components/home/DetailPanel";
+import { DetailPanel, setQeRoute } from "@/components/home/DetailPanel";
 import { MapControls } from "@/components/home/MapControls";
 import { AreaCompsPreview, CompsFlow } from "@/components/home/CompsFlow";
 import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
@@ -293,6 +293,8 @@ export default function HomeWeb() {
       // None in this area: open the first listing on its own, flagged as having no estimate.
       if (listings[0]) { alerts.close(); setParcel(null); setSelId(null); setSoloL({ ...listings[0], noQe: true }); }
     } },
+    { label: "No-estimate banner: side CTA", icon: "ph-layout", run: () => setQeRoute("side") },
+    { label: "No-estimate banner: full-width CTA", icon: "ph-rows", run: () => setQeRoute("full") },
   ];
   return (
     <>

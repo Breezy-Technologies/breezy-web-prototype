@@ -95,7 +95,7 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
       </div>
       {!compact && picked.length === 0 && listings.length > 0 && !unsupported && (
         <div style={css("flex:none;display:flex;gap:12px;padding:16px;background:rgb(253,252,252);box-shadow:inset 0 1px 0 rgb(245,240,238)")}>
-          <button onClick={onFooterSearch} className="fb-dark" style={css("flex:1;min-width:0;height:48px;border:none;border-radius:9999px;background:rgb(17,16,16);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap")}>{active ? "Manage search" : "Save search"}</button>
+          <button onClick={onFooterSearch} className={onCreateComps ? "fb-grey" : "fb-dark"} style={css("flex:1;min-width:0;height:48px;border:none;border-radius:9999px;" + (onCreateComps ? "background:rgb(233,233,233);color:rgb(17,16,16);" : "background:rgb(17,16,16);color:rgb(249,249,249);") + "font:700 15px/20px var(--font-sans);cursor:pointer;white-space:nowrap")}>{active ? "Manage search" : "Save search"}</button>
           {onCreateComps && (
             <button onClick={onCreateComps} className="fb-dark" style={css("flex:1;min-width:0;height:48px;display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:9999px;background:rgb(17,16,16);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap;animation:fadeIn .2s ease both")}>
               <i className="ph-fill ph-sparkle" style={{ fontSize: 16 }} />Create comps
