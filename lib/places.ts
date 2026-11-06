@@ -56,9 +56,31 @@ const SUB: Record<string, string> = { place: "City", postcode: "ZIP", region: "S
 // Labels without the trailing ", United States" (search is US only), closer to the canvas.
 const usLabel = (s: string) => s.replace(/,\s*United States$/, "");
 
-// Mapbox Geocoding v6 forward search (US only), falling back to the gazetteer.
-export async function searchPlaces(q: string, near?: LngLat): Promise<Place[]> {
+// Search failures the search panel surfaces (contextual error + Retry):
+// "failed": the service answered with an error or couldn't be reached;
+// "timeout": no answer within 8 s.
+export type SearchFailure = "failed" | "timeout";
+export class SearchError extends Error {
+  constructor(public kind: SearchFailure) { super(kind === "timeout" ? "Search service timed out" : "Unable to load search"); }
+}
+// Developer menu: make the next search fail on purpose (one shot, so Retry recovers).
+let simFail: SearchFailure | null = null;
+export const simulateSearchFailure = (k: SearchFailure | null) => { simFail = k; };
+
+// Mapbox Geocoding v6 forward search (US only). Throws a SearchError on failure
+// or timeout. Without a token (offline demo) it searches the gazetteer and never
+// fails, unless a failure is simulated from the Developer menu.
+export async function searchPlacesStrict(q: string, near?: LngLat): Promise<Place[]> {
+  if (simFail) {
+    const k = simFail; simFail = null;
+    await new Promise(r => setTimeout(r, k === "timeout" ? 1400 : 500));
+    throw new SearchError(k);
+  }
+  return geocode(q, near);
+}
+async function geocode(q: string, near?: LngLat): Promise<Place[]> {
   if (!isLiveMap()) return offlineSearch(q);
+  let r: Response;
   try {
     const u = new URL("https://api.mapbox.com/search/geocode/v6/forward");
     u.searchParams.set("q", q);
@@ -68,27 +90,35 @@ export async function searchPlaces(q: string, near?: LngLat): Promise<Place[]> {
     u.searchParams.set("limit", "6");
     u.searchParams.set("types", "region,district,place,locality,neighborhood,postcode,address");
     if (near) u.searchParams.set("proximity", near.join(","));
-    // Give up after 8 s (flaky networks) and use the offline gazetteer instead.
-    const r = await fetch(u.toString(), { signal: AbortSignal.timeout(8000) });
-    if (!r.ok) throw new Error(String(r.status));
-    const j = await r.json();
-    const res: Place[] = (j.features || []).map((f: any) => {
-      const p = f.properties || {};
-      const kind = (p.feature_type || "place") as PlaceKind;
-      return {
-        id: f.id || p.mapbox_id,
-        name: p.name,
-        label: usLabel(p.full_address || [p.name, p.place_formatted].filter(Boolean).join(", ")),
-        sub: SUB[kind] || "Place",
-        kind,
-        center: f.geometry.coordinates as LngLat,
-        bbox: p.bbox as BBox | undefined,
-      };
-    });
-    return res.length ? res : offlineSearch(q);
-  } catch {
-    return offlineSearch(q);
+    // Give up after 8 s (flaky networks).
+    r = await fetch(u.toString(), { signal: AbortSignal.timeout(8000) });
+  } catch (e: any) {
+    throw new SearchError(e && (e.name === "TimeoutError" || e.name === "AbortError") ? "timeout" : "failed");
   }
+  if (!r.ok) throw new SearchError("failed");
+  let j: any;
+  try { j = await r.json(); } catch { throw new SearchError("failed"); }
+  const res: Place[] = (j.features || []).map((f: any) => {
+    const p = f.properties || {};
+    const kind = (p.feature_type || "place") as PlaceKind;
+    return {
+      id: f.id || p.mapbox_id,
+      name: p.name,
+      label: usLabel(p.full_address || [p.name, p.place_formatted].filter(Boolean).join(", ")),
+      sub: SUB[kind] || "Place",
+      kind,
+      center: f.geometry.coordinates as LngLat,
+      bbox: p.bbox as BBox | undefined,
+    };
+  });
+  // No live match: the gazetteer may still know it (e.g. "Echo Park, CA").
+  return res.length ? res : offlineSearch(q);
+}
+
+// Lenient search for non-interactive callers (resolving a committed area, opening
+// a saved search): any failure falls back to the offline gazetteer, as before.
+export async function searchPlaces(q: string, near?: LngLat): Promise<Place[]> {
+  try { return await geocode(q, near); } catch { return offlineSearch(q); }
 }
 
 // Outline for a place: Census TIGERweb via our API route, else gazetteer ring.

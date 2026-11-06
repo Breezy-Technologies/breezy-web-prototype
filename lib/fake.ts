@@ -41,6 +41,9 @@ export type Listing = {
   ptype: string;
   pstyle: string;
   feats: string[];
+  // No quick estimate available (not enough nearby sales): the detail panel shows
+  // the "No quick estimate yet" banner instead of the estimate card. ~1 in 5.
+  noQe?: boolean;
 };
 
 const PTYPES: [string, number][] = [["Single family", 0.7], ["Condo", 0.1], ["Townhouse", 0.07], ["Multi family", 0.06], ["Duplex", 0.05], ["Lot", 0.02]];
@@ -76,6 +79,8 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
   const level = priceLevel(center);
   // separate stream so adding filter attributes doesn't reshuffle the existing fake data
   const R2 = rng(hashStr(key + ":attrs"));
+  // and its own stream for "no quick estimate", for the same reason
+  const R3 = rng(hashStr(key + ":qe"));
   let guard = 0;
   while (out.length < n && guard++ < n * 40) {
     const lng = center[0] + (R() - 0.5) * span, lat = center[1] + (R() - 0.5) * spanY;
@@ -120,6 +125,7 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
         for (const [k, w] of PTYPES) { if (t < w) { ptype = k; break; } t -= w; }
         return { ptype, pstyle: PSTYLES[Math.floor(R2() * PSTYLES.length)], feats: PFEATS.filter(() => R2() < 0.35) };
       })(),
+      noQe: R3() < 0.2,
     });
   }
   return out;
