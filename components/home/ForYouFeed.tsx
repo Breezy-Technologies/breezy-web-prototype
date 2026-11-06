@@ -31,7 +31,7 @@ function FeedCard({ l, fresh, onOpen, onHover }: { l: Listing; fresh: boolean; o
       <div style={{ position: "relative", flex: "none", height: 244, borderRadius: 20, overflow: "hidden", background: "rgb(241,231,228)" }}>
         <span style={{ position: "absolute", inset: 0, background: `url('${l.photos[0]}') center/cover no-repeat` }} />
         <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px 0 6px", borderRadius: 9999, background: "rgba(243,242,241,.88)", backdropFilter: "blur(12px)", font: "400 13px/16px var(--font-sans)", color: "rgb(17,16,16)", whiteSpace: "nowrap" }}>
-          <SignalDot type={l.opp} size={18} icon={11} />
+          <SignalDot l={l} type={l.opp} size={18} icon={11} />
           {fresh && <span style={{ flex: "none", width: 8, height: 8, borderRadius: 9999, background: "rgb(214,53,41)" }} />}
           {OPP[l.opp].lb}
         </span>

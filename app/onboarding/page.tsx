@@ -356,7 +356,7 @@ function PinWhy({ l, onClose, onMore }: { l: Listing; onClose: () => void; onMor
       <div style={{ position: "absolute", left: p.x, top: p.y - 26, transform: "translate(-50%,-100%)", width: 300, borderRadius: 20, overflow: "hidden", background: "var(--paper)", boxShadow: "0 18px 40px rgba(30,18,12,.22)", pointerEvents: "auto", animation: "hvPop .22s ease both" }}>
         <div style={{ position: "relative", height: 120, background: `url(${l.photos[0]}) center/cover` }}>
           <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px 0 4px", borderRadius: 9999, background: "rgba(253,252,252,.94)", font: "700 12px/28px var(--font-sans)" }}>
-            <SignalDot type={l.opp} size={20} icon={12} ringW={0} />{OPP[l.opp].lb}
+            <SignalDot l={l} type={l.opp} size={20} icon={12} ringW={0} />{OPP[l.opp].lb}
           </span>
           <button onClick={onClose} title="Close" style={{ position: "absolute", right: 10, top: 10, width: 28, height: 28, border: "none", borderRadius: 9999, background: "var(--paper)", cursor: "pointer" }}><i className="ph-bold ph-x" /></button>
         </div>

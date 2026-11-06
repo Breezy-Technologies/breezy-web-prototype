@@ -3,14 +3,15 @@
 // renders through it) and `PinRouteSwitcher` (floating prototype control to
 // compare the colour routes, with the ramp and the rationale).
 import { useState } from "react";
-import { OPP, OppType } from "@/lib/fake";
-import { PIN_ROUTES, pinFill, rampCss, routeOrder, setPinRoute, usePinRoute } from "@/lib/pinColors";
+import { Listing, OPP, OppType } from "@/lib/fake";
+import { PER_PIN, PIN_ROUTES, isValueSignal, pinFill, rampCss, routeOrder, setPinRoute, usePinRoute } from "@/lib/pinColors";
 
-export function SignalDot({ type, size, icon, selected, ring = "rgb(18,18,18)", ringW = 1.5, shadow }: {
-  type: OppType; size: number; icon?: number; selected?: boolean; ring?: string; ringW?: number; shadow?: string;
+// `l` (optional) lets per-pin routes (freshness, upside, heat layer) use the listing itself.
+export function SignalDot({ type, size, icon, selected, ring = "rgb(18,18,18)", ringW = 1.5, shadow, l }: {
+  type: OppType; size: number; icon?: number; selected?: boolean; ring?: string; ringW?: number; shadow?: string; l?: Listing;
 }) {
   const route = usePinRoute();
-  const f = pinFill(type, route, selected);
+  const f = pinFill(type, route, selected, l);
   return (
     <span style={{ flex: "none", width: size, height: size, borderRadius: 9999, background: f.background, boxShadow: `0 0 0 ${ringW}px ${ring}${shadow ? "," + shadow : ""}, inset 0 -1px 2px rgba(0,0,0,.12)`, display: "flex", alignItems: "center", justifyContent: "center", transition: "background .25s, width .2s, height .2s" }}>
       <i className={`ph-bold ph-${OPP[type].ic}`} style={{ fontSize: icon ?? Math.round(size * 0.52), color: f.icon }} />
@@ -21,7 +22,7 @@ export function SignalDot({ type, size, icon, selected, ring = "rgb(18,18,18)", 
 // Pulse ring colour for a pin under the current route.
 export function usePulseColor() {
   const route = usePinRoute();
-  return (type: OppType, a = 0.45) => `rgba(${pinFill(type, route).rgb.join(",")},${a})`;
+  return (type: OppType, a = 0.45, l?: Listing) => `rgba(${pinFill(type, route, false, l).rgb.join(",")},${a})`;
 }
 
 export function PinRouteSwitcher({ style }: { style?: React.CSSProperties }) {
@@ -29,26 +30,36 @@ export function PinRouteSwitcher({ style }: { style?: React.CSSProperties }) {
   const [open, setOpen] = useState(false);
   const cur = PIN_ROUTES.find(r => r.k === route)!;
   return (
-    <div style={{ position: "fixed", zIndex: 70, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start", pointerEvents: "auto", ...style }}>
+    <div style={{ position: "fixed", zIndex: 70, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", pointerEvents: "auto", ...style }}>
       {open && (
-        <div style={{ width: 290, display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 18, background: "var(--paper)", boxShadow: "0 0 0 .5px rgba(13,12,12,.12),0 14px 34px rgba(30,18,12,.18)", animation: "panelDrop .2s cubic-bezier(.2,.8,.2,1) both" }}>
+        <div style={{ width: 320, display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 18, background: "var(--paper)", boxShadow: "0 0 0 .5px rgba(13,12,12,.12),0 14px 34px rgba(30,18,12,.18)", animation: "panelDrop .2s cubic-bezier(.2,.8,.2,1) both" }}>
           <span style={{ font: "700 12px/16px var(--font-sans)", letterSpacing: ".06em", textTransform: "uppercase", color: "rgb(129,117,111)" }}>Pin colour route</span>
-          <div style={{ display: "flex", gap: 4, padding: 3, borderRadius: 9999, background: "rgba(13,12,12,.06)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
             {PIN_ROUTES.map(r => (
-              <button key={r.k} onClick={() => setPinRoute(r.k)} style={{ flex: 1, height: 30, border: "none", borderRadius: 9999, cursor: "pointer", font: "700 12px/16px var(--font-sans)", whiteSpace: "nowrap", background: route === r.k ? "var(--ink)" : "none", color: route === r.k ? "var(--paper)" : "var(--ink)" }}>{r.lb}</button>
+              <button key={r.k} onClick={() => setPinRoute(r.k)} style={{ display: "flex", alignItems: "center", gap: 6, height: 30, padding: "0 8px", border: "none", borderRadius: 9999, cursor: "pointer", font: "700 12px/16px var(--font-sans)", whiteSpace: "nowrap", textAlign: "left", background: route === r.k ? "var(--ink)" : "rgba(13,12,12,.06)", color: route === r.k ? "var(--paper)" : "var(--ink)" }}>
+                <span style={{ flex: "none", width: 12, height: 12, borderRadius: 9999, background: r.k === "yellow" ? "rgb(255,209,41)" : rampCss(r.k), boxShadow: "0 0 0 1px rgba(253,252,252,.6)" }} />{r.lb}
+              </button>
             ))}
           </div>
           <span style={{ font: "400 12px/17px var(--font-sans)", color: "var(--fg-2)" }}>{cur.sub}</span>
           {route !== "yellow" && <span style={{ height: 8, borderRadius: 9999, background: rampCss(route) }} />}
+          {PER_PIN.includes(route) && route !== "familyFresh" ? (
+            <div style={{ display: "flex", justifyContent: "space-between", font: "700 11px/14px var(--font-sans)", color: "var(--fg-3)" }}>
+              <span>{route === "fresh" ? "NEW SIGNAL" : route === "upside" ? "SMALL UPSIDE" : "LOW ROI AREA"}</span>
+              <span>{route === "fresh" ? "OLD SIGNAL" : route === "upside" ? "BIG UPSIDE" : "HIGH ROI AREA"}</span>
+            </div>
+          ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {routeOrder(route).map((t, i, a) => (
               <div key={t} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <SignalDot type={t} size={24} />
                 <span style={{ flex: 1, font: "400 13px/18px var(--font-sans)" }}>{OPP[t].lb}</span>
                 {route === "heat" && (i === 0 || i === a.length - 1) && <span style={{ font: "700 11px/14px var(--font-sans)", color: "var(--fg-3)" }}>{i === 0 ? "HOT" : "COLD"}</span>}
+                {(route === "family" || route === "familyFresh") && (i === 0 || isValueSignal(t) !== isValueSignal(a[i - 1])) && <span style={{ font: "700 11px/14px var(--font-sans)", color: "var(--fg-3)" }}>{isValueSignal(t) ? "VALUE" : "SELLER"}</span>}
               </div>
             ))}
           </div>
+          )}
           {route === "heat" && <span style={{ font: "400 11px/15px var(--font-sans)", color: "var(--fg-3)" }}>Price drop = active listing that just changed · ROI / Underbuilt = live opportunities · Stale = active but stagnant · Expired / Withdrawn = off the market.</span>}
         </div>
       )}

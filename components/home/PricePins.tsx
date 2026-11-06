@@ -75,7 +75,7 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
               }}
             >
               {sig && (
-                <SignalDot type={l.opp} size={22} icon={12} selected={dark} ring={dark ? "rgb(253,252,252)" : "rgb(18,18,18)"} />
+                <SignalDot l={l} type={l.opp} size={22} icon={12} selected={dark} ring={dark ? "rgb(253,252,252)" : "rgb(18,18,18)"} />
               )}
               {!isBlank && !sig && l.opp === "drop" && <i className="ph-fill ph-bell-simple" style={{ fontSize: 13, color: dark ? "var(--paper)" : "rgb(249,60,45)" }} />}
               {!isBlank && <span style={{ font: "700 14px/1.26 var(--font-sans)", color: dark ? "var(--paper)" : "var(--ink)" }}>{lab}</span>}
