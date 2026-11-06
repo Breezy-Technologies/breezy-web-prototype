@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 const MAIN: [string, string][] = [["Map", "/nav/map-iso.png"], ["Comps", "/nav/comps-iso.png"], ["Underbuilt", "/nav/radar.png"], ["AI Notes", "/nav/ai-notes-new.svg"], ["Assistant", "/nav/assistant.png"]];
 const FOOT: [string, string, boolean?][] = [["Upgrade to team", "ph-users", true], ["Reports", "ph-file-text"], ["Settings", "ph-gear"]];
 
+// Optical size per icon (relative to the 28px box).
+const ICON_SCALE: Record<string, number> = { Map: 1.18, Comps: 1.1, Underbuilt: 0.86, "AI Notes": 0.86, Assistant: 0.9 };
+
 export const NAV_W = { collapsed: 56, expanded: 239 };
 
 export type DevAction = { label: string; icon: string; run: () => void };
@@ -21,12 +24,14 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
         {MAIN.map(([k, ic]) => {
           const on = k === active;
           return (
-            // No background behind the icons (review feedback): the icons are trimmed to the same
-            // width; the active item reads through full-strength icon + ink label, others are softened.
-            <button key={k} title={k} onClick={() => onPick?.(k)} className="nav-item"
-              style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, background: "none", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden" }}>
-              <span style={{ flex: "none", width: 28, height: 28, background: `url(${ic}) center/contain no-repeat`, opacity: on ? 1 : 0.62, filter: on ? "none" : "saturate(.75)", transition: "opacity .15s, filter .15s" }} />
-              {expanded && <span style={{ font: "700 15px/20px var(--font-sans)", color: on ? "var(--ink)" : "rgb(129,117,111)" }}>{k}</span>}
+            // Selected: dark pill (restored). Icons sit in the same 28px box; flat, wide icons (map,
+            // comps) get a little extra size so they read at the same visual weight as the round ones.
+            <button key={k} title={k} onClick={() => onPick?.(k)} className={on ? "" : "btn-ghost"}
+              style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", background: on ? "rgb(52,47,46)" : undefined, boxShadow: on ? "inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(30,18,12,.18)" : "none" }}>
+              <span style={{ flex: "none", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ flex: "none", width: 28 * (ICON_SCALE[k] || 1), height: 28 * (ICON_SCALE[k] || 1), background: `url(${ic}) center/contain no-repeat` }} />
+              </span>
+              {expanded && <span style={{ font: "700 15px/20px var(--font-sans)", color: on ? "var(--paper)" : "rgb(77,71,69)" }}>{k}</span>}
             </button>
           );
         })}
