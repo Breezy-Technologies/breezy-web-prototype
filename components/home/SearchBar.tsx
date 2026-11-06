@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Area, CURRENT_LOCATION, Place, areaSq, searchPlaces } from "@/lib/places";
+import { Area, CURRENT_LOCATION, Place, SearchError, SearchFailure, areaSq, searchPlacesStrict, simulateSearchFailure } from "@/lib/places";
 import { SavedSearch } from "@/components/SavedState";
 import { css } from "@/lib/css";
 import { ActiveSearchHeader } from "./Saved";
@@ -15,7 +15,9 @@ import { ActiveSearchHeader } from "./Saved";
 // Searching (focus, `onSearchFocus`): the suggestion panel replaces the left
 // column. Empty query: "Current location" (`onUseCurLoc`) and "Recent searches"
 // (`sugRecent` / `rc.pick` → `_tagArea`). Typing: live suggestions from
-// `searchPlaces` (Mapbox geocoding, offline gazetteer fallback). With areas
+// `searchPlacesStrict` (Mapbox geocoding; offline gazetteer without a token).
+// A failed or timed-out search shows a contextual error with Retry; no recent
+// searches shows the empty state. With areas
 // already searched, "Add another search" (`onAddArea`) turns them into chips in
 // the field (`sbChips`, `ch.remove` → `_removeArea`); picking another area adds
 // it and commits (`_pickArea` → `_commitAreas`); recent searches add a chip
@@ -37,9 +39,23 @@ const recentMeta = (t: number) => {
   return days <= 0 ? "Searched today" : days === 1 ? "Searched yesterday" : days < 7 ? "Searched this week" : "Searched last week";
 };
 function loadRecent(): Recent[] {
-  try { const r = JSON.parse(localStorage.getItem(RECENT_KEY) || "null"); if (Array.isArray(r) && r.length) return r; } catch {}
+  // An empty stored list means the recent searches were cleared: empty state, not the seeds.
+  try { const r = JSON.parse(localStorage.getItem(RECENT_KEY) || "null"); if (Array.isArray(r)) return r; } catch {}
   return SEED_RECENT;
 }
+
+// Developer menu hooks: open the search step in a given state without prop plumbing.
+// "failed" / "timeout" type a query whose search fails; "empty" clears the recent searches.
+export type SearchDevState = SearchFailure | "empty";
+const DEV_EVENT = "bz-search-dev";
+export function previewSearchState(k: SearchDevState) {
+  if (k === "empty") { try { localStorage.setItem(RECENT_KEY, "[]"); } catch {} }
+  else simulateSearchFailure(k);
+  window.dispatchEvent(new CustomEvent(DEV_EVENT, { detail: k }));
+}
+
+const ERR_TEXT: Record<SearchFailure, string> = { failed: "Unable to load search. Please retry.", timeout: "Search service timed out" };
+const EMPTY_ART = "/iso/empty-search.png", EMPTY_ART_FALLBACK = "/iso/comps.png";
 
 const x14 = css("width:14px;height:14px;background:rgb(17,16,16);-webkit-mask:url('/ui/x.svg') center/contain no-repeat;mask:url('/ui/x.svg') center/contain no-repeat");
 const FIELD = "flex:none;min-height:56px;box-sizing:border-box;border-radius:28px;background:rgb(249,249,249);box-shadow:inset 0 0 0 .5px rgba(13,12,12,.24);display:flex;align-items:center;gap:16px;padding:12px 16px;pointer-events:auto";
@@ -66,9 +82,14 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
   const [cities, setCities] = useState<Area[]>([]);
   const [addMode, setAddMode] = useState(false);
   const [res, setRes] = useState<{ q: string; list: Place[] } | null>(null);
+  // Contextual error for the current query (failed to load / timed out), with Retry.
+  const [err, setErr] = useState<{ q: string; kind: SearchFailure } | null>(null);
+  const [tries, setTries] = useState(0);
   const [recent, setRecent] = useState<Recent[]>(SEED_RECENT);
   const input = useRef<HTMLInputElement>(null);
   const t = useRef<any>(null);
+  const reqId = useRef(0);
+  const devQ = useRef("");
   useEffect(() => { setRecent(loadRecent()); }, []);
 
   const labels = (cs: Area[]) => cs.map(c => c.label);
@@ -81,8 +102,30 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
   useEffect(() => {
     clearTimeout(t.current);
     if (!searching || !sHasQ) return;
-    t.current = setTimeout(() => { searchPlaces(q, near).then(list => setRes({ q, list })); }, 180);
-  }, [q, sHasQ, searching, near]);
+    t.current = setTimeout(() => {
+      const id = ++reqId.current;
+      searchPlacesStrict(q, near).then(
+        list => { if (id === reqId.current) { setErr(null); setRes({ q, list }); } },
+        e => { if (id === reqId.current) setErr({ q, kind: e instanceof SearchError ? e.kind : "failed" }); },
+      );
+    }, 180);
+  }, [q, sHasQ, searching, near, tries]);
+  const retry = () => { setErr(null); setRes(null); setTries(n => n + 1); setTimeout(() => input.current?.focus({ preventScroll: true }), 0); };
+
+  // Developer menu: enter the search step in a failure / empty state.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const k = (e as CustomEvent<SearchDevState>).detail;
+      if (k === "empty") setRecent([]);
+      setCities([]); setAddMode(false); setRes(null); setErr(null);
+      devQ.current = k === "empty" ? "" : "Silver Lake";
+      setSq(devQ.current);
+      if (!searching) onSearching(true);
+      setTries(n => n + 1);
+    };
+    window.addEventListener(DEV_EVENT, on);
+    return () => window.removeEventListener(DEV_EVENT, on);
+  }, [searching, onSearching]);
 
   // Entering the search step (`onSearchFocus`): committed areas come back as the query text.
   const enter = () => {
@@ -95,7 +138,8 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
   const exit = () => { input.current?.blur(); setAddMode(false); onSearching(false); };
   useEffect(() => { if (searching && document.activeElement !== input.current) setTimeout(() => input.current?.focus({ preventScroll: true }), 60); }, [searching]);
   // "Try another area" (`onTryArea`) opens the search step from outside with an empty query.
-  useEffect(() => { if (searching && !input.current?.matches(":focus")) { setCities([]); setSq(""); setAddMode(false); setRes(null); } }, [searching]); // eslint-disable-line react-hooks/exhaustive-deps
+  // (A Developer-menu preview opens it the same way, with its own query in `devQ`.)
+  useEffect(() => { if (searching && !input.current?.matches(":focus")) { setCities([]); setSq(devQ.current); setAddMode(false); setRes(null); } devQ.current = ""; }, [searching]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const remember = (list: Area[]) => {
     setRecent(r => {
@@ -157,6 +201,7 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
   // While the next answer is on its way, keep the last list only if the query just narrowed it (typing ahead).
   const fresh = !!res && q.toLowerCase().startsWith(res.q.toLowerCase());
   const list = sHasQ && fresh ? res!.list : [];
+  const errOn = sHasQ && !!err && err.q === q;
   const hasQuery = searching || !!value;
   const hl = (label: string) => {
     const i = label.toLowerCase().indexOf(q.toLowerCase());
@@ -216,7 +261,16 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
               <div style={css("height:32px;display:flex;align-items:center;padding:8px 24px")}>
                 <span style={css("flex:1;font:400 12px/16px var(--font-sans);color:rgb(77,71,69)")}>Recent searches</span>
               </div>
-              <div style={css("display:flex;flex-direction:column;gap:4px;padding:4px 12px 12px")}>
+              {!recent.length && (
+                // Empty state: no recent searches yet (or they were cleared).
+                <div style={css("display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 24px 20px;text-align:center;animation:fadeIn .2s ease both")}>
+                  <img src={EMPTY_ART} alt="" width={168} height={114} onError={e => { const i = e.currentTarget; if (!i.src.endsWith(EMPTY_ART_FALLBACK)) i.src = EMPTY_ART_FALLBACK; }}
+                    style={css("display:block;width:168px;height:114px;object-fit:contain;mix-blend-mode:multiply;margin-bottom:4px")} />
+                  <span style={css("font:700 15px/20px var(--font-sans);color:rgb(18,18,18)")}>No recent searches</span>
+                  <span style={css("max-width:260px;font:400 13px/18px var(--font-sans);color:rgb(98,90,89);text-wrap:pretty")}>Areas and addresses you search will show up here.</span>
+                </div>
+              )}
+              <div style={css("display:flex;flex-direction:column;gap:4px;padding:4px 12px " + (recent.length ? 12 : 0) + "px")}>
                 {recent.map(rc => (
                   <button key={rc.label} onClick={() => tagArea({ label: rc.label, place: rc.place })} className="hover-row" style={css(ROW)}>
                     <span style={css("flex:none;width:18px;height:18px;margin:0 1px;background:rgba(73,67,65,.65);-webkit-mask:url('/ui/search.svg') center/contain no-repeat;mask:url('/ui/search.svg') center/contain no-repeat")} />
@@ -236,7 +290,19 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
               </button>
             </div>
           )}
-          {sHasQ && (
+          {errOn && (
+            // Contextual error where the suggestions would be: failed to load / timed out, with Retry.
+            <div role="alert" style={css("display:flex;flex-direction:column;padding:4px 12px;animation:fadeIn .2s ease both")}>
+              <div style={css("display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 8px 8px 12px;border-radius:12px;background:rgb(248,229,225)")}>
+                <svg width="20" height="20" viewBox="0 0 24 24" style={{ flex: "none", display: "block" }}><circle cx="12" cy="12" r="10" fill="rgb(180,52,40)" /><path d="M12 6.8v6.2" stroke="rgb(253,252,252)" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="16.4" r="1.1" fill="rgb(253,252,252)" /></svg>
+                <span style={css("flex:1;min-width:0;font:400 14px/18px var(--font-sans);color:rgb(18,18,18);text-wrap:pretty")}>{ERR_TEXT[err!.kind]}</span>
+                <button onClick={retry} className="fb-dark" style={css("flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 14px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 13px/16px var(--font-sans);color:rgb(253,252,252);cursor:pointer;white-space:nowrap")}>
+                  <i className="ph-bold ph-arrow-clockwise" style={{ fontSize: 14 }} />Retry
+                </button>
+              </div>
+            </div>
+          )}
+          {sHasQ && !errOn && (
             <>
               <div style={css("height:32px;display:flex;align-items:center;padding:8px 24px")}>
                 <span style={css("flex:1;font:400 12px/16px var(--font-sans);color:rgb(77,71,69)")}>{res && res.q === q && !res.list.length ? "No matches" : fresh ? "Results suggested" : "Searching…"}</span>
