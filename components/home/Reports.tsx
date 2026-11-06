@@ -14,7 +14,12 @@ import { css } from "@/lib/css";
 import { specs } from "./Share";
 
 // The listing is stored with the report so it reopens even after the area changes.
-export type Report = { id: number; kind: "comps"; at: number; l: Listing };
+// "area": a sold-comps report created from the Results footer ("Create comps"); it keeps
+// its comps and the point distances are measured from, `l` is the first comp (thumbnail).
+export type Report = { id: number; kind: "comps" | "area"; at: number; l: Listing; title?: string; comps?: Listing[]; center?: [number, number] };
+export type AreaReport = { title: string; comps: Listing[]; center: [number, number] };
+// Stable key for an area report: same title + same comps = same report.
+export const areaKey = (a: AreaReport) => a.title + "|" + a.comps.map(c => c.id + c.addr).join(",");
 
 const KEY = "bz.reports";
 // Fake listing ids restart per area, so match on id + address.
@@ -25,18 +30,31 @@ export function useReports() {
   const [out, setOut] = useState(false);
   useEffect(() => { try { const s = sessionStorage.getItem(KEY); if (s) setList(JSON.parse(s)); } catch {} }, []);
   const save = useCallback((l: Listing) => setList(o => {
-    const next = [{ id: l.id, kind: "comps" as const, at: Date.now(), l }].concat(o.filter(r => !same(r.l, l)));
+    const next = [{ id: l.id, kind: "comps" as const, at: Date.now(), l } as Report].concat(o.filter(r => !(r.kind === "comps" && same(r.l, l))));
+    try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+    return next;
+  }), []);
+  const saveArea = useCallback((a: AreaReport) => setList(o => {
+    const key = areaKey(a);
+    const next = [{ id: -1, kind: "area" as const, at: Date.now(), l: a.comps[0], title: a.title, comps: a.comps, center: a.center } as Report]
+      .concat(o.filter(r => !(r.kind === "area" && areaKey(r as any) === key)));
+    try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+    return next;
+  }), []);
+  const hasArea = useCallback((a: AreaReport) => list.some(r => r.kind === "area" && areaKey(r as any) === areaKey(a)), [list]);
+  const removeReport = useCallback((x: Report) => setList(o => {
+    const next = o.filter(r => r.at !== x.at);
     try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {}
     return next;
   }), []);
   const remove = useCallback((l: Listing) => setList(o => {
-    const next = o.filter(r => !same(r.l, l));
+    const next = o.filter(r => !(r.kind === "comps" && same(r.l, l)));
     try { sessionStorage.setItem(KEY, JSON.stringify(next)); } catch {}
     return next;
   }), []);
-  const has = useCallback((l: Listing) => list.some(r => same(r.l, l)), [list]);
+  const has = useCallback((l: Listing) => list.some(r => r.kind === "comps" && same(r.l, l)), [list]);
   const close = useCallback(() => { setOut(true); setTimeout(() => { setOpen(false); setOut(false); }, 200); }, []);
-  return { list, save, remove, has, open, out, show: () => setOpen(true), close };
+  return { list, save, saveArea, hasArea, removeReport, remove, has, open, out, show: () => setOpen(true), close };
 }
 export type ReportsState = ReturnType<typeof useReports>;
 
@@ -65,13 +83,34 @@ export function ReportsSheet({ rp, onOpen, top = 76 }: { rp: ReportsState; onOpe
           <img src="/ui/pin-3d.png" alt="" style={css("display:block;width:66px;height:auto;margin-bottom:8px")} />
           <div style={css("display:flex;flex-direction:column;align-items:center;gap:6px")}>
             <span style={css("font:400 18px/24px var(--font-sans);color:rgb(17,16,16)")}>No reports yet</span>
-            <span style={css("max-width:320px;font:400 14px/1.6 var(--font-sans);letter-spacing:.25px;color:rgb(98,90,89);text-wrap:pretty")}>Open a property and tap Get comps. Your reports are saved here.</span>
+            <span style={css("max-width:320px;font:400 14px/1.6 var(--font-sans);letter-spacing:.25px;color:rgb(98,90,89);text-wrap:pretty")}>Open a property and tap Get comps, or filter by Sold and tap Create comps. Your reports are saved here.</span>
           </div>
         </div>
       ) : (
         <div className="no-scrollbar" style={css("flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:32px;padding:16px")}>
           {rp.list.map(r => {
             const l = r.l;
+            if (r.kind === "area" && r.comps) {
+              const ppsf = r.comps.map(c => c.price / c.sqft).sort((a, b) => a - b);
+              const med = ppsf[Math.floor(ppsf.length / 2)] || 0;
+              return (
+                <div key={r.at} onClick={() => onOpen(r)} style={css("flex:none;display:flex;align-items:center;gap:12px;height:89px;cursor:pointer;animation:fadeIn .2s ease both")}>
+                  <span style={{ ...css("flex:none;width:89px;height:89px;border-radius:8px"), background: `url('${l.photos[0]}') center/cover no-repeat` }} />
+                  <span style={css("flex:1;min-width:0;display:flex;flex-direction:column")}>
+                    <span style={css("font:700 14px/19px var(--font-sans);letter-spacing:.25px;color:rgb(18,18,18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis")}>Sold comps · {r.title}</span>
+                    <span style={css("font:400 14px/21px var(--font-sans);letter-spacing:.25px;color:rgb(73,67,65);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden")}>Comps report · {when(r.at)} · {r.comps.length} sold {r.comps.length === 1 ? "home" : "homes"}</span>
+                    <span style={css("height:6px")} />
+                    <span style={css("display:flex;align-items:baseline;gap:4px;white-space:nowrap")}>
+                      <span style={css("font:700 14px/21px var(--font-sans);letter-spacing:.25px;color:rgb(18,18,18)")}>${Math.round(med).toLocaleString("en-US")} / ft²</span>
+                      <span style={css("font:400 12px/16px var(--font-sans);letter-spacing:.25px;color:rgb(98,90,89)")}>median sold</span>
+                    </span>
+                  </span>
+                  <button onClick={e => { e.stopPropagation(); rp.removeReport(r); }} title="Remove" className="btn-ghost" style={css("flex:none;width:32px;height:32px;margin-right:-4px;border:none;border-radius:9999px;background:none;color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14M10 10v6M14 10v6" /></svg>
+                  </button>
+                </div>
+              );
+            }
             return (
               <div key={r.at} onClick={() => onOpen(r)} style={css("flex:none;display:flex;align-items:center;gap:12px;height:89px;cursor:pointer;animation:fadeIn .2s ease both")}>
                 <span style={{ ...css("flex:none;width:89px;height:89px;border-radius:8px"), background: `url('${l.photos[0]}') center/cover no-repeat` }} />
@@ -84,7 +123,7 @@ export function ReportsSheet({ rp, onOpen, top = 76 }: { rp: ReportsState; onOpe
                     <span style={css("font:400 12px/16px var(--font-sans);letter-spacing:.25px;color:rgb(98,90,89)")}>list price</span>
                   </span>
                 </span>
-                <button onClick={e => { e.stopPropagation(); rp.remove(r.l); }} title="Remove" className="btn-ghost" style={css("flex:none;width:32px;height:32px;margin-right:-4px;border:none;border-radius:9999px;background:none;color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
+                <button onClick={e => { e.stopPropagation(); rp.removeReport(r); }} title="Remove" className="btn-ghost" style={css("flex:none;width:32px;height:32px;margin-right:-4px;border:none;border-radius:9999px;background:none;color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14M10 10v6M14 10v6" /></svg>
                 </button>
               </div>
