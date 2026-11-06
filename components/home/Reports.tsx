@@ -91,8 +91,8 @@ export function ReportsSheet({ rp, onOpen, top = 76 }: { rp: ReportsState; onOpe
           {rp.list.map(r => {
             const l = r.l;
             if (r.kind === "area" && r.comps) {
-              const ppsf = r.comps.map(c => c.price / c.sqft).sort((a, b) => a - b);
-              const med = ppsf[Math.floor(ppsf.length / 2)] || 0;
+              const ppsf = r.comps.map(c => c.price / c.sqft).sort((a, b) => a - b), k = ppsf.length;
+              const med = k ? (k % 2 ? ppsf[(k - 1) / 2] : (ppsf[k / 2 - 1] + ppsf[k / 2]) / 2) : 0; // same median as the preview
               return (
                 <div key={r.at} onClick={() => onOpen(r)} style={css("flex:none;display:flex;align-items:center;gap:12px;height:89px;cursor:pointer;animation:fadeIn .2s ease both")}>
                   <span style={{ ...css("flex:none;width:89px;height:89px;border-radius:8px"), background: `url('${l.photos[0]}') center/cover no-repeat` }} />

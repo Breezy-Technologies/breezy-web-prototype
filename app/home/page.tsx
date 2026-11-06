@@ -259,7 +259,7 @@ export default function HomeWeb() {
   const [areaComps, setAreaComps] = useState<AreaReport | null>(null);
   const createComps = () => {
     if (!soldResults.length) return;
-    setAreaComps({ title: active ? active.name : areaMeta, comps: soldResults, center: place.center });
+    setAreaComps({ title: active ? active.name : multi ? areaMeta : place.label.split(",")[0], comps: soldResults, center: place.center });
   };
   // Sheets stacked over the results column (`depth`): the save-search sheet or "All
   // filters" on top, the saved-properties sheet under it. Each one steps the column back.
