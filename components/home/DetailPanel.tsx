@@ -193,13 +193,13 @@ export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShar
           <div style={css("display:flex;flex-direction:column;padding:16px 16px 0")}>
             {qeState !== "ready" ? (
               // No quick estimate: illustration (its background is the banner colour), label, CTA on the right.
-              <div style={css("display:flex;align-items:center;gap:10px;height:76px;padding:0 12px 0 0;border-radius:16px;background:rgb(243,240,238);overflow:hidden")}>
-                <span aria-hidden style={css("flex:none;align-self:stretch;width:104px;background:url('/iso/no-estimate.png') 50% 55%/128px auto no-repeat")} />
+              <div style={css("display:flex;align-items:center;gap:8px;height:72px;padding:0 12px 0 0;border-radius:16px;background:rgb(243,240,238);overflow:hidden")}>
+                <span aria-hidden style={css("flex:none;align-self:stretch;width:84px;background:url('/iso/no-estimate.png') 50% 55%/112px auto no-repeat")} />
                 <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:2px")}>
-                  <span style={css("font:700 14px/18px var(--font-sans);color:rgb(18,18,18)")}>No quick estimate yet</span>
-                  <span style={css("font:400 12px/16px var(--font-sans);color:rgb(98,90,89)")}>{qeState === "loading" ? "Checking nearby sales…" : "Not enough nearby sales"}</span>
+                  <span style={css("font:700 14px/18px var(--font-sans);color:rgb(18,18,18);white-space:nowrap")}>No quick estimate yet</span>
+                  <span style={css("font:400 12px/16px var(--font-sans);color:rgb(98,90,89)")}>{qeState === "loading" ? "Checking nearby sales…" : "Too few nearby sales"}</span>
                 </span>
-                <button className="fb-dark dt-press" onClick={getEstimate} disabled={qeState === "loading"} style={css("flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 13px/16px var(--font-sans);color:rgb(249,249,249);white-space:nowrap;cursor:" + (qeState === "loading" ? "default" : "pointer"))}>
+                <button className="fb-dark dt-press" onClick={getEstimate} disabled={qeState === "loading"} style={css("flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 13px/16px var(--font-sans);color:rgb(249,249,249);white-space:nowrap;cursor:" + (qeState === "loading" ? "default" : "pointer"))}>
                   {qeState === "loading" && <i className="ph-bold ph-circle-notch" style={{ fontSize: 14, animation: "spin .8s linear infinite" }} />}
                   {qeState === "loading" ? "Estimating" : "Get price estimate"}
                 </button>
