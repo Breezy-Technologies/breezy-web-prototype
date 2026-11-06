@@ -49,8 +49,19 @@ const FEATS: Feat[] = [
 
 // Footer bell: `onBell` opens the Alerts panel; with alerts set it turns green with the count.
 // Footer share: `onShare` (canvas `onShareProp`) opens the Share modal for this property.
-export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShare }: { l: Listing; onClose: () => void; onGetComps: () => void; alertN?: number; onBell?: () => void; onShare?: () => void }) {
+// No quick estimate (`l.noQe`): a slim banner (illustration, label, "Get price estimate")
+// replaces the estimate card. The CTA runs a short estimate, then reveals the card and
+// raises a positive snackbar via `onToast`. Estimated properties stay revealed this session.
+const estimated = new Set<string>();
+export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShare, onToast }: { l: Listing; onClose: () => void; onGetComps: () => void; alertN?: number; onBell?: () => void; onShare?: () => void; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
   const d = useMemo(() => listingDetail(l), [l]);
+  const qeKey = `${l.addr}|${l.lng.toFixed(5)},${l.lat.toFixed(5)}`;
+  const [qeState, setQeState] = useState<"none" | "loading" | "ready">(() => !l.noQe || estimated.has(qeKey) ? "ready" : "none");
+  const getEstimate = () => {
+    if (qeState !== "none") return;
+    setQeState("loading");
+    setTimeout(() => { estimated.add(qeKey); setQeState("ready"); onToast?.("Quick estimate ready", "positive"); }, 1600);
+  };
   const [tab, setTab] = useState<Tab>("Summary");
   const [revealed, setRevealed] = useState(false);
   const [gi, setGi] = useState(0);
@@ -180,7 +191,21 @@ export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShar
         {tab === "Summary" && <>
           {/* Quick estimate (floating card) + Get comps */}
           <div style={css("display:flex;flex-direction:column;padding:16px 16px 0")}>
-            <div style={css("display:flex;align-items:flex-end;gap:12px;padding:16px;border-radius:20px;background:rgb(255,255,255);box-shadow:0 0 0 .5px rgba(13,12,12,.08),0 10px 28px rgba(40,26,20,.12)")}>
+            {qeState !== "ready" ? (
+              // No quick estimate: illustration (its background is the banner colour), label, CTA on the right.
+              <div style={css("display:flex;align-items:center;gap:8px;height:72px;padding:0 12px 0 0;border-radius:16px;background:rgb(243,240,238);overflow:hidden")}>
+                <span aria-hidden style={css("flex:none;align-self:stretch;width:84px;background:url('/iso/no-estimate.png') 50% 55%/112px auto no-repeat")} />
+                <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:2px")}>
+                  <span style={css("font:700 14px/18px var(--font-sans);color:rgb(18,18,18);white-space:nowrap")}>No quick estimate yet</span>
+                  <span style={css("font:400 12px/16px var(--font-sans);color:rgb(98,90,89)")}>{qeState === "loading" ? "Checking nearby sales…" : "Too few nearby sales"}</span>
+                </span>
+                <button className="fb-dark dt-press" onClick={getEstimate} disabled={qeState === "loading"} style={css("flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 13px/16px var(--font-sans);color:rgb(249,249,249);white-space:nowrap;cursor:" + (qeState === "loading" ? "default" : "pointer"))}>
+                  {qeState === "loading" && <i className="ph-bold ph-circle-notch" style={{ fontSize: 14, animation: "spin .8s linear infinite" }} />}
+                  {qeState === "loading" ? "Estimating" : "Get price estimate"}
+                </button>
+              </div>
+            ) : (
+            <div style={css("display:flex;align-items:flex-end;gap:12px;padding:16px;border-radius:20px;background:rgb(255,255,255);box-shadow:0 0 0 .5px rgba(13,12,12,.08),0 10px 28px rgba(40,26,20,.12);" + (l.noQe ? "animation:fadeIn .3s ease both" : ""))}>
               <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:2px")}>
                 <span style={css("display:flex;align-items:center;gap:5px;font:700 11px/14px var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:rgb(129,117,111)")}><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ flex: "none", display: "block" }}><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.5z" /></svg>Quick estimate</span>
                 <span style={css("font:300 36px/1.1 var(--font-sans);letter-spacing:-1px;color:rgb(18,18,18);white-space:nowrap")}>~{shortPrice(l.qe.value)}</span>
@@ -190,6 +215,7 @@ export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShar
                 <span style={maskIco("/ui/act-files.svg", 15, "currentColor")} />Get comps
               </button>
             </div>
+            )}
           </div>
           {/* Max build + Profit potential tiles (canvas `detailTiles`; the UB / ROI flows aren't ported yet) */}
           <div style={css("position:relative;z-index:7;display:flex;gap:8px;padding:16px 16px 0")}>

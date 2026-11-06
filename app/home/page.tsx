@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMapCtx } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
-import { SideNav, NAV_W } from "@/components/home/SideNav";
-import { SearchBar } from "@/components/home/SearchBar";
+import { SideNav, NAV_W, DevAction } from "@/components/home/SideNav";
+import { SearchBar, previewSearchState } from "@/components/home/SearchBar";
 import { ResultsPanel, SortMenu } from "@/components/home/LeftPanel";
 import { AllFiltersPanel, FilterBar, FilterDropdown, useFilterState } from "@/components/home/Filters";
 import { HomeCard } from "@/components/home/HomeCard";
@@ -180,10 +180,27 @@ export default function HomeWeb() {
   const depth = (svOn ? 1 : 0) + (topOn ? 1 : 0);
   const layerOn = depth > 0;
   const layerBack = () => { if (fs.fd) fs.closePanel(); if (ss.open) ss.requestClose(); if (savedOpen) closeSaved(); if (rp.open) rp.close(); };
+  // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
+  const devActions: DevAction[] = [
+    { label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } },
+    { label: "Snackbar: neutral", icon: "ph-info", run: () => showToast("No property found", "neutral") },
+    { label: "Snackbar: positive", icon: "ph-check-circle", run: () => showToast("Search saved", "positive") },
+    { label: "Snackbar: negative", icon: "ph-warning-circle", run: () => showToast("Couldn't save search. Try again.", "negative") },
+    { label: "Search: failed to load", icon: "ph-plugs", run: () => { closeDetail(); previewSearchState("failed"); } },
+    { label: "Search: timed out", icon: "ph-timer", run: () => { closeDetail(); previewSearchState("timeout"); } },
+    { label: "Clear recent searches", icon: "ph-clock-counter-clockwise", run: () => { closeDetail(); previewSearchState("empty"); } },
+    { label: "Property with no estimate", icon: "ph-lightning-slash", run: () => {
+      setSearching(false);
+      const l = listings.find(x => x.noQe);
+      if (l) return openListing(l.id);
+      // None in this area: open the first listing on its own, flagged as having no estimate.
+      if (listings[0]) { alerts.close(); setParcel(null); setSelId(null); setSoloL({ ...listings[0], noQe: true }); }
+    } },
+  ];
   return (
     <>
       <SideNav expanded={navX} onToggle={() => setNavX(v => !v)} userName={user.name.split(" ")[0]}
-        dev={[{ label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } }]}
+        dev={devActions}
         onPick={k => {
         if (k === "Map") { closeDetail(); setView("home"); setSearching(false); if (rp.open) rp.close(); }
         // Reports (side-nav footer) opens the saved reports sheet over the left column.
@@ -231,7 +248,7 @@ export default function HomeWeb() {
           // The detail column steps back while the Alerts sheet sits on top of it (`dtT` / `dtF`).
           <div style={{ position: "absolute", left: GAP + COL + GAP, top: GAP, bottom: GAP, transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
             <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => openComps(sel!)}
-              alertN={alerts.count(sel)} onBell={() => alerts.open(sel!)} onShare={() => shareOne(sel!)} />
+              alertN={alerts.count(sel)} onBell={() => alerts.open(sel!)} onShare={() => shareOne(sel!)} onToast={showToast} />
           </div>
         )}
         {detailOpen && alerts.panel(GAP + COL + GAP)}
