@@ -34,6 +34,9 @@ const COLS_KEY = "bz-results-cols";
 // Top of the visible map below the filter bar (search-this-area pill and viewport box).
 const BAR_BOTTOM = 70;
 
+// Camera zoom when a property's panel opens or a parcel is selected (review feedback: parcel-level view).
+const DETAIL_ZOOM = 18;
+
 export default function HomeWeb() {
   const router = useRouter();
   const { map, ready, setInset, setAreaRings, offline, setHeat } = useMapCtx();
@@ -138,7 +141,7 @@ export default function HomeWeb() {
     setSeen(s => new Set(s).add(id));
     setBadgeSeen(s => new Set(s).add(id));
     const l = listings.find(x => x.id === id);
-    if (l && map) map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 15), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
+    if (l && map) map.easeTo({ center: [l.lng, l.lat], zoom: DETAIL_ZOOM, offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
   };
   const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); };
   const goPlace = async (p: Place) => { setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
@@ -174,7 +177,7 @@ export default function HomeWeb() {
     const hit = listings.find(x => propKey(x) === propKey(l));
     if (hit) return openListing(hit.id);
     alerts.close(); setParcel(null); setSelId(null); setHoverId(null); setSoloL(l);
-    if (map) map.easeTo({ center: [l.lng, l.lat], zoom: Math.max(map.getZoom(), 15), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
+    if (map) map.easeTo({ center: [l.lng, l.lat], zoom: DETAIL_ZOOM, offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
   };
   // `openSearch`: results for the search's area and filters, with it as the active search.
   const openSearch = async (x: SavedSearch) => {
@@ -387,7 +390,7 @@ export default function HomeWeb() {
       <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => {
         alerts.close(); setSearching(false); setSelId(null); setSoloL(null); setParcel(p);
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
-        if (map) map.easeTo({ center: [p.cx, p.cy], zoom: Math.max(map.getZoom(), 16), offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
+        if (map) map.easeTo({ center: [p.cx, p.cy], zoom: DETAIL_ZOOM, offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
       }} />
       {comps && <CompsFlow key={comps.id + comps.addr} l={comps} cached={compsCached} onClose={() => setComps(null)}
         onDone={() => { if (!rp.has(comps)) showToast("Report saved to Reports"); rp.save(comps); }} onShare={() => shareOne(comps)} />}

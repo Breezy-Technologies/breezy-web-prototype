@@ -103,7 +103,7 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
           )}
         </div>
       )}
-      {!compact && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved?.()} onShare={onSharePicked} onSaveSearch={listings.length > 0 ? onFooterSearch : undefined} searchLabel={active ? "Manage search" : "Save search"} />}
+      {!compact && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved?.()} onShare={onSharePicked} />}
     </div>
   );
 }
