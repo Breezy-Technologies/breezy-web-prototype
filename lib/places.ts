@@ -1,7 +1,8 @@
 import { config, isLiveMap } from "./config";
 import { BBox, LngLat, Ring, anticlockwise, clockwise, closeRing, ringBBox } from "./geo";
 
-export type PlaceKind = "place" | "postcode" | "region" | "district" | "neighborhood" | "locality" | "address";
+// "area": a map viewport searched with "Search this area" (no boundary, bbox only).
+export type PlaceKind = "place" | "postcode" | "region" | "district" | "neighborhood" | "locality" | "address" | "area";
 
 export type Place = {
   id: string;
@@ -93,7 +94,7 @@ export async function searchPlaces(q: string, near?: LngLat): Promise<Place[]> {
 
 // Outline for a place: Census TIGERweb via our API route, else gazetteer ring.
 export async function placeBoundary(p: Place): Promise<Ring[] | null> {
-  if (p.kind === "address") return null;
+  if (p.kind === "address" || p.kind === "area") return null;
   try {
     const u = `/api/boundary?kind=${p.kind}&lng=${p.center[0]}&lat=${p.center[1]}&name=${encodeURIComponent(p.name)}`;
     const r = await fetch(u);
@@ -112,6 +113,14 @@ export async function placeBoundary(p: Place): Promise<Ring[] | null> {
 // Dallas, where the Regrid trial has parcels. Anything else is "Unsupported area".
 const COVERAGE: BBox[] = [[-124.48, 32.53, -114.13, 42.01], [-97.0, 32.62, -96.55, 33.02]];
 export const isCovered = (p: Place) => COVERAGE.some(([w, s, e, n]) => p.center[0] >= w && p.center[0] <= e && p.center[1] >= s && p.center[1] <= n);
+
+// "Search this area": the visible map viewport as a searchable place. The id is the
+// bbox rounded to ~100 m, so the same view always gives the same fake listings.
+export const MAP_AREA = "Map area";
+export function viewportPlace(bb: BBox): Place {
+  const r = (v: number) => v.toFixed(3);
+  return { id: "map:" + bb.map(r).join(","), name: MAP_AREA, label: MAP_AREA, sub: "Map area", kind: "area", center: [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2], bbox: bb };
+}
 
 // Search-field area labels (canvas `_areaSq`): "A", "A, B", "A, B +1 more".
 export function areaSq(labels: string[]): string {
