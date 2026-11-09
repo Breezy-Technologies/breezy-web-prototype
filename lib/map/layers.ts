@@ -1,7 +1,7 @@
 import type { Map as MbMap, GeoJSONSource } from "mapbox-gl";
 import { config, hasRegrid } from "../config";
 import { Ring, metersPerDegLat, metersPerDegLng, rng, hashStr } from "../geo";
-import { heatColor, heatValue } from "../fake";
+import { heatColors, heatPct, heatStep } from "../heat";
 
 export type HeatKind = "roi" | "ub" | "none";
 
@@ -20,8 +20,8 @@ export function ensureLayers(m: MbMap) {
   const before = firstSymbol(m);
   if (!m.getSource("bz-hex")) {
     m.addSource("bz-hex", { type: "geojson", data: EMPTY });
-    m.addLayer({ id: "bz-hex-fill", type: "fill", source: "bz-hex", paint: { "fill-color": ["get", "c"], "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14.8, 0.36, 15.6, 0], "fill-opacity-transition": { duration: 400 } } }, before);
-    m.addLayer({ id: "bz-hex-line", type: "line", source: "bz-hex", paint: { "line-color": ["get", "l"], "line-width": 1, "line-opacity": ["interpolate", ["linear"], ["zoom"], 14.8, 0.35, 15.6, 0] } }, before);
+    m.addLayer({ id: "bz-hex-fill", type: "fill", source: "bz-hex", paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14.8, 0.36, 15.6, 0], "fill-opacity-transition": { duration: 400 } } }, before);
+    m.addLayer({ id: "bz-hex-line", type: "line", source: "bz-hex", paint: { "line-color": "rgba(0,0,0,0)", "line-width": 1, "line-opacity": ["interpolate", ["linear"], ["zoom"], 14.8, 0.35, 15.6, 0] } }, before);
   }
   if (!m.getSource("bz-par")) {
     if (hasRegrid()) {
@@ -33,7 +33,7 @@ export function ensureLayers(m: MbMap) {
       });
     } else m.addSource("bz-par", { type: "geojson", data: EMPTY });
     const sl = hasRegrid() ? { "source-layer": config.regridSourceLayer } : {};
-    m.addLayer({ id: "bz-par-fill", type: "fill", source: "bz-par", ...sl, minzoom: 14.6, paint: { "fill-color": hasRegrid() ? "rgba(0,0,0,0)" : ["coalesce", ["get", "h"], "rgba(0,0,0,0)"], "fill-opacity": 0 } } as any, before);
+    m.addLayer({ id: "bz-par-fill", type: "fill", source: "bz-par", ...sl, minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } } as any, before);
     m.addLayer({ id: "bz-par-line", type: "line", source: "bz-par", ...sl, minzoom: 14.6, paint: { "line-color": "rgba(110,100,94,.55)", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.4, 18, 1.2], "line-opacity": ["interpolate", ["linear"], ["zoom"], 14.6, 0, 15.4, 1] } } as any, before);
   }
   if (!m.getSource("bz-area")) {
@@ -52,10 +52,22 @@ export function setArea(m: MbMap, rings: Ring[] | null) {
   src.setData({ type: "FeatureCollection", features: (rings || []).map(r => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: r } })) });
 }
 
+// ---- Heat colours: one step expression per layer (lib/heat) ----
+// Hexes and demo parcels carry `v`, the percentage; the palette lives in the
+// paint, so a palette change is a repaint, not a regeneration.
+export function applyHeatColors(m: MbMap, kind: HeatKind) {
+  if (kind === "none" || !m.getLayer("bz-hex-fill")) return;
+  const step = heatStep(kind, heatColors(kind));
+  m.setPaintProperty("bz-hex-fill", "fill-color", step);
+  m.setPaintProperty("bz-hex-line", "line-color", step);
+  if (m.getLayer("bz-par-fill") && !hasRegrid()) m.setPaintProperty("bz-par-fill", "fill-color", step);
+}
+
 // ---- Heat hexes (fake), generated for the visible viewport ----
 export function syncHeat(m: MbMap, kind: HeatKind) {
   const src = m.getSource("bz-hex") as GeoJSONSource | undefined;
   if (!src) return;
+  applyHeatColors(m, kind);
   m.setLayoutProperty("bz-hex-fill", "visibility", kind === "none" ? "none" : "visible");
   m.setLayoutProperty("bz-hex-line", "visibility", kind === "none" ? "none" : "visible");
   if (kind === "none") return;
@@ -74,12 +86,10 @@ export function syncHeat(m: MbMap, kind: HeatKind) {
     const c0 = Math.floor((b.getWest() - off) / dx) - 1, c1 = Math.ceil((b.getEast() - off) / dx) + 1;
     for (let c = c0; c <= c1; c++) {
       const cx = c * dx + off, cy = r * dy;
-      const v = heatValue(kind, cx, cy);
-      const col = heatColor(kind, v);
       const ring: number[][] = [];
       for (let k = 0; k < 6; k++) { const a = (Math.PI / 180) * (60 * k - 30); ring.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]); }
       ring.push(ring[0]);
-      feats.push({ type: "Feature", properties: { c: col, l: col.replace("rgb(", "rgba(").replace(")", ",.9)"), x: cx, y: cy }, geometry: { type: "Polygon", coordinates: [ring] } });
+      feats.push({ type: "Feature", properties: { v: heatPct(kind, cx, cy), x: cx, y: cy }, geometry: { type: "Polygon", coordinates: [ring] } });
     }
   }
   src.setData({ type: "FeatureCollection", features: feats });
@@ -104,7 +114,7 @@ export function fakeParcelsFor(m: MbMap, heat: HeatKind): FakeParcel[] {
   }
   src.setData({
     type: "FeatureCollection",
-    features: all.map(p => ({ type: "Feature", id: p.id, properties: { pid: p.id, h: heat === "none" ? "rgba(0,0,0,0)" : heatColor(heat, heatValue(heat, p.cx, p.cy)) }, geometry: { type: "Polygon", coordinates: [p.ring] } })),
+    features: all.map(p => ({ type: "Feature", id: p.id, properties: heat === "none" ? { pid: p.id } : { pid: p.id, v: heatPct(heat, p.cx, p.cy) }, geometry: { type: "Polygon", coordinates: [p.ring] } })),
   });
   m.setPaintProperty("bz-par-fill", "fill-opacity", heat === "none" ? 0 : ["interpolate", ["linear"], ["zoom"], 14.8, 0, 15.6, 0.85]);
   return all;

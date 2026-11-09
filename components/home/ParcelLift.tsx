@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
-import { Listing, heatColor, heatValue, makeListings } from "@/lib/fake";
+import { Listing, makeListings } from "@/lib/fake";
+import { PALETTES, heatColorOf, heatPct, useHeatPalettes } from "@/lib/heat";
 import { config, hasRegrid, isLiveMap } from "@/lib/config";
 import { OwnerRow, QeRow } from "./HoverCard";
 
@@ -12,6 +13,7 @@ export type ParcelHit = { key: string; ring: [number, number][]; cx: number; cy:
 // heat map on the slab keeps the parcel's heat colour; otherwise it's neutral.
 export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: boolean; onOpen: (p: ParcelHit) => void; selected: ParcelHit | null }) {
   const { map, tick, heat, mode } = useMapCtx();
+  const palettes = useHeatPalettes();
   const [hit, setHit] = useState<ParcelHit | null>(null);
   const keyRef = useRef("");
   const satUrls = useRef(new Map<string, string>()); // parcel key -> satellite image URL (fetched once per parcel)
@@ -51,8 +53,8 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   const q = show.ring.map(ll => map.project(ll));
   const pts = q.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(" ");
   const sat = mode === "satellite";
-  const hc = heat !== "none" && !sat ? heatColor(heat, heatValue(heat, show.cx, show.cy)) : null;
-  const hv = hc ? hc.match(/[\d.]+/g)!.map(Number) : null;
+  const hc = heat !== "none" && !sat ? heatColorOf(heat, heatPct(heat, show.cx, show.cy), PALETTES[palettes[heat]].c) : null;
+  const hv = hc ? [1, 3, 5].map(i => parseInt(hc.slice(i, i + 2), 16)) : null;
   const shade = (c: number[], f: number) => `rgb(${c.slice(0, 3).map(v => Math.round(v * f)).join(",")})`;
   const sideC = sat ? "rgb(122,112,100)" : hv ? shade(hv, 0.8) : "rgb(212,200,192)";
   const topC = sat ? "rgb(246,243,238)" : hc || "rgb(253,251,248)";

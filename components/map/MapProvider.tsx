@@ -7,7 +7,8 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { config, isLiveMap } from "@/lib/config";
 import { MapMode, offlineStyle, styleFor } from "@/lib/map/style";
 import { applyBreezyTheme } from "@/lib/map/theme";
-import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel } from "@/lib/map/layers";
+import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors } from "@/lib/map/layers";
+import { HEAT_PALETTE_EVENT } from "@/lib/heat";
 import { Ring } from "@/lib/geo";
 
 type Inset = { left: number; top: number; radius: number };
@@ -117,6 +118,14 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     heatRef.current = h;
     setHeatS(h);
     if (map && map.getSource("bz-hex")) { syncHeat(map, h); setParcels(fakeParcelsFor(map, h)); }
+  }, [map]);
+
+  // Heat palette changed (Dev menu): repaint hexes and parcels in place.
+  useEffect(() => {
+    if (!map) return;
+    const on = () => applyHeatColors(map, heatRef.current);
+    window.addEventListener(HEAT_PALETTE_EVENT, on);
+    return () => window.removeEventListener(HEAT_PALETTE_EVENT, on);
   }, [map]);
 
   const setAreaRings = useCallback((r: Ring[] | null) => {

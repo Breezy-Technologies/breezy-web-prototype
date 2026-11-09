@@ -137,15 +137,7 @@ export function heatValue(kind: "roi" | "ub", lng: number, lat: number) {
   return Math.max(0, Math.min(0.999, field(k, lng * 90, lat * 110)));
 }
 
-export const HEAT_TONES: Record<"roi" | "ub", [number, number, number][]> = {
-  roi: [[110, 150, 210], [150, 185, 225], [242, 232, 205], [246, 200, 150], [236, 140, 120], [222, 96, 82]],
-  ub: [[150, 190, 170], [190, 214, 190], [244, 236, 210], [240, 205, 160], [226, 160, 128], [200, 112, 96]],
-};
-
-export function heatColor(kind: "roi" | "ub", v: number): string {
-  const t = HEAT_TONES[kind][Math.min(5, Math.floor(v * 6))];
-  return `rgb(${t.join(",")})`;
-}
+// Colours for these values live in lib/heat (one scale for hexes, parcels and pins).
 
 // ---- Property detail extras (Specs / Records / Owners tabs) ----
 // Derived from a listing on a separate random stream, so the listing's own

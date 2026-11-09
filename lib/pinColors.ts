@@ -11,7 +11,7 @@
 // Every circle gets a light gradient of its shade for extra pop. Selected
 // state is always black with a white icon.
 import { useEffect, useState } from "react";
-import { HEAT_TONES, heatValue } from "./fake";
+import { heatColorOf, heatColors, heatPct } from "./heat";
 import type { Listing, OppType } from "./fake";
 
 export type PinRoute = "yellow" | "heat" | "brand" | "family" | "fresh" | "familyFresh" | "upside" | "layer";
@@ -60,7 +60,11 @@ export const freshness = (l?: Listing) => (l ? Math.max(0, Math.min(1, 1 - l.dom
 const FADED: RGB = [228, 222, 212];
 const UP_LO: RGB = [244, 230, 176], UP_HI: RGB = [24, 128, 88];
 const upsideT = (l?: Listing) => (l ? Math.max(0, Math.min(1, ((l.price * l.roi) / 100 - 300000) / 1700000)) : 0.55);
-const layerRGB = (l?: Listing): RGB => { const v = l ? heatValue("roi", l.lng, l.lat) : 0.6; return HEAT_TONES.roi[Math.min(5, Math.floor(v * 6))] as RGB; };
+// The ROI heat colour under the pin, from the same scale as the hexes and parcels.
+const layerRGB = (l?: Listing): RGB => {
+  const h = heatColorOf("roi", l ? heatPct("roi", l.lng, l.lat) : 20, heatColors("roi"));
+  return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)) as RGB;
+};
 
 export function pinRGB(type: OppType, route: PinRoute, l?: Listing): RGB {
   if (route === "family") return familyRGB(type);
@@ -77,7 +81,7 @@ export const rampCss = (route: PinRoute) => {
   if (route === "fresh") return g([255, 186, 20], FADED);
   if (route === "familyFresh") return `linear-gradient(90deg,rgb(${SELLER_RGB[0].join(",")}),rgb(${FADED.join(",")}) 50%,rgb(${VALUE_RGB[0].join(",")}))`;
   if (route === "upside") return g(UP_LO, UP_HI);
-  if (route === "layer") return `linear-gradient(90deg,${HEAT_TONES.roi.map(c => `rgb(${c.join(",")})`).join(",")})`;
+  if (route === "layer") return `linear-gradient(90deg,${heatColors("roi").join(",")})`;
   if (route === "family") return `linear-gradient(90deg,${[...SELLER_RGB, ...VALUE_RGB].map(c => `rgb(${c.join(",")})`).join(",")})`;
   const order = route === "brand" ? BRAND_ORDER : HEAT_ORDER;
   return `linear-gradient(90deg,${order.map((t, i) => `rgb(${pinRGB(t, route).join(",")}) ${Math.round((i / (order.length - 1)) * 100)}%`).join(",")})`;
