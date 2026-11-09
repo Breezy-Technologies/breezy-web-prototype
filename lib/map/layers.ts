@@ -1,6 +1,7 @@
 import type { Map as MbMap, GeoJSONSource } from "mapbox-gl";
 import { config, hasRegrid } from "../config";
 import { Ring, metersPerDegLat, metersPerDegLng, rng, hashStr } from "../geo";
+import { cellToBoundary, cellToLatLng, polygonToCells } from "h3-js";
 import { heatColors, heatPct, heatStep } from "../heat";
 
 export type HeatKind = "roi" | "ub" | "none";
@@ -63,7 +64,15 @@ export function applyHeatColors(m: MbMap, kind: HeatKind) {
   if (m.getLayer("bz-par-fill") && !hasRegrid()) m.setPaintProperty("bz-par-fill", "fill-color", step);
 }
 
-// ---- Heat hexes (fake), generated for the visible viewport ----
+// ---- Heat hexes on the fixed H3 grid ----
+// Cells are global and stable, so a hex never shifts as the map pans; only
+// which cells are listed changes. Tiers follow underbuilt-roi (derive.ts):
+// res 7 for the city view, res 8 from zoom 12, plus res 6 when zoomed far out
+// to keep the count bounded. A cell's value is the field at its centre; when
+// real data lands it becomes the average of the parcels inside the cell.
+export const hexRes = (z: number) => (z < 10 ? 6 : z < 12 ? 7 : 8);
+const MAX_CELLS = 5000;
+
 export function syncHeat(m: MbMap, kind: HeatKind) {
   const src = m.getSource("bz-hex") as GeoJSONSource | undefined;
   if (!src) return;
@@ -73,26 +82,31 @@ export function syncHeat(m: MbMap, kind: HeatKind) {
   if (kind === "none") return;
   const b = m.getBounds();
   if (!b) return;
-  const lat0 = (b.getNorth() + b.getSouth()) / 2;
-  let rM = 320; // hex radius in metres
-  const areaM = ((b.getEast() - b.getWest()) * metersPerDegLng(lat0)) * ((b.getNorth() - b.getSouth()) * metersPerDegLat);
-  while (areaM / (2.6 * rM * rM) > 1800) rM *= 1.6;
-  const dx = (Math.sqrt(3) * rM) / metersPerDegLng(lat0), dy = (1.5 * rM) / metersPerDegLat;
-  const rx = rM / metersPerDegLng(lat0), ry = rM / metersPerDegLat;
-  const feats: GeoJSON.Feature[] = [];
-  const r0 = Math.floor(b.getSouth() / dy) - 1, r1 = Math.ceil(b.getNorth() / dy) + 1;
-  for (let r = r0; r <= r1; r++) {
-    const off = (r & 1) * dx / 2;
-    const c0 = Math.floor((b.getWest() - off) / dx) - 1, c1 = Math.ceil((b.getEast() - off) / dx) + 1;
-    for (let c = c0; c <= c1; c++) {
-      const cx = c * dx + off, cy = r * dy;
-      const ring: number[][] = [];
-      for (let k = 0; k < 6; k++) { const a = (Math.PI / 180) * (60 * k - 30); ring.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]); }
-      ring.push(ring[0]);
-      feats.push({ type: "Feature", properties: { v: heatPct(kind, cx, cy), x: cx, y: cy }, geometry: { type: "Polygon", coordinates: [ring] } });
-    }
+  // pad by a fifth so cells whose centre sits just off screen still draw
+  const px = (b.getEast() - b.getWest()) * 0.2, py = (b.getNorth() - b.getSouth()) * 0.2;
+  const w = Math.max(-180, b.getWest() - px), e = Math.min(180, b.getEast() + px);
+  const s = Math.max(-85, b.getSouth() - py), n = Math.min(85, b.getNorth() + py);
+  let res = hexRes(m.getZoom()), cells: string[] = [];
+  for (; res >= 0; res--) {
+    cells = polygonToCells([[[w, s], [e, s], [e, n], [w, n], [w, s]]], res, true);
+    if (cells.length <= MAX_CELLS) break;
   }
-  src.setData({ type: "FeatureCollection", features: feats });
+  src.setData({ type: "FeatureCollection", features: cells.map(h => hexFeature(h, kind)) });
+}
+
+const hexCache = new Map<string, GeoJSON.Feature>();
+function hexFeature(h: string, kind: "roi" | "ub"): GeoJSON.Feature {
+  const key = kind + h;
+  let f = hexCache.get(key);
+  if (!f) {
+    const [lat, lng] = cellToLatLng(h);
+    const ring = cellToBoundary(h, true);
+    ring.push(ring[0]);
+    f = { type: "Feature", properties: { h3: h, v: heatPct(kind, lng, lat), x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } };
+    if (hexCache.size > 40000) hexCache.clear();
+    hexCache.set(key, f);
+  }
+  return f;
 }
 
 // ---- Demo parcels when Regrid isn't configured ----
