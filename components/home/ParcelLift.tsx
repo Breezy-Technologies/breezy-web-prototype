@@ -53,7 +53,13 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   const q = show.ring.map(ll => map.project(ll));
   const pts = q.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(" ");
   const sat = mode === "satellite";
-  const hc = heat !== "none" && !sat ? heatColorOf(heat, heatPct(heat, show.cx, show.cy), PALETTES[palettes[heat]].c) : null;
+  // Same value the parcel is painted with: its feature state (Regrid), else the field at its centre.
+  let pct: number | null = null;
+  if (heat !== "none" && !sat) {
+    try { const st = map.getFeatureState(hasRegrid() ? { source: "bz-par", sourceLayer: config.regridSourceLayer, id: show.key } : { source: "bz-par", id: show.key }); if (typeof st?.v === "number") pct = st.v; } catch {}
+    if (pct === null) pct = heatPct(heat, show.cx, show.cy);
+  }
+  const hc = pct !== null && heat !== "none" ? heatColorOf(heat, pct, PALETTES[palettes[heat]].c) : null;
   const hv = hc ? [1, 3, 5].map(i => parseInt(hc.slice(i, i + 2), 16)) : null;
   const shade = (c: number[], f: number) => `rgb(${c.slice(0, 3).map(v => Math.round(v * f)).join(",")})`;
   const sideC = sat ? "rgb(122,112,100)" : hv ? shade(hv, 0.8) : "rgb(212,200,192)";

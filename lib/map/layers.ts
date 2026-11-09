@@ -25,6 +25,7 @@ export function ensureLayers(m: MbMap) {
     m.addLayer({ id: "bz-hex-line", type: "line", source: "bz-hex", paint: { "line-color": "rgba(0,0,0,0)", "line-width": 1, "line-opacity": ["interpolate", ["linear"], ["zoom"], 14.8, 0.35, 15.6, 0] } }, before);
   }
   if (!m.getSource("bz-par")) {
+    resetParcelStamps();
     if (hasRegrid()) {
       m.addSource("bz-par", {
         type: "vector",
@@ -57,11 +58,45 @@ export function setArea(m: MbMap, rings: Ring[] | null) {
 // Hexes and demo parcels carry `v`, the percentage; the palette lives in the
 // paint, so a palette change is a repaint, not a regeneration.
 export function applyHeatColors(m: MbMap, kind: HeatKind) {
-  if (kind === "none" || !m.getLayer("bz-hex-fill")) return;
-  const step = heatStep(kind, heatColors(kind));
+  if (!m.getLayer("bz-hex-fill")) return;
+  if (m.getLayer("bz-par-fill")) m.setPaintProperty("bz-par-fill", "fill-opacity", kind === "none" ? 0 : PAR_OPACITY);
+  if (kind === "none") return;
+  const colors = heatColors(kind);
+  const step = heatStep(kind, colors);
   m.setPaintProperty("bz-hex-fill", "fill-color", step);
   m.setPaintProperty("bz-hex-line", "line-color", step);
-  if (m.getLayer("bz-par-fill") && !hasRegrid()) m.setPaintProperty("bz-par-fill", "fill-color", step);
+  if (!m.getLayer("bz-par-fill")) return;
+  // Regrid parcels get their value as feature state (stampParcels); until a
+  // parcel is stamped it stays clear rather than flashing the lowest band.
+  m.setPaintProperty("bz-par-fill", "fill-color", hasRegrid()
+    ? ["case", ["==", ["typeof", ["feature-state", "v"]], "number"], heatStep(kind, colors, ["feature-state", "v"]), "rgba(0,0,0,0)"]
+    : step);
+}
+const PAR_OPACITY = ["interpolate", ["linear"], ["zoom"], 14.8, 0, 15.6, 0.85] as any;
+
+// ---- Regrid parcel colour ----
+// Regrid tiles carry no Breezy data, so each loaded parcel (keyed by ll_uuid
+// via promoteId) gets its heat percentage as feature state `v`, read at the
+// centre of its outline. ParcelLift reads the same state, so the slab and the
+// parcel agree. When the heat service is live, `v` comes from it instead.
+const stamped = new Map<string | number, HeatKind>();
+export function resetParcelStamps() { stamped.clear(); }
+
+export function stampParcels(m: MbMap, kind: HeatKind) {
+  if (!hasRegrid() || kind === "none" || !m.getSource("bz-par") || m.getZoom() < 14.6) return;
+  const sourceLayer = config.regridSourceLayer;
+  for (const f of m.querySourceFeatures("bz-par", { sourceLayer })) {
+    const id = f.id;
+    if (id === undefined || stamped.get(id) === kind) continue;
+    const ring = f.geometry.type === "Polygon" ? f.geometry.coordinates[0]
+      : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates[0][0] : null;
+    if (!ring || !ring.length) continue;
+    let x = 0, y = 0;
+    for (const p of ring) { x += p[0]; y += p[1]; }
+    m.setFeatureState({ source: "bz-par", sourceLayer, id }, { v: heatPct(kind, x / ring.length, y / ring.length) });
+    stamped.set(id, kind);
+  }
+  if (stamped.size > 60000) stamped.clear(); // re-stamping is idempotent
 }
 
 // ---- Heat hexes on the fixed H3 grid ----
@@ -130,7 +165,6 @@ export function fakeParcelsFor(m: MbMap, heat: HeatKind): FakeParcel[] {
     type: "FeatureCollection",
     features: all.map(p => ({ type: "Feature", id: p.id, properties: heat === "none" ? { pid: p.id } : { pid: p.id, v: heatPct(heat, p.cx, p.cy) }, geometry: { type: "Polygon", coordinates: [p.ring] } })),
   });
-  m.setPaintProperty("bz-par-fill", "fill-opacity", heat === "none" ? 0 : ["interpolate", ["linear"], ["zoom"], 14.8, 0, 15.6, 0.85]);
   return all;
 }
 

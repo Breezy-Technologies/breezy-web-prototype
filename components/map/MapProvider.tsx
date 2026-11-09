@@ -7,7 +7,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { config, isLiveMap } from "@/lib/config";
 import { MapMode, offlineStyle, styleFor } from "@/lib/map/style";
 import { applyBreezyTheme } from "@/lib/map/theme";
-import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors } from "@/lib/map/layers";
+import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors, stampParcels } from "@/lib/map/layers";
 import { HEAT_PALETTE_EVENT } from "@/lib/heat";
 import { Ring } from "@/lib/geo";
 
@@ -70,6 +70,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       setArea(m, areaRef.current);
       syncHeat(m, heatRef.current);
       setParcels(fakeParcelsFor(m, heatRef.current));
+      stampParcels(m, heatRef.current);
       setReady(true);
       setTick(t => t + 1);
     };
@@ -94,6 +95,14 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     m.on("moveend", () => {
       syncHeat(m, heatRef.current);
       setParcels(fakeParcelsFor(m, heatRef.current));
+      stampParcels(m, heatRef.current);
+    });
+    // Regrid tiles arrive after the move ends: colour them as they load.
+    let stampRaf = 0;
+    m.on("sourcedata", e => {
+      if ((e as any).sourceId !== "bz-par" || !(e as any).tile) return;
+      cancelAnimationFrame(stampRaf);
+      stampRaf = requestAnimationFrame(() => stampParcels(m, heatRef.current));
     });
     setMap(m);
     (window as any).__bzMap = m; // handy for debugging in the console
@@ -117,7 +126,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const setHeat = useCallback((h: HeatKind) => {
     heatRef.current = h;
     setHeatS(h);
-    if (map && map.getSource("bz-hex")) { syncHeat(map, h); setParcels(fakeParcelsFor(map, h)); }
+    if (map && map.getSource("bz-hex")) { syncHeat(map, h); setParcels(fakeParcelsFor(map, h)); stampParcels(map, h); }
   }, [map]);
 
   // Heat palette changed (Dev menu): repaint hexes and parcels in place.
