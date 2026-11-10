@@ -90,14 +90,21 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
             >
               {sig && (
                 <span style={{ position: "relative", display: "flex" }}>
-                  {/* A soft pulse in the signal's colour, like the onboarding pins; seen or selected pins stay still. */}
-                  {!dark && !sn && <span style={{ position: "absolute", inset: 0, borderRadius: 9999, background: pulseColor(l.opp, 0.5), animation: `pulse 2.4s ease-out ${(l.id % 7) * 0.3}s infinite`, pointerEvents: "none" }} />}
+                  {/* Pulse in the signal's colour, reaching well past the pill (review: make it
+                      more prominent): a soft disc and a ring, behind the pill (z -1), staggered
+                      per pin. Seen or selected pins stay still. */}
+                  {!dark && !sn && <>
+                    <span style={{ position: "absolute", left: "50%", top: "50%", width: 22, height: 22, margin: -11, zIndex: -1, borderRadius: 9999, background: pulseColor(l.opp, 0.42), animation: `sigPulse 2.2s cubic-bezier(.2,.6,.3,1) ${(l.id % 7) * 0.3}s infinite`, pointerEvents: "none" }} />
+                    <span style={{ position: "absolute", left: "50%", top: "50%", width: 22, height: 22, margin: -11, zIndex: -1, borderRadius: 9999, boxShadow: `0 0 0 2px ${pulseColor(l.opp, 0.7)}`, animation: `sigRing 2.2s cubic-bezier(.2,.6,.3,1) ${(l.id % 7) * 0.3 + 0.5}s infinite`, pointerEvents: "none" }} />
+                  </>}
                   <span style={{ position: "relative", display: "flex" }}>
                     <SignalDot l={l} type={l.opp} size={22} icon={12} selected={dark} ring="rgb(253,252,252)" ringW={dark ? 1.5 : 0} />
+                    {/* Unread (decided): a red dot until the property is opened. */}
+                    {!sn && <span style={{ position: "absolute", right: -3, top: -3, width: 9, height: 9, borderRadius: 9999, background: "rgb(214,53,41)", boxShadow: "0 0 0 1.5px rgb(253,252,252)" }} />}
                   </span>
                 </span>
               )}
-              {!isBlank && !sig && l.opp === "drop" && <i className="ph-fill ph-bell-simple" style={{ fontSize: 13, color: dark ? "var(--paper)" : "rgb(192,98,84)" }} />}
+              {!isBlank && !sig && l.opp === "drop" && <i className="ph-bold ph-arrow-down" style={{ fontSize: 13, color: dark ? "var(--paper)" : "rgb(192,98,84)" }} />}
               {!isBlank && <span style={{ font: "700 14px/1.26 var(--font-sans)", color: dark ? "var(--paper)" : "var(--ink)" }}>{lab}</span>}
             </span>
           </div>

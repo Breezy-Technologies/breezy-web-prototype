@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Listing, OppType, fullPrice } from "@/lib/fake";
 import { CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
 import { PickedFooter } from "./Saved";
-import { ForYouFeed } from "./ForYouFeed";
+import { ForYouFeed, SeenView } from "./ForYouFeed";
 import { userLocationLabel } from "@/lib/places";
 
 export type Tab = "For you" | "Searches" | "Properties";
@@ -25,9 +25,6 @@ const card: React.CSSProperties = { display: "flex", flexDirection: "column", ov
 const roundBtn: React.CSSProperties = { flex: "none", width: 32, height: 32, border: "none", borderRadius: 9999, background: "rgba(18,18,18,.06)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 const mask = (u: string, size: number, color: string): React.CSSProperties => ({ flex: "none", width: size, height: size, background: color, WebkitMask: `url('${u}') center/contain no-repeat`, mask: `url('${u}') center/contain no-repeat` });
 
-function Bell() {
-  return <svg width="14" height="14" viewBox="0 0 24 24" style={{ flex: "none", display: "block" }}><path d="M12 3a6 6 0 0 0-6 6v3.6L4.4 15.4a.9.9 0 0 0 .8 1.4h13.6a.9.9 0 0 0 .8-1.4L18 12.6V9a6 6 0 0 0-6-6z" fill="rgb(214,53,41)" /><path d="M9.6 19a2.5 2.5 0 0 0 4.8 0z" fill="rgb(214,53,41)" /></svg>;
-}
 
 function Tabs({ tab, onPick, bellS, bellP }: { tab: Tab; onPick: (t: Tab) => void; bellS: boolean; bellP: boolean }) {
   return (
@@ -36,7 +33,7 @@ function Tabs({ tab, onPick, bellS, bellP }: { tab: Tab; onPick: (t: Tab) => voi
         const on = tab === t;
         return (
           <button key={t} onClick={() => onPick(t)} style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", border: "none", borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", font: "400 15px/20px var(--font-sans)", transition: "background .16s,color .16s", background: on ? INK : "rgba(18,18,18,.06)", color: on ? "rgb(249,249,249)" : INK }}>
-            {((t === "Searches" && bellS) || (t === "Properties" && bellP)) && <Bell />}<span>{t}</span>
+            {((t === "Searches" && bellS) || (t === "Properties" && bellP)) && <span title="New" style={{ flex: "none", width: 8, height: 8, borderRadius: 9999, background: "rgb(214,53,41)" }} />}<span>{t}</span>
           </button>
         );
       })}
@@ -127,9 +124,9 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
   );
 }
 
-export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals }: {
+export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals, onSeenView }: {
   name: string; area?: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void; onOpenSaved?: () => void;
-  onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void;
+  onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void; onSeenView?: (v: SeenView) => void;
   onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
   const sv = useSaved();
@@ -179,7 +176,7 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
   );
   const propList = (rows: PropItem[], live: boolean) => rows.map(x => <PropRow key={x.key} x={x} hover={live && hover === x.key} onEnter={enter(x.key)} onLeave={leave(x.key)} onOpen={() => openProp(x)} onDel={() => askDel(x.key, x.l.addr)} />);
   // V5 "For you" feed: filter by opportunity signal, larger cards with the signal badge.
-  const forYouList = <ForYouFeed items={forYou} seen={seen} onOpen={onOpen} onHover={onHover} onSignals={onSignals} />;
+  const forYouList = <ForYouFeed items={forYou} seen={seen} onOpen={onOpen} onHover={onHover} onSignals={onSignals} onView={onSeenView} area={(area || "").split(",")[0]} />;
   const hello = (
     <>
       <span style={{ font: "300 26px/1.26 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>Hello {name.split(" ")[0]}</span>

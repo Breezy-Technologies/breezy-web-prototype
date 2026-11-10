@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMapCtx } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
 import { SideNav, NAV_W, DevAction } from "@/components/home/SideNav";
+import type { SeenView } from "@/components/home/ForYouFeed";
 import { SearchBar, previewSearchState } from "@/components/home/SearchBar";
 import { ResultsPanel, SortMenu } from "@/components/home/LeftPanel";
 import { AllFiltersPanel, FilterBar, FilterDropdown, useFilterState } from "@/components/home/Filters";
@@ -132,9 +133,11 @@ export default function HomeWeb() {
   // detail has been opened. Picked signals also limit which pins are on the map.
   const [homeTab, setHomeTab] = useState<string>("For you");
   const [fySignals, setFySignals] = useState<OppType[]>([]);
+  // The feed's All / Unseen / Seen view: "Seen" shows no special pins (they're for what's unread).
+  const [fyView, setFyView] = useState<SeenView>("all");
   const fyOn = view === "home" && homeTab === "For you";
   const sigFilter = fyOn && fySignals.length > 0;
-  const signalIds = useMemo(() => fyOn ? new Set(forYou.filter(l => (!sigFilter || fySignals.includes(l.opp)) && !seen.has(l.id)).map(l => l.id)) : undefined, [fyOn, sigFilter, fySignals, forYou, seen]);
+  const signalIds = useMemo(() => fyOn ? new Set(fyView === "seen" ? [] : forYou.filter(l => (!sigFilter || fySignals.includes(l.opp)) && !seen.has(l.id)).map(l => l.id)) : undefined, [fyOn, fyView, sigFilter, fySignals, forYou, seen]);
   const pinListings = useMemo(() => unsupOn ? [] : sigFilter ? shown.filter(l => fySignals.includes(l.opp)) : shown, [unsupOn, sigFilter, fySignals, shown]);
 
   const openListing = (id: number) => {
@@ -329,7 +332,7 @@ export default function HomeWeb() {
           {searching ? null : view === "home"
             ? <HomeCard name={user.name} area={place.label} forYou={forYou} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
-                picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals}
+                picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} onSeenView={setFyView}
                 onOpenSaved={() => { setSavedOut(false); setSavedOpen(true); }} />
             : (
               // The results column steps back (scale + dim) while a sheet sits on top of it.

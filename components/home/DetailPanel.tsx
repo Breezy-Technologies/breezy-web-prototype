@@ -63,7 +63,9 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
     setTimeout(() => { estimated.add(qeKey); setQeState("ready"); onToast?.("Quick estimate ready", "positive"); }, 1600);
   };
   const [tab, setTab] = useState<Tab>("Summary");
-  const [revealed, setRevealed] = useState(false);
+  const ownerKey = l.apn || l.addr;
+  const [revealed, setRevealed] = useState(() => unlockedOwners.has(ownerKey));
+  const [credits, setCredits] = useState(creditsLeft);
   const ownerRef = useRef<HTMLDivElement>(null);
   // Contact owner reveals the contact lines and scrolls the Owner section into view,
   // just under the compact header and the sticky tabs (review feedback).
@@ -72,6 +74,13 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   // place (so the scroll target is exact), "play" runs the reveal, "done" is plain text.
   const [reveal, setReveal] = useState<"wait" | "play" | "done">("done");
   const contactOwner = () => {
+    // One credit per owner, spent on the tap itself (no confirmation step); reopening an unlocked owner is free.
+    if (!unlockedOwners.has(ownerKey)) {
+      unlockedOwners.add(ownerKey);
+      creditsLeft = Math.max(0, creditsLeft - 1);
+      setCredits(creditsLeft);
+      onToast?.(`Owner unlocked · ${creditsLeft} credits left`, "positive");
+    }
     setRevealed(true);
     setReveal("wait");
     if (tab !== "Summary") setTab("Summary");
@@ -283,8 +292,12 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                     <span style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg,rgba(174,106,91,0) 0%,rgba(174,106,91,.10) 35%,rgba(186,160,251,.12) 55%,rgba(186,160,251,0) 80%)", animation: "revealSheen 1.5s cubic-bezier(.3,.7,.3,1) both" }} />
                   </span>}
                   <CopyLine text={l.owner.phone} reveal={reveal} delay={0} /><CopyLine text={l.owner.email} reveal={reveal} delay={160} /><CopyLine text={l.owner.mail} muted reveal={reveal} delay={320} />
+                  <CreditLine text={`1 credit used · ${credits} left`} used />
                 </div>
-              : <span style={css("padding-left:70px;font:400 13px/18px var(--font-sans);color:rgb(129,117,111)")}>Phone, email and mailing address unlock with Contact owner below.</span>}
+              : <div style={css("padding-left:70px;display:flex;flex-direction:column;gap:6px")}>
+                  <span style={css("font:400 13px/18px var(--font-sans);color:rgb(129,117,111)")}>Phone, email and mailing address unlock with Contact owner below.</span>
+                  <CreditLine text={`Uses 1 credit · ${credits} left`} />
+                </div>}
           </div>
           <div style={css("display:flex;flex-direction:column;gap:24px;padding:24px 16px 0")}>
             {/* Listing description: `onDescToggle` */}
@@ -511,6 +524,20 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
 
 // Owner contact line: hovering shows a copy icon; clicking copies the value to
 // the clipboard and briefly shows a check (review feedback).
+/* Owner contact credits (10 Nov review): show clearly that unlocking spends one
+   credit and how many remain, without a confirmation step. Fake balance for the
+   session; each owner is charged once. */
+let creditsLeft = 24;
+const unlockedOwners = new Set<string>();
+function CreditLine({ text, used }: { text: string; used?: boolean }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 6, padding: used ? "6px 8px 0" : 0, font: "400 12px/16px var(--font-sans)", color: used ? "rgb(129,117,111)" : "rgb(98,90,89)", animation: used ? "fadeIn .4s ease .5s both" : undefined }}>
+      <span style={{ flex: "none", width: 16, height: 16, borderRadius: 9999, background: "linear-gradient(180deg,rgb(255,224,120),rgb(232,184,64))", boxShadow: "inset 0 0 0 1px rgba(150,110,20,.35)", display: "flex", alignItems: "center", justifyContent: "center", font: "700 9px/1 var(--font-sans)", color: "rgb(110,78,10)" }}>1</span>
+      {text}
+    </span>
+  );
+}
+
 // While revealing, the text is painted by a gradient (ink, a clay → violet edge,
 // then transparent) that slides across it, so each line is written in left to right.
 function CopyLine({ text, muted, reveal = "done", delay = 0 }: { text: string; muted?: boolean; reveal?: "wait" | "play" | "done"; delay?: number }) {

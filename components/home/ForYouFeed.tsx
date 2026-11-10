@@ -8,6 +8,7 @@
 // is the yellow pin accent (rgb 255,209,41 with an ink ring) instead of clay.
 import { useEffect, useRef, useState } from "react";
 import { Listing, OPP, OppType, fullPrice } from "@/lib/fake";
+import { hashStr } from "@/lib/geo";
 import { useSaved } from "@/components/SavedState";
 import { SaveToggle } from "./Saved";
 import { SignalDot } from "../PinPalette";
@@ -56,7 +57,7 @@ function PhotoStrip({ photos }: { photos: string[] }) {
   );
 }
 
-function FeedCard({ l, fresh, onOpen, onHover }: { l: Listing; fresh: boolean; onOpen: () => void; onHover: (on: boolean) => void }) {
+function FeedCard({ l, fresh, seen, onOpen, onHover }: { l: Listing; fresh: boolean; seen: boolean; onOpen: () => void; onHover: (on: boolean) => void }) {
   const sv = useSaved();
   return (
     <div onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} className="fy-card"
@@ -65,9 +66,10 @@ function FeedCard({ l, fresh, onOpen, onHover }: { l: Listing; fresh: boolean; o
         <PhotoStrip photos={l.photos} />
         <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px 0 6px", borderRadius: 9999, background: "rgba(243,242,241,.88)", backdropFilter: "blur(12px)", font: "400 13px/16px var(--font-sans)", color: "rgb(17,16,16)", whiteSpace: "nowrap" }}>
           <SignalDot l={l} type={l.opp} size={18} icon={11} />
-          {fresh && <span style={{ flex: "none", width: 8, height: 8, borderRadius: 9999, background: "rgb(214,53,41)" }} />}
           {OPP[l.opp].lb}
         </span>
+        {/* Unread: a "New" label until the card is opened (review: the bell read as an alert someone set). */}
+        {fresh && <span style={{ position: "absolute", right: 56, top: 14, height: 24, padding: "0 9px", borderRadius: 9999, background: "rgb(214,53,41)", font: "700 12px/24px var(--font-sans)", letterSpacing: ".3px", color: "rgb(253,252,252)" }}>New</span>}
         <SaveToggle saved={sv.isSaved(l)} onToggle={() => sv.toggleProp(l)} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", padding: "0 8px" }}>
@@ -77,13 +79,57 @@ function FeedCard({ l, fresh, onOpen, onHover }: { l: Listing; fresh: boolean; o
         <span style={{ display: "flex", alignItems: "baseline", gap: 4, whiteSpace: "nowrap" }}>
           <span style={{ font: "700 14px/21px var(--font-sans)", letterSpacing: ".25px", color: INK }}>{fullPrice(l.price)}</span>
           <span style={{ font: "400 12px/16px var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)" }}>/ ${Math.round(l.price / l.sqft).toLocaleString()} per ft² · {l.dom} DOM</span>
+          {seen && <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, font: "400 12px/16px var(--font-sans)", color: "rgb(129,117,111)" }}><i className="ph-bold ph-check" style={{ fontSize: 12 }} />Seen</span>}
         </span>
       </div>
     </div>
   );
 }
 
-export function ForYouFeed({ items, seen, onOpen, onHover, onSignals }: { items: Listing[]; seen: Set<number>; onOpen: (id: number) => void; onHover: (id: number | null) => void; onSignals?: (keys: OppType[]) => void }) {
+/* ---- Read state (10 Nov review) ----
+   An item is seen once it's opened (clicked); hovering doesn't count. Each
+   opportunity is dated by when Breezy found it (fake: 0–3 days ago, stable per
+   listing) and the feed is grouped under date dividers. A divider carries a red
+   dot while anything under it is unread; unread cards carry "New" and their map
+   pins a red dot. All / Unseen / Seen picks what the feed shows, and the end of
+   the feed says when you're all caught up. */
+export type SeenView = "all" | "unseen" | "seen";
+const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const foundDaysAgo = (l: Listing) => hashStr("found:" + (l.apn || l.id)) % 4;
+function dayLabel(d: number) {
+  const t = new Date(); t.setDate(t.getDate() - d);
+  const date = `${MON[t.getMonth()]} ${t.getDate()}`;
+  return d === 0 ? `Today · ${date}` : d === 1 ? `Yesterday · ${date}` : date;
+}
+
+function DateDivider({ label, unread }: { label: string; unread: number }) {
+  return (
+    <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "10px 0 2px" }}>
+      {unread > 0 && <span title={`${unread} unread`} style={{ flex: "none", width: 8, height: 8, borderRadius: 9999, background: "rgb(214,53,41)" }} />}
+      <span style={{ flex: "none", font: "700 15px/20px var(--font-sans)", color: INK }}>{label}</span>
+      {unread > 0 && <span style={{ flex: "none", font: "400 13px/18px var(--font-sans)", color: "rgb(214,53,41)" }}>{unread} new</span>}
+      <span style={{ flex: 1, height: 1.5, borderRadius: 1, background: "rgba(18,18,18,.12)" }} />
+    </div>
+  );
+}
+
+function CaughtUp({ seenN, area, onShowSeen }: { seenN: number; area: string; onShowSeen?: () => void }) {
+  return (
+    <div style={{ flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "28px 16px 32px", textAlign: "center" }}>
+      <span style={{ width: 48, height: 48, borderRadius: 9999, background: "rgb(232,242,234)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <i className="ph-bold ph-check" style={{ fontSize: 22, color: "rgb(74,128,88)" }} />
+      </span>
+      <span style={{ font: "700 16px/22px var(--font-sans)", color: INK }}>You&apos;re all caught up</span>
+      <span style={{ maxWidth: 280, font: "400 13px/19px var(--font-sans)", color: "rgb(98,90,89)" }}>You&apos;ve opened every new opportunity{area ? ` in ${area}` : ""}. New ones show up here, dated, as Breezy finds them.</span>
+      {onShowSeen && seenN > 0 && <button onClick={onShowSeen} style={{ marginTop: 6, height: 36, padding: "0 16px", border: "none", borderRadius: 9999, background: "rgba(18,18,18,.06)", font: "700 13px/18px var(--font-sans)", color: INK, cursor: "pointer" }}>Show seen ({seenN})</button>}
+    </div>
+  );
+}
+
+export function ForYouFeed({ items, seen, onOpen, onHover, onSignals, onView, area = "" }: { items: Listing[]; seen: Set<number>; onOpen: (id: number) => void; onHover: (id: number | null) => void; onSignals?: (keys: OppType[]) => void; onView?: (v: SeenView) => void; area?: string }) {
+  const [view, setView] = useState<SeenView>("all");
+  useEffect(() => { onView?.(view); }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onView?.("all"), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [sel, setSel] = useState<Partial<Record<OppType, boolean>>>({});
   // The picked signals also filter the map pins (review feedback); cleared when the feed unmounts.
   const selKey = (Object.keys(sel) as OppType[]).filter(k => sel[k]).sort().join(",");
@@ -100,7 +146,11 @@ export function ForYouFeed({ items, seen, onOpen, onHover, onSignals }: { items:
   }, [open]);
 
   const keys = (Object.keys(sel) as OppType[]).filter(k => sel[k]);
-  const feed = items.filter(l => !keys.length || sel[l.opp]);
+  const bySignal = items.filter(l => !keys.length || sel[l.opp]);
+  const seenN = bySignal.filter(l => seen.has(l.id)).length, unseenN = bySignal.length - seenN;
+  const feed = bySignal.filter(l => view === "all" || (view === "seen") === seen.has(l.id));
+  // newest first, grouped by day found
+  const days = [...new Set(feed.map(foundDaysAgo))].sort((a, b) => a - b);
   const k = keys.length, res = `${feed.length} result${feed.length === 1 ? "" : "s"}`;
   const toggle = (c: OppType) => setSel(s => ({ ...s, [c]: !s[c] }));
   const cnt = (c: OppType) => items.filter(l => l.opp === c).length;
@@ -163,7 +213,25 @@ export function ForYouFeed({ items, seen, onOpen, onHover, onSignals }: { items:
           </div>
         )}
       </div>
-      {feed.map(l => <FeedCard key={l.id} l={l} fresh={l.isNew && !seen.has(l.id)} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />)}
+      {/* What the feed shows: everything, only what you haven't opened, or what you have. */}
+      <div style={{ flex: "none", display: "flex", gap: 4, padding: 3, borderRadius: 9999, background: "rgba(18,18,18,.05)", alignSelf: "flex-start" }}>
+        {([["all", "All", bySignal.length], ["unseen", "Unseen", unseenN], ["seen", "Seen", seenN]] as [SeenView, string, number][]).map(([v, lb, n]) => (
+          <button key={v} onClick={() => setView(v)} style={{ display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px", border: "none", borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", font: `${view === v ? 700 : 400} 13px/16px var(--font-sans)`, color: INK, background: view === v ? "rgb(253,252,252)" : "none", boxShadow: view === v ? "0 1px 3px rgba(30,18,12,.14)" : "none" }}>
+            {v === "unseen" && n > 0 && <span style={{ width: 6, height: 6, borderRadius: 9999, background: "rgb(214,53,41)" }} />}
+            {lb}<span style={{ color: "rgb(129,117,111)", fontVariantNumeric: "tabular-nums" }}>{n}</span>
+          </button>
+        ))}
+      </div>
+      {days.map(d => {
+        const ls = feed.filter(l => foundDaysAgo(l) === d);
+        return [
+          <DateDivider key={"d" + d} label={dayLabel(d)} unread={ls.filter(l => !seen.has(l.id)).length} />,
+          ...ls.map(l => <FeedCard key={l.id} l={l} fresh={!seen.has(l.id)} seen={seen.has(l.id)} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />),
+        ];
+      })}
+      {view !== "seen" && unseenN === 0 && bySignal.length > 0 && <CaughtUp seenN={seenN} area={area} onShowSeen={view === "unseen" ? () => setView("seen") : undefined} />}
+      {view === "unseen" && unseenN > 0 && <span style={{ flex: "none", padding: "8px 0 24px", textAlign: "center", font: "400 13px/18px var(--font-sans)", color: "rgb(129,117,111)" }}>That&apos;s everything new since {dayLabel(Math.max(...days)).split(" · ").pop()}.</span>}
+      {view === "seen" && seenN === 0 && <span style={{ flex: "none", padding: "24px 16px", textAlign: "center", font: "400 13px/19px var(--font-sans)", color: "rgb(98,90,89)" }}>Nothing seen yet. Properties you open land here.</span>}
     </>
   );
 }

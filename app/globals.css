@@ -41,6 +41,9 @@ input { font-family: inherit; }
 @keyframes sweep { to { transform: translate(-50%, -50%) rotate(360deg) } }
 @keyframes ping { 0% { transform: translate(-50%, -50%) scale(.3); opacity: .6 } 100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0 } }
 @keyframes pulse { 0% { transform: scale(1); opacity: .55 } 100% { transform: scale(2.2); opacity: 0 } }
+/* Home special pins: reaches well past the price pill (review: more prominent). */
+@keyframes sigPulse { 0% { transform: scale(1); opacity: .9 } 70% { opacity: .25 } 100% { transform: scale(4.2); opacity: 0 } }
+@keyframes sigRing { 0% { transform: scale(1); opacity: 1 } 100% { transform: scale(3.4); opacity: 0 } }
 @keyframes spin { to { transform: rotate(360deg) } }
 @keyframes cardSwipeL { to { transform: translateX(-120%) rotate(-14deg); opacity: 0 } }
 @keyframes cardSwipeR { to { transform: translateX(120%) rotate(14deg); opacity: 0 } }

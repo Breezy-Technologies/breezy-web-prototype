@@ -54,16 +54,18 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Map controls sit bottom-right.
 
 **Home card** (`HomeCard.tsx`), always full height, with three tabs:
-- **For you:** the V5 feed (`ForYouFeed.tsx`), sorted by signal, with a signal filter dropdown and `SignalDot` badges.
+- **For you:** the V5 feed (`ForYouFeed.tsx`), with a signal filter dropdown and `SignalDot` badges.
+  - **Read state (decided 10 Nov):** an item is **seen when it's opened** (clicked); hover doesn't count. Each opportunity is dated by when Breezy found it (fake, 0–3 days ago) and the feed is grouped under bold date dividers ("Today · November 11", "Yesterday · …"); a divider has a red dot and "n new" while anything under it is unread. Unread cards carry a red **"New"** label (the bell read as an alert someone set up); opened cards show a quiet "Seen" tick.
+  - **All / Unseen / Seen** control under the signal filter (counts on each). "Seen" lists what you've opened and shows no special pins. When nothing is unread: "You're all caught up" (with "Show seen (n)" in the Unseen view).
   - **Special pins** (yellow signal circles) appear on the map **only while For you is the visible tab**. They follow the feed's signal filter.
-  - A pin reverts to a plain white price pill once its detail has been opened ("seen").
+  - A pin reverts to a plain white price pill once its detail has been opened ("seen"). Until then it pulses (a disc and a ring in its colour, reaching well past the pill, staggered) and carries a red unread dot.
   - The "+" on a card picks the property. Picked properties show in the `PickedFooter`, and their thumbnails open the Saved sheet.
 - Under "Hello <name>": the user's location. **The prototype defaults to LA:** "you are here" is always Silver Lake, Los Angeles (`DEMO_LOCATION` in `lib/places.ts`; `USE_BROWSER_LOCATION` brings real geolocation back), for the greeting, "Current location" and My location. A saved session area outside LA isn't restored.
 - Searches and Properties show their **whole list** (no "View all"); hover shows the delete button.
 - For you cards: the photo is a carousel (up to 5 photos, dots) that swipes with a mouse drag or touch; a drag never opens the card.
 - **Searches:** saved searches, each with an "n new" badge (red) until the search is **clicked** (hover doesn't count), then Active (pulsing green); and alerts.
 - **Properties:** saved properties. Unviewed ones carry a red dot; opening one marks it viewed. Properties you save yourself start viewed.
-- The Searches / Properties tab bells show only while something is unseen (a search with new matches, a property with its red dot).
+- The Searches / Properties tabs show a red unread dot (no bell) only while something is unseen (a search with new matches, a property with its red dot). Price-drop pins use a down arrow, not a bell.
 
 **Search** (`SearchBar.tsx`, the canvas search step)
 - Recent searches are stored in localStorage. Several areas can be picked as chips.
@@ -119,7 +121,8 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - An **Owner** section (56 px avatar, "View history" on the right), then the listing description. Owner contact lines copy on click.
 - **No estimate (`noQe`):** only reachable from the Dev menu ("Property with no estimate"; every property has an estimate). The full-width CTA layout (decided): title and one-line explanation with the illustration on the right, a full-width outline "Get price estimate" underneath; it loads, then shows the estimate and a positive toast.
 - "View more" buttons have no arrows.
-- Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). Pressing it scrolls the panel to the Owner section (switching to Summary if needed); once the scroll settles, the phone, email and address are written in left to right by a soft clay → violet gradient edge (staggered 160 ms, a faint sheen behind), then settle to plain copyable text; the footer becomes Call owner + an email icon.
+- Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text on the button).
+- **Credits (10 Nov review):** the Owner section says "Uses 1 credit · 24 left" before unlocking and "1 credit used · 23 left" after, plus an "Owner unlocked · 23 credits left" toast. No confirmation step; each owner is charged once per session (fake balance). Pressing it scrolls the panel to the Owner section (switching to Summary if needed); once the scroll settles, the phone, email and address are written in left to right by a soft clay → violet gradient edge (staggered 160 ms, a faint sheen behind), then settle to plain copyable text; the footer becomes Call owner + an email icon.
 
 **Flows and sheets**
 - **Report sheet** (`components/report/ReportFlow.tsx`, canvas `rptLayer` / `_wsTilt` / `_runFlow`): opened by **Get comps**, the **Max build** tile (Underbuilt) and the **Profit potential** tile (ROI).
@@ -197,6 +200,7 @@ Muted in the 10 Nov review (the first set read too garish): same hues, lower sat
 - Make saved reports easier to reach, as on mobile.
 - Welcome-panel polish: rounder corners, no bottom padding between list items, skeleton loading piece by piece.
 - "New match" badge should clear on first interaction.
+- Read state on Searches / market alerts: same pattern as the feed (dated, "New", red dot until opened) still to apply there.
 - **Heat palette:** pick one with Ann and Jimsy and remove the switcher. Underbuilt band cut points are placeholders until JD's service defines them.
 - Pedro's smooth heat surface (canvas image + water clip) is not ported yet.
 - Pins: inside the lot zone, every search shows real lots (`lotListing`, fixed rank); elsewhere named places still generate their own listings and only "Search this area" uses the fixed grid.
