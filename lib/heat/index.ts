@@ -126,8 +126,24 @@ export function setHeatPrefs(patch: Partial<HeatPrefs>) {
   window.dispatchEvent(new CustomEvent(KEY, { detail: next }));
 }
 
+/* On a dark basemap a pale band (sand, pale blue) would read as a grey veil
+   instead of "neutral", so pale colours are blended toward the dark land;
+   strong bands keep their hue. Set by MapProvider from the map type. */
+let darkBase = false;
+export const setHeatDarkBase = (on: boolean) => { darkBase = on; };
+const DARK_LAND = [36, 32, 30];
+function forDark(hex: string): string {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const lum = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+  const t = Math.max(0, Math.min(0.8, (lum - 0.55) * 2.4)); // 0 for strong colours, up to 0.8 for the palest
+  return "#" + c.map((v, k) => Math.round(v + (DARK_LAND[k] - v) * t).toString(16).padStart(2, "0")).join("");
+}
+
 /** Current colours per layer, outside React (map layer code). */
-export const heatColors = (kind: HeatLayer): Colors => HEAT_PALETTES[read()[kind]].c;
+export const heatColors = (kind: HeatLayer): Colors => {
+  const c = HEAT_PALETTES[read()[kind]].c;
+  return darkBase ? c.map(forDark) : c;
+};
 /** Layer opacity: the override, else what the layer's palette is tuned for. */
 export const heatAlpha = (kind: HeatLayer): number => read().alpha ?? HEAT_PALETTES[read()[kind]].alpha;
 

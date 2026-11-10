@@ -7,8 +7,9 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { config, isLiveMap } from "@/lib/config";
 import { MapMode, offlineStyle, styleFor } from "@/lib/map/style";
 import { applyBreezyTheme } from "@/lib/map/theme";
+import { applyBreezyBasemap, breezyTransformRequest } from "@/lib/map/breezyTheme";
 import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors, stampParcels } from "@/lib/map/layers";
-import { HEAT_PALETTE_EVENT } from "@/lib/heat";
+import { HEAT_PALETTE_EVENT, setHeatDarkBase } from "@/lib/heat";
 import { Ring } from "@/lib/geo";
 
 type Inset = { left: number; top: number; radius: number };
@@ -47,6 +48,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const [offline, setOffline] = useState(!isLiveMap());
   const areaRef = useRef<Ring[] | null>(null);
   const heatRef = useRef<HeatKind>("roi");
+  const modeRef = useRef<MapMode>("light");
   const raf = useRef(0);
 
   // Create the map once.
@@ -62,11 +64,13 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       dragRotate: false,
       pitchWithRotate: false,
       fadeDuration: 0,
+      transformRequest: breezyTransformRequest as any,
     });
     m.touchZoomRotate.disableRotation();
     const restore = () => {
       if (!ensureLayers(m)) return;
       applyBreezyTheme(m);
+      applyBreezyBasemap(m, modeRef.current === "dark");
       setArea(m, areaRef.current);
       syncHeat(m, heatRef.current);
       setParcels(fakeParcelsFor(m, heatRef.current));
@@ -118,8 +122,13 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   }, [map, inset.left, inset.top]);
 
   const setMode = useCallback((md: MapMode) => {
+    const prev = modeRef.current;
+    modeRef.current = md;
     setModeS(md);
+    setHeatDarkBase(md === "dark");
     if (!map) return;
+    // Breezy light ↔ dark is one style with two presets: switch in place.
+    if (!offline && (prev === "light" || prev === "dark") && (md === "light" || md === "dark")) { applyBreezyBasemap(map, md === "dark"); applyHeatColors(map, heatRef.current); return; }
     map.setStyle(offline ? offlineStyle(md) : styleFor(md), { diff: false } as any);
   }, [map, offline]);
 

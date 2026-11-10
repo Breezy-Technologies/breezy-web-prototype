@@ -19,7 +19,7 @@ Both routes share **one Mapbox GL map** that lives in the root layout (`componen
 
 | Layer | Source | Status |
 |---|---|---|
-| Base map | Mapbox `streets-v12` (light) and `satellite-streets-v12`, on the dev-breezy **production public token** | Live. Keep the token to prototypes. Production has no custom style. Its dark mode is `navigation-night-v1` (landmass #221d1b, water #234447, greenspace #405e44, primary roads #343434); the prototype has no dark mode yet. `lib/map/theme.ts` (Breezy palette) only applies if the style is set back to `light-v11`. |
+| Base map | **Breezy light / dark** (default): Mapbox Standard, Pedro's `dev-breezy/cmgfg4m3e007y01re4uq6bz83` (`NEXT_PUBLIC_MAPBOX_BREEZY_STYLE`) with runtime presets in `lib/map/breezyTheme.ts` (spec: `docs/map-theme.md`). Also `streets-v12` ("Streets", the old base) and `satellite-streets-v12`, all on the dev-breezy **production public token** | Live. Keep the token to prototypes. Our layers go in Standard's `middle` slot with emissive strength 1. Breezy dark: `monochrome` + `night`; land colour isn't configurable, so it needs the Studio style. `lib/map/theme.ts` (old Breezy palette) only applies to `light-v11`. |
 | Parcels | Regrid vector tiles, source layer `parcels`, `promoteId: ll_uuid`, fields `owner, address, parcelnumb, path…` | Live on a **trial token: Dallas County only, expires 4 Dec 2026**, ~10k tiles. LA comes back empty, so demo around 32.7767, -96.7970. Tiles carry no lot size or specs, so those stay fake. Without the token, `lib/map/layers.ts` generates demo parcels. |
 | Area outlines | US Census TIGERweb through `app/api/boundary/route.ts` (city, ZIP, county, state) | Live. Outer rings come back **clockwise** and enclave holes **anticlockwise** (`lib/geo.ts`). The inner-glow edge depends on that: a positive `line-offset` means inside. `pointInRings` is even-odd, so holes count as outside. |
 | Search | Mapbox Geocoding v6 (`searchPlaces` / `searchPlacesStrict` in `lib/places.ts`) | Live. The hand-drawn gazetteer (Beverly Hills, Silver Lake, Dallas…) is the offline fallback. |
@@ -101,7 +101,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - In satellite: the rest of the map dims, the slab top is the satellite image (Mapbox Static) with a yellow edge, and there are no colour washes.
 - **Detail zoom:** opening a property panel (from a pin, card or saved property) or clicking a parcel eases to **zoom 18** (`DETAIL_ZOOM`), centred in the visible map between the panels.
 - **Searched-area outline:** option 04, "inner glow edge". A thin clay line (rgb 147,89,75) plus a soft clay gradient inside the boundary; nothing outside. The glow widens with zoom while the line keeps a fixed width.
-- **Map controls**, bottom-right, from the bottom up: Layers (84 px card with thumbnail), zoom, my location, info. The Layers and info panels open to the left. Layers cover satellite, the heat map (ROI / Underbuilt hexes) and parcels.
+- **Map controls**, bottom-right, from the bottom up: Layers (84 px card with thumbnail), zoom, my location, info. The Layers and info panels open to the left. Layers cover the data layer (ROI / Underbuilt / none) and the map type: Breezy light, Breezy dark, Streets, Satellite. Light ↔ dark switches presets in place; on dark, pale heat bands are blended toward the land so "neutral" doesn't read as a grey veil.
 
 **Detail panel** (`DetailPanel.tsx`)
 - Photo carousel, address, specs row, then sticky tabs: **Summary / Specs / Records / Owners**.
@@ -187,7 +187,8 @@ A floating **"Pins: …" switcher** (`components/PinPalette.tsx`) sits at the bo
 - Pedro's smooth heat surface (canvas image + water clip) is not ported yet.
 - Pins: named places (Silver Lake, Dallas…) still generate their own listings; only "Search this area" uses the fixed grid. Move named places onto the grid too when the listings API lands.
 - Regrid: ask for LA County coverage before the trial ends (4 Dec 2026).
-- Dark mode (production's `navigation-night-v1` palette).
+- **Breezy map theme:** duplicate Pedro's style in Studio as Breezy Light / Dark with the values in `docs/map-theme.md` (plus dark land #221d1b), then confirm with Ann and Jeff. Needs Mapbox access.
+- Dark map only: the app UI and the lifted parcel slab are still light.
 - Onboarding and activation designs were due 7 Nov to unblock the China team. The full engineering handoff is end of November.
 
 ## Code map

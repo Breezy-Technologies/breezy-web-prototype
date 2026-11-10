@@ -2,6 +2,7 @@ import type { Map as MbMap, GeoJSONSource } from "mapbox-gl";
 import { config, hasRegrid } from "../config";
 import { Ring, metersPerDegLat, metersPerDegLng, rng, hashStr } from "../geo";
 import { cellToBoundary, cellToLatLng, polygonToCells } from "h3-js";
+import { isStandardStyle } from "./breezyTheme";
 import { heatAlpha, heatColors, heatPct, heatStep, parcelPct } from "../heat";
 
 export type HeatKind = "roi" | "ub" | "none";
@@ -18,15 +19,20 @@ function firstSymbol(m: MbMap) {
 // Adds every Breezy source/layer if missing. Safe to call after each style load.
 export function ensureLayers(m: MbMap) {
   if (!(m as any).style || !(m as any).style._loaded) return false;
-  const before = firstSymbol(m);
+  // Mapbox Standard (Breezy light / dark) has no symbol layers to insert
+  // before; it exposes slots instead. `middle` is above roads, below labels.
+  const std = isStandardStyle(m), before = std ? undefined : firstSymbol(m);
+  // Standard's light presets (night) would tint our data; emissive strength 1 keeps its true colour.
+  const glow = (l: any) => ({ ...l, slot: "middle", paint: { ...l.paint, [l.type + "-emissive-strength"]: 1 } });
+  const add = (layer: any): void => { m.addLayer(std ? glow(layer) : layer, before); };
   if (!m.getSource("bz-hex")) {
     // Two hex tiers, as in Pedro's build: city cells (bz-hex) hand over to
     // submarket cells (bz-hex-sub) between zoom 11.9 and 13. No outlines; the
     // line layers stay invisible except for the onboarding wave's front.
     for (const [src, min, max] of [["bz-hex", 0, 13.2], ["bz-hex-sub", 11.9, 16]] as const) {
       m.addSource(src, { type: "geojson", data: EMPTY });
-      m.addLayer({ id: src + "-fill", type: "fill", source: src, minzoom: min, maxzoom: max, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0, "fill-opacity-transition": { duration: 400 } } }, before);
-      m.addLayer({ id: src + "-line", type: "line", source: src, minzoom: min, maxzoom: max, paint: { "line-color": "rgba(0,0,0,0)", "line-width": 1, "line-opacity": 0 } }, before);
+      add({ id: src + "-fill", type: "fill", source: src, minzoom: min, maxzoom: max, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0, "fill-opacity-transition": { duration: 400 }, "fill-antialias": false } }); // no seams where translucent cells meet
+      add({ id: src + "-line", type: "line", source: src, minzoom: min, maxzoom: max, paint: { "line-color": "rgba(0,0,0,0)", "line-width": 1, "line-opacity": 0 } });
     }
   }
   if (!m.getSource("bz-par")) {
@@ -40,16 +46,16 @@ export function ensureLayers(m: MbMap) {
       });
     } else m.addSource("bz-par", { type: "geojson", data: EMPTY });
     const sl = hasRegrid() ? { "source-layer": config.regridSourceLayer } : {};
-    m.addLayer({ id: "bz-par-fill", type: "fill", source: "bz-par", ...sl, minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } } as any, before);
+    add({ id: "bz-par-fill", type: "fill", source: "bz-par", ...sl, minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } });
     // Lot outlines, Pedro's style: thin warm grey, fading in with the fills.
-    m.addLayer({ id: "bz-par-line", type: "line", source: "bz-par", ...sl, minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } } as any, before);
+    add({ id: "bz-par-line", type: "line", source: "bz-par", ...sl, minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } });
   }
   if (!m.getSource("bz-area")) {
     const Z = (a: number[]) => ["interpolate", ["exponential", 1.6], ["zoom"], ...a] as any;
     m.addSource("bz-area", { type: "geojson", data: EMPTY });
-    m.addLayer({ id: "bz-area-glow-wide", type: "line", source: "bz-area", layout: { "line-join": "round" }, paint: { "line-color": "rgb(175,127,113)", "line-opacity": 0.2, "line-width": Z([8, 8, 11, 12, 14, 30, 17, 90]), "line-offset": Z([8, 4, 11, 6, 14, 15, 17, 45]), "line-blur": Z([8, 5, 11, 8, 14, 18, 17, 50]) } }, before);
-    m.addLayer({ id: "bz-area-glow", type: "line", source: "bz-area", layout: { "line-join": "round" }, paint: { "line-color": "rgb(175,127,113)", "line-opacity": 0.3, "line-width": Z([8, 3, 11, 5, 14, 12, 17, 34]), "line-offset": Z([8, 1.5, 11, 2.5, 14, 6, 17, 17]), "line-blur": Z([8, 2, 11, 3, 14, 7, 17, 18]) } }, before);
-    m.addLayer({ id: "bz-area-line", type: "line", source: "bz-area", layout: { "line-join": "round" }, paint: { "line-color": "rgb(147,89,75)", "line-width": 1.5, "line-opacity": 0.9 } }, before);
+    add({ id: "bz-area-glow-wide", type: "line", source: "bz-area", layout: { "line-join": "round" }, paint: { "line-color": "rgb(175,127,113)", "line-opacity": 0.2, "line-width": Z([8, 8, 11, 12, 14, 30, 17, 90]), "line-offset": Z([8, 4, 11, 6, 14, 15, 17, 45]), "line-blur": Z([8, 5, 11, 8, 14, 18, 17, 50]) } });
+    add({ id: "bz-area-glow", type: "line", source: "bz-area", layout: { "line-join": "round" }, paint: { "line-color": "rgb(175,127,113)", "line-opacity": 0.3, "line-width": Z([8, 3, 11, 5, 14, 12, 17, 34]), "line-offset": Z([8, 1.5, 11, 2.5, 14, 6, 17, 17]), "line-blur": Z([8, 2, 11, 3, 14, 7, 17, 18]) } });
+    add({ id: "bz-area-line", type: "line", source: "bz-area", layout: { "line-join": "round" }, paint: { "line-color": "rgb(147,89,75)", "line-width": 1.5, "line-opacity": 0.9 } });
   }
   return true;
 }

@@ -1,7 +1,9 @@
 import type { StyleSpecification } from "mapbox-gl";
 import { config, isLiveMap } from "../config";
 
-export type MapMode = "light" | "satellite";
+// light / dark: the Breezy theme (Mapbox Standard, see lib/map/breezyTheme.ts).
+// streets: the previous base (streets-v12 via NEXT_PUBLIC_MAPBOX_STYLE), kept to compare.
+export type MapMode = "light" | "dark" | "streets" | "satellite";
 
 // Offline base map: georeferenced Mapbox light-v11 static images (and a
 // generated aerial stand-in) for Beverly Hills and Silver Lake. Used whenever
@@ -35,5 +37,7 @@ export function offlineStyle(mode: MapMode): StyleSpecification {
 
 export function styleFor(mode: MapMode): string | StyleSpecification {
   if (!isLiveMap()) return offlineStyle(mode);
-  return mode === "satellite" ? config.mapboxSatelliteStyle : config.mapboxStyle;
+  if (mode === "satellite") return config.mapboxSatelliteStyle;
+  if (mode === "streets") return config.mapboxStyle;
+  return config.mapboxBreezyStyle;
 }

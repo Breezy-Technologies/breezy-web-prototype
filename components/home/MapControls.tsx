@@ -17,10 +17,10 @@ export function MapControls({ onLocate }: { onLocate: () => void }) {
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState(false);
   const t = useRef<any>(null);
-  const label = { roi: "ROI heat", ub: "Underbuilt", none: "No layer" }[heat] + (mode === "satellite" ? " · Sat" : "");
+  const label = { roi: "ROI heat", ub: "Underbuilt", none: "No layer" }[heat] + ({ light: "", dark: " · Dark", streets: " · Streets", satellite: " · Sat" } as const)[mode];
   const thumb = mode === "satellite" ? "url(/map/sat-bh-se.jpg) center/cover" : heat === "none" ? "url(/map/bh-se.jpg) center/cover" : hexThumb(HEAT_PALETTES[palettes[heat]].c);
   return (
-    <div style={{ position: "absolute", right: 20, bottom: 20, zIndex: 60, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+    <div style={{ position: "absolute", right: 20, bottom: 20, zIndex: open || info ? 80 : 60, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
       <div style={{ position: "relative" }}>
         <button style={round} title="Map key" onClick={() => setInfo(v => !v)}><i className="ph-bold ph-info" /></button>
         {info && (
@@ -48,9 +48,14 @@ export function MapControls({ onLocate }: { onLocate: () => void }) {
           <span style={{ font: "400 11px/13px var(--font-sans)", color: "var(--fg-2)", whiteSpace: "nowrap" }}>{label}</span>
         </button>
         {open && (
-          <div style={{ position: "absolute", right: "calc(100% + 12px)", bottom: 0, width: 300, padding: 16, borderRadius: 20, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.18)", display: "flex", flexDirection: "column", gap: 14, animation: "panelDrop .2s ease both" }}>
+          <div style={{ position: "absolute", right: "calc(100% + 12px)", bottom: 0, width: 380, padding: 16, borderRadius: 20, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.18)", display: "flex", flexDirection: "column", gap: 14, animation: "panelDrop .2s ease both" }}>
             <Group title="Data layer" opts={[["ub", "Underbuilt", hexThumb(HEAT_PALETTES[palettes.ub].c)], ["roi", "ROI", hexThumb(HEAT_PALETTES[palettes.roi].c)], ["none", "None", "url(/map/bh-se.jpg) center/cover"]]} value={heat} onPick={v => setHeat(v as any)} />
-            <Group title="Map type" opts={[["light", "Default", "url(/map/bh-se.jpg) center/cover"], ["satellite", "Satellite", "url(/map/sat-bh-se.jpg) center/cover"]]} value={mode} onPick={v => setMode(v as any)} />
+            <Group title="Map type" opts={[
+              ["light", "Breezy light", "repeating-linear-gradient(35deg, transparent 0 13px, #e4e0de 13px 17px), repeating-linear-gradient(-55deg, transparent 0 9px, #e2d9d3 9px 11px), #f4f1ed"],
+              ["dark", "Breezy dark", "repeating-linear-gradient(35deg, transparent 0 13px, #45403d 13px 17px), repeating-linear-gradient(-55deg, transparent 0 9px, #3a3634 9px 11px), #24201e"],
+              ["streets", "Streets", "url(/map/bh-se.jpg) center/cover"],
+              ["satellite", "Satellite", "url(/map/sat-bh-se.jpg) center/cover"],
+            ]} value={mode} onPick={v => setMode(v as any)} />
           </div>
         )}
       </div>
