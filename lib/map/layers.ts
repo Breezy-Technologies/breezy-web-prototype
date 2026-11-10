@@ -30,8 +30,12 @@ export function ensureLayers(m: MbMap) {
     // Two hex tiers, as in Pedro's build: city cells (bz-hex) hand over to
     // submarket cells (bz-hex-sub) between zoom 11.9 and 13. No outlines; the
     // line layers stay invisible except for the onboarding wave's front.
-    for (const [src, min, max] of [["bz-hex", 0, 13.2], ["bz-hex-sub", 11.9, 16]] as const) {
-      m.addSource(src, { type: "geojson", data: hexData(src === "bz-hex" ? 7 : 8) });
+    // One continuous grid (review: hexes still changed as you zoomed): the res 8
+    // cells draw at every zoom, so zooming only scales them. The city tier
+    // (bz-hex) stays as an empty source so the rest of the code is unchanged.
+    // tolerance 0: no per-zoom simplification, so hex edges never shift.
+    for (const [src, min, max] of [["bz-hex", 0, 13.2], ["bz-hex-sub", 0, 16]] as const) {
+      m.addSource(src, { type: "geojson", data: src === "bz-hex" ? EMPTY : hexData(8), tolerance: 0, buffer: 16 });
       add({ id: src + "-fill", type: "fill", source: src, minzoom: min, maxzoom: max, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0, "fill-opacity-transition": { duration: 400 }, "fill-antialias": false } }); // no seams where translucent cells meet
       add({ id: src + "-line", type: "line", source: src, minzoom: min, maxzoom: max, paint: { "line-color": "rgba(0,0,0,0)", "line-width": 1, "line-opacity": 0 } });
     }
@@ -57,6 +61,10 @@ export function ensureLayers(m: MbMap) {
     m.addSource("bz-lots", { type: "geojson", data: lotData() });
     add({ id: "bz-lots-fill", type: "fill", source: "bz-lots", minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } });
     add({ id: "bz-lots-line", type: "line", source: "bz-lots", minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } });
+    // Pedro's building footprints, on top of the lots so the house sits in its lot (his layers.ts values).
+    m.addSource("bz-bldgs", { type: "geojson", data: "/data/silverlake-bldgs.json" });
+    add({ id: "bz-bldgs-fill", type: "fill", source: "bz-bldgs", minzoom: 15.6, paint: { "fill-color": "#B7969C", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.22, 17.5, 0.26] } });
+    add({ id: "bz-bldgs-line", type: "line", source: "bz-bldgs", minzoom: 15.6, paint: { "line-color": "#8A7A72", "line-width": 0.6, "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.4] } });
   }
   if (!m.getSource("bz-area")) {
     const Z = (a: number[]) => ["interpolate", ["exponential", 1.6], ["zoom"], ...a] as any;
@@ -144,7 +152,7 @@ export function fadeHeatTo(m: MbMap, kind: HeatKind) {
    and strengthen to 17. */
 const zr = (...stops: number[]) => ["interpolate", ["linear"], ["zoom"], ...stops] as any;
 const cityOpacity = (A: number) => zr(9.5, 0.95 * A, 11.8, 0.92 * A, 13, 0);
-const subOpacity = (A: number) => zr(11.9, 0, 13, 0.92 * A, 15, 0.8 * A, 16, 0);
+const subOpacity = (A: number) => zr(9.5, 0.95 * A, 13, 0.92 * A, 15, 0.8 * A, 16, 0);
 const parcelOpacity = (A: number) => zr(15.6, 0, 16.2, 0.8 * A, 17, 0.9 * A);
 
 // ---- Regrid parcel colour ----
@@ -176,8 +184,9 @@ export function stampParcels(m: MbMap, kind: HeatKind) {
 // Review: hexes kept redrawing and changing size (they were rebuilt for the
 // viewport after every pan, at a coarser resolution when zoomed out), and fake
 // heat across all of LA broke the behaviour. Now, as in Pedro's build, the
-// cells are listed once for a small circle (lib/silverlake HEAT_AREA) at two
-// fixed sizes: res 7 city cells and res 8 submarket cells. Their data never
+// cells are listed once for a small circle (lib/silverlake HEAT_AREA), and a
+// second review asked for one continuous grid with no snapping as you zoom:
+// one size, res 8, at every zoom (no city tier crossfade). Their data never
 // changes after load; the layer switch only repaints.
 // A cell with more than 3 of Pedro's lots in it averages them (his derive.ts);
 // other cells read the fake field at their centre.
@@ -278,7 +287,7 @@ export function heatWave(m: MbMap, c: [number, number], R: number, band: number)
   const A = lastKind === "none" ? 0 : heatAlpha(lastKind);
   const kx = metersPerDegLng(c[1]), ky = metersPerDegLat;
   const d = ["sqrt", ["+", ["^", ["*", ["-", ["get", "x"], c[0]], kx], 2], ["^", ["*", ["-", ["get", "y"], c[1]], ky], 2]]];
-  const on = m.getZoom() < 12.45 ? "bz-hex" : "bz-hex-sub", off = on === "bz-hex" ? "bz-hex-sub" : "bz-hex";
+  const on = "bz-hex-sub", off = "bz-hex"; // one grid at every zoom
   m.setPaintProperty(on + "-fill", "fill-opacity", ["case", ["<", d, R - band], 0.92 * A, ["<", d, R], Math.min(1, 0.92 * A + 0.3), 0] as any);
   m.setPaintProperty(on + "-line", "line-opacity", ["case", ["<", d, R - band], 0, ["<", d, R], 0.9, 0] as any);
   m.setPaintProperty(off + "-fill", "fill-opacity", 0);

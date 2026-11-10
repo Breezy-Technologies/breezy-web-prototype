@@ -57,3 +57,15 @@ mkdirSync(path.dirname(dest), { recursive: true });
 writeFileSync(dest, JSON.stringify(out));
 const by = k => out.reduce((a, l) => ((a[l[k]] = (a[l[k]] || 0) + 1), a), {});
 console.log(`${out.length} lots →`, dest, by("hood"), by("st"));
+
+// Building footprints (buildings.json next to lots.json): every footprint in the
+// lots' box, as Pedro draws them over the lots. Served from public/ and loaded
+// by Mapbox on demand, so it stays out of the JS bundle.
+let w = 180, s = 90, e = -180, n = -90;
+for (const l of out) for (const [x, y] of l.ring) { w = Math.min(w, x); e = Math.max(e, x); s = Math.min(s, y); n = Math.max(n, y); }
+const rings = JSON.parse(readFileSync(path.join(path.dirname(src), "buildings.json"), "utf8"))
+  .filter(r => r.length > 3 && r.every(([x, y]) => x >= w && x <= e && y >= s && y <= n));
+const bdest = path.join(path.dirname(dest), "..", "..", "public", "data", "silverlake-bldgs.json");
+mkdirSync(path.dirname(bdest), { recursive: true });
+writeFileSync(bdest, JSON.stringify({ type: "FeatureCollection", features: rings.map(r => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [r.map(p => [r6(p[0]), r6(p[1])])] } })) }));
+console.log(`${rings.length} building footprints →`, bdest);

@@ -182,8 +182,17 @@ export async function reversePlace(c: LngLat): Promise<Place> {
   }
 }
 
+/* The prototype's "you are here" is always Silver Lake, Los Angeles (review:
+   default the prototype to LA). The demo is anchored there (Pedro's lots, the
+   heat circle), so the greeting, "Current location" and "My location" never
+   send a presenter to wherever their laptop happens to be. Set
+   USE_BROWSER_LOCATION to bring the browser's position back. */
+const USE_BROWSER_LOCATION = false;
+export const DEMO_LOCATION = { center: [-118.2701, 34.0869] as LngLat, label: "Silver Lake, Los Angeles" };
+
 // The browser's position, falling back to `fallback` (the map centre) when it's denied or slow.
 export function currentPosition(fallback: LngLat): Promise<LngLat> {
+  if (!USE_BROWSER_LOCATION) return Promise.resolve(DEMO_LOCATION.center);
   return new Promise(res => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return res(fallback);
     const t = setTimeout(() => res(fallback), 6000);
@@ -218,6 +227,7 @@ let userLoc: Promise<string | null> | null = null;
 export function userLocationLabel(): Promise<string | null> {
   if (userLoc) return userLoc;
   userLoc = (async () => {
+    if (!USE_BROWSER_LOCATION) return DEMO_LOCATION.label;
     try { const s = sessionStorage.getItem("bz-user-loc"); if (s) return s; } catch {}
     if (typeof navigator === "undefined" || !navigator.geolocation) return null;
     const c = await new Promise<LngLat | null>(res => {

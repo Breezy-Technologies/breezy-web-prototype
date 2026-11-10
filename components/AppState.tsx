@@ -83,7 +83,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const s = JSON.parse(sessionStorage.getItem(KEY) || "null");
-      if (s && s.place) { chooseAreas(s.areas && s.areas.length ? s.areas : [s.place]); setPicksS(s.picks || {}); setOnboarded(!!s.onboarded); }
+      if (s && s.place) {
+        // The demo defaults to LA: an area saved from an older session elsewhere (e.g. Dallas) isn't restored.
+        const saved: Place[] = s.areas && s.areas.length ? s.areas : [s.place];
+        const inLA = (p: Place) => p.center[0] > -119.0 && p.center[0] < -117.6 && p.center[1] > 33.6 && p.center[1] < 34.5;
+        if (saved.every(inLA)) chooseAreas(saved);
+        setPicksS(s.picks || {}); setOnboarded(!!s.onboarded);
+      }
     } catch {}
   }, [chooseAreas]);
   useEffect(() => {
