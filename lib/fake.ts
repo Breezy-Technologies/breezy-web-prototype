@@ -132,6 +132,43 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
   return out;
 }
 
+// ---- Listings for a map box ("Search this area"), stable across searches ----
+// The world is cut into fixed ~500 m cells; each cell always holds the same
+// candidate listings (same place, same id, same data), so searching an
+// overlapping box finds the same homes in the same spots. Each candidate has a
+// fixed rank; a search keeps the pins it already shows inside the box and
+// tops up with the best-ranked candidates, so pins never jump between searches.
+const CELL = 0.005, PER_CELL = 5;
+const cellCache = new Map<string, { l: Listing; rank: number }[]>();
+function cellListings(i: number, j: number) {
+  const key = `cell:${i}:${j}`;
+  let c = cellCache.get(key);
+  if (!c) {
+    const w = i * CELL, s = j * CELL;
+    c = makeListings(key, [w + CELL / 2, s + CELL / 2], [w, s, w + CELL, s + CELL], null, PER_CELL, "")
+      .map((l, k) => ({ l: { ...l, id: 1e10 + hashStr(key + ":" + k) }, rank: rng(hashStr(key + ":rank:" + k))() }));
+    if (cellCache.size > 5000) cellCache.clear();
+    cellCache.set(key, c);
+  }
+  return c;
+}
+export function areaListings(prev: Listing[], bbox: BBox, n: number): Listing[] {
+  // every pin already on screen inside the box stays (up to 2n, for very dense views)
+  const kept = prev.filter(l => l.lng >= bbox[0] && l.lng <= bbox[2] && l.lat >= bbox[1] && l.lat <= bbox[3]).slice(0, 2 * n);
+  // new homes: as before, a zoomed-out box only gets them in a window round its centre
+  let [w, s, e, nn] = bbox;
+  const cx = (w + e) / 2, cy = (s + nn) / 2, hx = Math.min(0.03, (e - w) / 2), hy = Math.min(0.0225, (nn - s) / 2);
+  [w, s, e, nn] = [cx - hx, cy - hy, cx + hx, cy + hy];
+  const inBox = (l: Listing) => l.lng >= w && l.lng <= e && l.lat >= s && l.lat <= nn;
+  const have = new Set(kept.map(l => l.id));
+  const cand: { l: Listing; rank: number }[] = [];
+  for (let i = Math.floor(w / CELL); i <= Math.floor(e / CELL); i++)
+    for (let j = Math.floor(s / CELL); j <= Math.floor(nn / CELL); j++)
+      for (const c of cellListings(i, j)) if (inBox(c.l) && !have.has(c.l.id)) cand.push(c);
+  cand.sort((a, b) => a.rank - b.rank);
+  return [...kept, ...cand.slice(0, Math.max(0, n - kept.length)).map(c => c.l)];
+}
+
 // Heat value 0..1 for the ROI / Underbuilt layers at a coordinate.
 export function heatValue(kind: "roi" | "ub", lng: number, lat: number) {
   const k = kind === "roi" ? 31 : 77;

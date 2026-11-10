@@ -80,9 +80,11 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - the centre of the visible map has left the searched area;
   - more than half of a 4 × 3 grid over the visible map has no pins.
 - Clicking it searches the visible box: the field reads "Map area", the outline clears, and the camera stays put.
+- Pins already inside the box are kept (same id, same spot); the rest come from a fixed global grid of listings (~500 m cells, `areaListings` in `lib/fake.ts`), so searching overlapping boxes finds the same homes in the same places.
 
 **Map and pins**
-- **Price pins** (`PricePins.tsx`) are white pills with a soft shadow. Pins that would overlap a higher-priority pin collapse into small blank pills underneath, and hover reveals the price. Priority: selected / hovered, then price drops, then new.
+- **Price pins** (`PricePins.tsx`) are white pills with a soft shadow. Pins that would overlap a higher-priority pin collapse into small blank pills underneath, and hover reveals the price. Priority: price drops, then new. Hover / selection don't take part: that pin just draws full and on top, so neighbours never flip.
+- **Pin stability:** every map pin (price pills, onboarding `OppPins`) is anchored with `components/map/anchors.ts`: its wrapper is moved on the map's `move` event, in the same frame the map draws (measured ≤ 0.01 px off during an animated pan / zoom). The collapse layout is recomputed only when the map comes to rest.
 - **Pin hover preview** (`HoverCard.tsx`):
   - opens after ~220 ms and closes on hover-out;
   - photo carousel (arrows, dots, n/total), address, price per ft², specs, an **owner** row and a **quick estimate** chip (hidden for `noQe` listings);
@@ -183,7 +185,7 @@ A floating **"Pins: …" switcher** (`components/PinPalette.tsx`) sits at the bo
 - "New match" badge should clear on first interaction.
 - **Heat palette:** pick one with Ann and Jimsy and remove the switcher. Underbuilt band cut points are placeholders until JD's service defines them.
 - Pedro's smooth heat surface (canvas image + water clip) is not ported yet.
-- Pins should come from one listings source per area, refreshed on "Search this area".
+- Pins: named places (Silver Lake, Dallas…) still generate their own listings; only "Search this area" uses the fixed grid. Move named places onto the grid too when the listings API lands.
 - Regrid: ask for LA County coverage before the trial ends (4 Dec 2026).
 - Dark mode (production's `navigation-night-v1` palette).
 - Onboarding and activation designs were due 7 Nov to unblock the China team. The full engineering handoff is end of November.
