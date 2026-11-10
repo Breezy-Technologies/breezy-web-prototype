@@ -80,7 +80,6 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
   // separate stream so adding filter attributes doesn't reshuffle the existing fake data
   const R2 = rng(hashStr(key + ":attrs"));
   // and its own stream for "no quick estimate", for the same reason
-  const R3 = rng(hashStr(key + ":qe"));
   let guard = 0;
   while (out.length < n && guard++ < n * 40) {
     const lng = center[0] + (R() - 0.5) * span, lat = center[1] + (R() - 0.5) * spanY;
@@ -125,7 +124,9 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
         for (const [k, w] of PTYPES) { if (t < w) { ptype = k; break; } t -= w; }
         return { ptype, pstyle: PSTYLES[Math.floor(R2() * PSTYLES.length)], feats: PFEATS.filter(() => R2() < 0.35) };
       })(),
-      noQe: R3() < 0.2,
+      // Every property has a Quick Estimate (design point 6). The no-estimate
+      // state is previewed from the Dev menu ("Property with no estimate").
+      noQe: false,
     });
   }
   return out;

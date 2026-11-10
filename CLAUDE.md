@@ -24,7 +24,7 @@ Both routes share **one Mapbox GL map** that lives in the root layout (`componen
 | Area outlines | US Census TIGERweb through `app/api/boundary/route.ts` (city, ZIP, county, state) | Live. Outer rings come back **clockwise** and enclave holes **anticlockwise** (`lib/geo.ts`). The inner-glow edge depends on that: a positive `line-offset` means inside. `pointInRings` is even-odd, so holes count as outside. |
 | Search | Mapbox Geocoding v6 (`searchPlaces` / `searchPlacesStrict` in `lib/places.ts`) | Live. The hand-drawn gazetteer (Beverly Hills, Silver Lake, Dallas…) is the offline fallback. |
 | Coverage | `isCovered()` in `lib/places.ts` | California + Dallas. Outside that, the app shows an "unsupported area" state. |
-| Breezy data | `lib/fake.ts` | **Fake and deterministic per place / box:** listings, opportunity types, owners, quick estimates (some listings have `noQe`, i.e. no estimate), ROI (24–90) and Underbuilt heat, listing detail. Each generator will be swapped for a real service: the listings API, JD's heat-map service, the owner data service, and Justin's quick-estimate endpoint. |
+| Breezy data | `lib/fake.ts` | **Fake and deterministic per place / box:** listings, opportunity types, owners, quick estimates (on **every** property; `noQe`, no estimate, is only set by the Dev menu preview), ROI (24–90) and Underbuilt heat, listing detail. Each generator will be swapped for a real service: the listings API, JD's heat-map service, the owner data service, and Justin's quick-estimate endpoint. |
 | Offline mode | No Mapbox token, a style error, or a 4 s timeout | Uses the georeferenced static images in `public/map/` (Beverly Hills, Silver Lake, plus a fake-satellite `sat-*` set). **Keep it working for demos without network.** |
 
 Env keys are listed in `.env.example`, set locally in `.env.local`, and stored for deploys in the Vercel project settings. They are never committed. `lib/config.ts` reads them.
@@ -107,7 +107,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - A floating **Quick estimate** card with the big number and a **Get comps** button.
   - Max build + Profit potential tiles.
   - An **Owner** section (56 px avatar, "View history" on the right), then the listing description. Owner contact lines copy on click.
-- **No estimate (`noQe`):** a banner with a "Get price estimate" CTA, which loads, then shows the estimate and a positive toast. There are two layout routes, **side CTA** and **full-width CTA**, switched from the Dev menu (localStorage `bz-qe-route`). *Waiting on William to choose (Vercel thread K9edXzqfVf9j).*
+- **No estimate (`noQe`):** only reachable from the Dev menu (every property has an estimate). A banner with a "Get price estimate" CTA, which loads, then shows the estimate and a positive toast. There are two layout routes, **side CTA** and **full-width CTA**, switched from the Dev menu (localStorage `bz-qe-route`). *Waiting on William to choose (Vercel thread K9edXzqfVf9j).*
 - "View more" buttons have no arrows.
 - Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). After reveal, it becomes Call owner + an email icon.
 
