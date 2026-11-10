@@ -17,6 +17,7 @@ import { DetailPanel, setQeRoute } from "@/components/home/DetailPanel";
 import { MapControls } from "@/components/home/MapControls";
 import { AreaCompsPreview } from "@/components/home/CompsFlow";
 import { FlowKind, ReportFlow } from "@/components/report/ReportFlow";
+import { frameLot } from "@/lib/map/frame";
 import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
@@ -36,7 +37,6 @@ const COLS_KEY = "bz-results-cols";
 const BAR_BOTTOM = 70;
 
 // Camera zoom when a property's panel opens or a parcel is selected (review feedback: parcel-level view).
-const DETAIL_ZOOM = 18;
 
 export default function HomeWeb() {
   const router = useRouter();
@@ -143,7 +143,12 @@ export default function HomeWeb() {
     setSeen(s => new Set(s).add(id));
     setBadgeSeen(s => new Set(s).add(id));
     const l = listings.find(x => x.id === id);
-    if (l && map) map.easeTo({ center: [l.lng, l.lat], zoom: DETAIL_ZOOM, offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
+    if (l) frameSel(l);
+  };
+  // Frame the selection in the free map space right of the detail panel (lib/map/frame.ts).
+  const frameSel = (l: Listing | null, ring?: number[][], at?: [number, number]) => {
+    if (!map) return;
+    frameLot(map, { ring, at: at || [l!.lng, l!.lat], lotAc: l?.lotAc, left: GAP + COL + GAP + 420, top: BAR_BOTTOM });
   };
   const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); };
   const goPlace = async (p: Place) => { setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
@@ -179,7 +184,7 @@ export default function HomeWeb() {
     const hit = listings.find(x => propKey(x) === propKey(l));
     if (hit) return openListing(hit.id);
     alerts.close(); setParcel(null); setSelId(null); setHoverId(null); setSoloL(l);
-    if (map) map.easeTo({ center: [l.lng, l.lat], zoom: DETAIL_ZOOM, offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
+    frameSel(l);
   };
   // `openSearch`: results for the search's area and filters, with it as the active search.
   const openSearch = async (x: SavedSearch) => {
@@ -393,7 +398,7 @@ export default function HomeWeb() {
       <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => {
         alerts.close(); setSearching(false); setSelId(null); setSoloL(null); setParcel(p);
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
-        if (map) map.easeTo({ center: [p.cx, p.cy], zoom: DETAIL_ZOOM, offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
+        frameSel(p.listing, p.ring, [p.cx, p.cy]);
       }} />
       {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached} onClose={() => setFlow(null)}
         onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); }} onShare={() => shareOne(flow.l)} />}

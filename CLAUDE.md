@@ -57,8 +57,9 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - **Special pins** (yellow signal circles) appear on the map **only while For you is the visible tab**. They follow the feed's signal filter.
   - A pin reverts to a plain white price pill once its detail has been opened ("seen").
   - The "+" on a card picks the property. Picked properties show in the `PickedFooter`, and their thumbnails open the Saved sheet.
-- **Searches:** saved searches, each with an Active badge (pulsing green) and alerts.
-- **Properties:** saved properties.
+- **Searches:** saved searches, each with an "n new" badge (red) until the search is **clicked** (hover doesn't count), then Active (pulsing green); and alerts.
+- **Properties:** saved properties. Unviewed ones carry a red dot; opening one marks it viewed. Properties you save yourself start viewed.
+- The Searches / Properties tab bells show only while something is unseen (a search with new matches, a property with its red dot).
 
 **Search** (`SearchBar.tsx`, the canvas search step)
 - Recent searches are stored in localStorage. Several areas can be picked as chips.
@@ -99,7 +100,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - The parcel lifts off the map as a solid slab: drop shadow, stacked sides, an **opaque** top and the house number, with a dashed outline on the ground.
   - With the heat map on, the slab keeps its parcel's band colour (softened 60% toward paper, since the slab is opaque); with it off, it's neutral.
   - In satellite: the rest of the map dims, the slab top is the satellite image (Mapbox Static) with a yellow edge, and there are no colour washes.
-- **Detail zoom:** opening a property panel (from a pin, card or saved property) or clicking a parcel eases to **zoom 18** (`DETAIL_ZOOM`), centred in the visible map between the panels.
+- **Selection framing** (`lib/map/frame.ts`): opening a property (pin, card, saved property, address) or clicking a parcel fits the **whole lot** into the free map space between the detail panel and the viewport edge, below the filter bar, centred, with an even 64 px margin; the zoom follows from the fit (up to 21). A parcel uses its outline; a listing fits a lot-sized square first, then settles on the parcel under it once drawn.
 - **Searched-area outline:** option 04, "inner glow edge". A thin clay line (rgb 147,89,75) plus a soft clay gradient inside the boundary; nothing outside. The glow widens with zoom while the line keeps a fixed width.
 - **Map controls**, bottom-right, from the bottom up: Layers (84 px card with thumbnail), zoom, my location, info. The Layers and info panels open to the left. Layers cover the data layer (ROI / Underbuilt / none) and the map type: Breezy light, Breezy dark, Streets, Satellite. Light ↔ dark switches presets in place; on dark, pale heat bands are blended toward the land so "neutral" doesn't read as a grey veil.
 
@@ -119,7 +120,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - Loading stage per flow: progress bar in the flow's colour (comps purple, UB clay, ROI green), radar GIF (UB) or sparkle, "Analyzing …", one shimmering step every 700 ms, then the done title for 1.5 s.
   - Comps first confirms the subject property (review modal), then "Let AI do the work" inside the sheet (auto-runs after 6.7 s unless the pointer rests on Get comps).
   - Report header: Back to map, tabs **Upside analysis / Build guidelines / Comps** (a tab that hasn't run starts its flow), Share. A report that has run reopens on its result.
-  - **Build guidelines** = `UBReport.tsx`: version D ("Property") main column of the Underbuilt Report Versions design, no property card. Recorded from `design-reference/underbuilt-report/` by `scripts/extract-ub-report.mjs` into `public/ub-report/`; modals, expandable rules, build options (option × plan/section × roof), dots rail, glossary drawer and "Get Comps" links all work. Sample data (418 Wren Hollow Lane).
+  - **Build guidelines** = `UBReport.tsx`: version D ("Property") main column of the Underbuilt Report Versions design, no property card, spread to the full sheet width on white (review feedback) like the Comps result. Recorded from `design-reference/underbuilt-report/` by `scripts/extract-ub-report.mjs` into `public/ub-report/`; modals, expandable rules, build options (option × plan/section × roof), dots rail, glossary drawer and "Get Comps" links all work. Sample data (418 Wren Hollow Lane).
   - **Upside analysis** body is a placeholder until Pedro's UB ROI variants are ported. **Comps** body is the existing comps result.
   - Area comps come from Create comps (`AreaCompsPreview`, still the older full-screen view).
 - **Saved** (`Saved.tsx`, `SavedState.tsx`): save-search sheet, `SaveToggle`, the Saved sheet (opens from Home and Results).

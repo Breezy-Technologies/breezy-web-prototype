@@ -99,7 +99,7 @@ function SearchRow({ x, hover, full, onEnter, onLeave, onOpen, onDel }: { x: Sav
   );
 }
 
-type PropItem = { key: string; l: Listing; status: string; when: string };
+type PropItem = { key: string; l: Listing; status: string; when: string; viewed: boolean };
 
 function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; hover: boolean; onEnter: () => void; onLeave: () => void; onOpen: () => void; onDel: () => void }) {
   const { l } = x;
@@ -110,7 +110,7 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 4, font: "400 12px/1.26 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)", whiteSpace: "nowrap", overflow: "hidden" }}>
-            <span style={{ flex: "none", width: 8, height: 8, borderRadius: "50%", background: "rgb(249,60,45)" }} />{x.status}
+            {!x.viewed && <span style={{ flex: "none", width: 8, height: 8, borderRadius: "50%", background: "rgb(249,60,45)" }} />}{x.status}
           </span>
           <span style={{ flex: "none", font: "400 12px/1.26 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)" }}>{x.when}</span>
         </div>
@@ -146,17 +146,18 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
   const cardRef = useRef<HTMLDivElement>(null);
 
   const sorted = <T extends { when: string }>(a: T[]) => sort === "Default" ? a : a.slice().sort((x, y) => ((RANK[x.when] ?? 0) - (RANK[y.when] ?? 0)) * (sort === "Newest" ? 1 : -1));
-  // Opening or hovering a saved search marks its new matches as seen (store `markSeen`).
+  // Opening (clicking) a saved search marks its new matches as seen (store `markSeen`).
   const searches = sorted(sv.searches);
   // Status + "when" follow the row position, as the canvas `mapP` does. Row keys are "p:" + the store key.
-  const props: PropItem[] = sorted(sv.props.map((p, k) => ({ key: "p:" + p.key, l: p.l, status: PROP_STATUS[k % PROP_STATUS.length], when: PROP_WHEN[Math.min(k, PROP_WHEN.length - 1)] })));
-  const bellS = searches.some(x => x.newN > 0), bellP = props.length > 0;
+  const props: PropItem[] = sorted(sv.props.map((p, k) => ({ key: "p:" + p.key, l: p.l, status: PROP_STATUS[k % PROP_STATUS.length], when: PROP_WHEN[Math.min(k, PROP_WHEN.length - 1)], viewed: !!p.viewed })));
+  // The tab bells show while anything is unseen: a search with new matches, a property with its red dot.
+  const bellS = searches.some(x => x.newN > 0), bellP = props.some(x => !x.viewed);
 
   const openSearch = (x: SavedSearch) => { seenSearch(x.id); setFull(false); onOpenSearch(x); };
-  const openProp = (x: PropItem) => { setFull(false); onOpenProp(x.l); };
+  const openProp = (x: PropItem) => { sv.markPropViewed(x.key.slice(2)); setFull(false); onOpenProp(x.l); };
   const seenSearch = (id: string) => sv.markSeen(id);
-  // Hovering a saved search counts as interacting with it: its "n new" badge turns to Active (review feedback).
-  const enter = (id: string) => () => { setHover(id); if (!id.startsWith("p:")) seenSearch(id); };
+  // Hover only shows the row's actions; the "n new" badge turns to Active on click, not on hover (review feedback).
+  const enter = (id: string) => () => setHover(id);
   const leave = (id: string) => () => setHover(h => (h === id ? null : h));
   const askDel = (id: string, nm: string) => { setConfirm({ id, name: nm }); setSortOpen(false); };
   const isProp = confirm?.id.startsWith("p:");

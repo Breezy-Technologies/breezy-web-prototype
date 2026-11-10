@@ -124,16 +124,17 @@ export function UBReport({ onComps }: { onComps: () => void }) {
   };
 
   if (!data) return (
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "rgb(239,229,226)" }}>
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "rgb(255,255,255)" }}>
       <span style={{ width: 28, height: 28, borderRadius: 9999, border: "3px solid rgba(18,18,18,.12)", borderTopColor: "rgb(174,106,91)", animation: "spin 1s linear infinite" }} />
     </div>
   );
   const [r, css] = data;
   return (
-    <div className="ubr" style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", background: r.bg }}>
+    // White, full width like the Comps result (review feedback), rather than the design's tan 748 px column.
+    <div className="ubr" style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", background: "rgb(255,255,255)" }}>
       <style>{css}</style>
       <div ref={scroller} className="no-scrollbar" style={{ flex: 1, minWidth: 0, overflowY: "auto", overscrollBehavior: "contain" }}>
-        <div onClick={onClick} ref={body} style={{ width: "min(748px, calc(100% - 96px))", margin: "0 auto", padding: "48px 0 96px" }} />
+        <div onClick={onClick} ref={body} style={{ padding: "40px 88px 96px 48px" }} />
       </div>
       {/* The dots rail (version D's .d-dots): a dash per section; hover shows every title. */}
       <nav className="d-dots" aria-label="Report sections" style={{ position: "absolute" }}>

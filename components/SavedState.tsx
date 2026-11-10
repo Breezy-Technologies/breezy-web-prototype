@@ -48,7 +48,7 @@ export const forTxt = (cl: string[]) => cl.length ? "For " + (cl.length > 2 ? cl
 
 // Saved properties are keyed by address + id, since listing ids repeat between areas.
 export const propKey = (l: Listing) => l.addr + "|" + l.id;
-export type SavedProp = { key: string; l: Listing; seed?: boolean };
+export type SavedProp = { key: string; l: Listing; seed?: boolean ; viewed?: boolean };
 
 // `_defSearches` + `_hcExtra` from the canvas (seed data so the panel isn't empty).
 const SEED_SEARCHES: SavedSearch[] = [
@@ -80,6 +80,7 @@ type Saved = {
   updateSearch: (id: string, p: Partial<SavedSearch>) => void;
   removeSearch: (id: string) => void;
   markSeen: (id: string) => void;
+  markPropViewed: (key: string) => void;
   setActive: (id: string | null) => void;
   addContact: (n: string) => void;
 };
@@ -123,7 +124,7 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
   // `save` on a results card: toggle `savedP[i]` and move it to the end of `pickOrder` (newest first here).
   const toggleProp = useCallback((l: Listing) => {
     const k = propKey(l), on = props.some(p => p.key === k);
-    setProps(ps => on ? ps.filter(p => p.key !== k) : [{ key: k, l }, ...ps.filter(p => p.key !== k)]);
+    setProps(ps => on ? ps.filter(p => p.key !== k) : [{ key: k, l, viewed: true }, ...ps.filter(p => p.key !== k)]);
     return !on;
   }, [props]);
   const removeProp = useCallback((key: string) => {
@@ -142,13 +143,15 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
   const updateSearch = useCallback((id: string, p: Partial<SavedSearch>) => setSearches(l => l.map(x => x.id === id ? { ...x, ...p } : x)), []);
   const removeSearch = useCallback((id: string) => { setSearches(l => l.filter(x => x.id !== id)); setActiveId(a => a === id ? null : a); }, []);
   const markSeen = useCallback((id: string) => setSearches(l => l.some(x => x.id === id && x.newN) ? l.map(x => x.id === id ? { ...x, newN: 0 } : x) : l), []);
+  // Opening a saved property marks it viewed: its red dot goes, and the Properties bell once none is left (review feedback).
+  const markPropViewed = useCallback((key: string) => setProps(ps => ps.some(p => p.key === key && !p.viewed) ? ps.map(p => p.key === key ? { ...p, viewed: true } : p) : ps), []);
   const addContact = useCallback((n: string) => setNewContacts(c => c.includes(n) ? c : c.concat(n)), []);
   const active = useMemo(() => searches.find(x => x.id === activeId) || null, [searches, activeId]);
 
   return (
     <Ctx.Provider value={{
       searches, props, alerts, newContacts, activeId, active,
-      isSaved, toggleProp, removeProp, clearPicked, setAlerts, addSearch, updateSearch, removeSearch, markSeen, setActive: setActiveId, addContact,
+      isSaved, toggleProp, removeProp, clearPicked, setAlerts, addSearch, updateSearch, removeSearch, markSeen, markPropViewed, setActive: setActiveId, addContact,
     }}>
       {children}
     </Ctx.Provider>
