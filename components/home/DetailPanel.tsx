@@ -65,6 +65,20 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   };
   const [tab, setTab] = useState<Tab>("Summary");
   const [revealed, setRevealed] = useState(false);
+  const ownerRef = useRef<HTMLDivElement>(null);
+  // Contact owner reveals the contact lines and scrolls the Owner section into view,
+  // just under the compact header and the sticky tabs (review feedback).
+  const contactOwner = () => {
+    setRevealed(true);
+    if (tab !== "Summary") setTab("Summary");
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const sc = scroller.current, el = ownerRef.current;
+      if (!sc || !el) return;
+      const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+      const sticky = 64 + (tabBar.current?.offsetHeight ?? 64); // compact header (shows past 210 px) + tab bar
+      sc.scrollTo({ top: Math.max(0, top - sticky - 8), behavior: "smooth" });
+    }));
+  };
   const [gi, setGi] = useState(0);
   const [descOpen, setDescOpen] = useState(false);
   const [hdr, setHdr] = useState(false);
@@ -249,7 +263,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
             ))}
           </div>
           {/* Owner: `onOwnersTab` (View history), contact lines unlock with Contact owner (`onOwnerReveal`) */}
-          <div style={css("display:flex;flex-direction:column;gap:12px;padding:24px 16px 8px")}>
+          <div ref={ownerRef} style={css("display:flex;flex-direction:column;gap:12px;padding:24px 16px 8px")}>
             <div style={css("display:flex;align-items:center;justify-content:space-between;gap:12px")}>
               <span style={css(H17)}>Owner</span>
               <button className="dt-ghost" onClick={() => setTab("Owners")} style={css("flex:none;height:32px;padding:0 10px;margin-right:-10px;border:none;border-radius:9999px;background:none;font:700 14px/18px var(--font-sans);color:rgb(17,16,16);cursor:pointer;white-space:nowrap")}>View history</button>
@@ -477,7 +491,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(17,16,16)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
           </button>
         </> : (
-          <button className="btn-dark" style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap" }} onClick={() => setRevealed(true)}>
+          <button className="btn-dark" style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap" }} onClick={contactOwner}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
             Contact owner
           </button>

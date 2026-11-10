@@ -111,7 +111,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - An **Owner** section (56 px avatar, "View history" on the right), then the listing description. Owner contact lines copy on click.
 - **No estimate (`noQe`):** only reachable from the Dev menu (every property has an estimate). A banner with a "Get price estimate" CTA, which loads, then shows the estimate and a positive toast. There are two layout routes, **side CTA** and **full-width CTA**, switched from the Dev menu (localStorage `bz-qe-route`). *Waiting on William to choose (Vercel thread K9edXzqfVf9j).*
 - "View more" buttons have no arrows.
-- Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). After reveal, it becomes Call owner + an email icon.
+- Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). Pressing it unlocks the contact lines and scrolls the panel to the Owner section (switching to Summary if needed); the footer becomes Call owner + an email icon.
 
 **Flows and sheets**
 - **Report sheet** (`components/report/ReportFlow.tsx`, canvas `rptLayer` / `_wsTilt` / `_runFlow`): opened by **Get comps**, the **Max build** tile (Underbuilt) and the **Profit potential** tile (ROI).
@@ -151,23 +151,21 @@ A floating **"Heat: …" switcher** (`components/HeatPaletteSwitcher.tsx`) sits 
 
 Done when Ann signs the palette off as on-brand and Jimsy agrees it keeps Pedro's legibility; then remove the switcher.
 
-## Special-pin colour routes (exploration, not yet decided)
+## Signal pin colours (decided)
 
-A floating **"Pins: …" switcher** (`components/PinPalette.tsx`) sits at the bottom-right of both routes. It changes the colour of every yellow signal circle (`SignalDot`). White price pills never change. The choice is saved in localStorage (`bz-pin-route`) and shared through a window event. Logic lives in `lib/pinColors.ts`.
+Every coloured opportunity circle (`SignalDot` in `components/PinPalette.tsx`: map pins, feed badges, cards, legends) takes its colour from one family, in `lib/pinColors.ts`:
 
-- Every circle gets a light radial gradient of its shade. The icon goes dark or light by luminance. **Selected is always black with a white icon.**
-- Onboarding pins are 38 px (44 px selected) with a pulse ring in the pin colour. On Home they are 22 px.
+| Family | Signals | Base |
+|---|---|---|
+| Red | Alert related: price drops | rgb(214,72,58) |
+| Yellow | Underbuilt | rgb(228,172,62) |
+| Green | ROI | rgb(58,144,80) |
+| Blue | Status related: withdrawn, expired, stale, foreclosure | rgb(62,132,192) |
+| Purple | Comps | rgb(130,101,158) |
 
-| Route | Logic |
-|---|---|
-| Yellow | Today's single Breezy yellow (baseline). |
-| Hot → cold | By how active the listing is: price drop > ROI > Underbuilt > stale > expired > withdrawn, red-orange to blue. |
-| Brand range | Breezy yellow → deep clay. |
-| Seller vs value | Warm = call the owner (drop, stale, expired, withdrawn); cool = pitch the upside (ROI, Underbuilt). Shade = urgency. |
-| Freshness | Per pin: vivid when new, fading with age (`1 − dom/150`). |
-| Family + freshness | Seller / value colour, with strength set by freshness. |
-| Upside $ | Per pin: estimated profit (price × ROI), pale gold → deep green. |
-| Match heat layer | Per pin: the ROI heat-map colour under the pin. |
+- Each circle is lit from the top (a lighter tint fading to the base) with a darker ring of its own shade. The icon is white, dark on yellow. **Selected is always black with a white icon.** White price pills never change; the price-drop bell uses the alert red.
+- Onboarding pins are 38 px (44 px selected) with a white outline and a pulse ring in the family colour. On Home they are 22 px.
+- The colour-route switcher is gone.
 
 ## Design rules (from review feedback; keep them)
 
@@ -185,7 +183,6 @@ A floating **"Pins: …" switcher** (`components/PinPalette.tsx`) sits at the bo
 ## Open items
 
 - **No-estimate banner:** choose side vs full-width CTA.
-- **Pin colour route:** pick one (or keep yellow) and remove the switcher.
 - **Report sheet:** port Pedro's UB ROI page variants into Upside analysis; feed Build guidelines from the selected property instead of the sample report.
 - Draw-area tool: placement still undecided. The "Search this area" zone diagram is coming from William's Figma.
 - Make saved reports easier to reach, as on mobile.
@@ -209,7 +206,7 @@ app/home/page.tsx           Home Web: layout, views (home / results), search thi
 app/api/boundary/route.ts   Census TIGERweb lookup (winding + holes)
 components/AppState.tsx     place / areas, outline rings, listings, picks, onboarded (sessionStorage)
 components/SavedState.tsx   saved searches + properties, alert definitions
-components/PinPalette.tsx   SignalDot, pulse colour, PinRouteSwitcher
+components/PinPalette.tsx   SignalDot, pulse colour
 components/HeatPaletteSwitcher.tsx  heat palette / opacity exploration control
 components/map/             MapProvider (inset, mode, heat, area), Overlay (portal into the map)
 components/home/            SideNav (+DevMenu), SearchBar, HomeCard, ForYouFeed, LeftPanel, Filters,
@@ -225,7 +222,7 @@ lib/places.ts               search, boundaries, gazetteer, viewportPlace, isCove
 lib/geo.ts                  ring winding, bbox, point-in-rings
 lib/fake.ts                 demo data (listings, detail, owners, estimates, heat)
 lib/filters.ts              filter model and defaults
-lib/pinColors.ts            pin colour routes
+lib/pinColors.ts            signal pin colour families
 lib/heat/                   heat colour scale (scale.ts ported from underbuilt-roi), palettes, bands, values
 lib/css.ts                  converts canvas style strings to React styles
 ```

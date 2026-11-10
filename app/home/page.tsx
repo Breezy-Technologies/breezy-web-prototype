@@ -9,7 +9,6 @@ import { ResultsPanel, SortMenu } from "@/components/home/LeftPanel";
 import { AllFiltersPanel, FilterBar, FilterDropdown, useFilterState } from "@/components/home/Filters";
 import { HomeCard } from "@/components/home/HomeCard";
 import { Toast, useToast } from "@/components/home/Toast";
-import { PinRouteSwitcher } from "@/components/PinPalette";
 import { HeatPaletteSwitcher } from "@/components/HeatPaletteSwitcher";
 import { PricePins } from "@/components/home/PricePins";
 import { HoverCard } from "@/components/home/HoverCard";
@@ -403,8 +402,7 @@ export default function HomeWeb() {
       {ss.modals}
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
-      <PinRouteSwitcher style={{ right: 104, bottom: 20 }} />
-      <HeatPaletteSwitcher style={{ right: 104, bottom: 62 }} />
+      <HeatPaletteSwitcher style={{ right: 104, bottom: 20 }} />
     </>
   );
 }
