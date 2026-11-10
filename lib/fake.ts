@@ -2,6 +2,7 @@
 // values, all generated deterministically from a place so every search feels
 // populated. Swap these functions for real API calls later.
 import { BBox, LngLat, Ring, field, hashStr, pointInRings, rng } from "./geo";
+import { LOTS, LOT_ZONE, Lot, PIN_LOTS, boxesMeet, inBox, inLotZone, lotId, lotRng } from "./silverlake";
 
 export type OppType = "ub" | "drop" | "exp" | "roi" | "wd" | "stale";
 
@@ -44,6 +45,8 @@ export type Listing = {
   // No quick estimate available (not enough nearby sales): the detail panel shows
   // the "No quick estimate yet" banner instead of the estimate card. ~1 in 5.
   noQe?: boolean;
+  // Set when the listing stands on one of Pedro's real Silver Lake lots (lib/silverlake.ts).
+  apn?: string;
 };
 
 const PTYPES: [string, number][] = [["Single family", 0.7], ["Condo", 0.1], ["Townhouse", 0.07], ["Multi family", 0.06], ["Duplex", 0.05], ["Lot", 0.02]];
@@ -70,11 +73,95 @@ function priceLevel(center: LngLat) {
   return 1.1e6;
 }
 
-export function makeListings(key: string, center: LngLat, bbox: BBox | undefined, rings: Ring[] | null, n = 28, cityLabel = ""): Listing[] {
+// ---- Listings on Pedro's real lots (Silver Lake / Echo Park) ----
+// Real: position, outline, address, beds, baths, ft², lot, year, value, zoning,
+// listed / sold, ROI and Underbuilt. Still fake: photos, owner, opportunity
+// copy, days on market. Seeded per lot, so a home is the same wherever it shows.
+const ptypeOfZone = (z: string) => {
+  const s = z.toUpperCase().replace(/^[[(][^\])]*[\])]/, ""); // Pedro's typeOf: a [Q] / (T) prefix is a condition, not the zone
+  return /^R2[-.]/.test(s) ? "Duplex" : /^R[34][-.]|^RD/.test(s) ? "Multi family" : "Single family";
+};
+const lotListingCache = new Map<number, Listing>();
+export function lotListing(l: Lot, i: number): Listing {
+  const hit = lotListingCache.get(i);
+  if (hit) return hit;
+  const R = lotRng(l);
+  const left = l.ub > 0 && l.ub < 100 ? Math.round((l.sqft / (1 - l.ub / 100) - l.sqft) / 10) * 10 : 0;
+  const opp: OppType = l.roi >= 30 ? "roi" : l.ub >= 55 && R() < 0.7 ? "ub" : (["drop", "exp", "wd", "stale"] as OppType[])[Math.floor(R() * 4)];
+  const why = opp === "roi" ? `${l.roi}% ROI · ${l.ub}% underbuilt, room to add value`
+    : opp === "ub" ? `${l.ub}% underbuilt · ${left.toLocaleString("en-US")} ft² left to build`
+    : OPP[opp].why[Math.floor(R() * OPP[opp].why.length)];
+  const ow = OWNERS[Math.floor(R() * OWNERS.length)];
+  const first = ow[0].split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
+  const qeV = l.price * (0.94 + R() * 0.14);
+  const p0 = Math.floor(R() * PHOTOS.length);
+  const out: Listing = {
+    id: lotId(i), apn: l.apn,
+    lng: l.c[0], lat: l.c[1],
+    addr: l.addr, city: "Los Angeles",
+    price: Math.round(l.price / 5e3) * 5e3,
+    beds: l.beds, baths: l.baths, sqft: l.sqft,
+    lotAc: Math.round((l.lot / 43560) * 100) / 100,
+    built: l.year,
+    status: l.st === "S" ? "Sold" : l.st === "O" ? "Off market" : R() < 0.15 ? "Pending" : "Active",
+    opp, oppWhy: why,
+    photos: Array.from({ length: 6 }, (_, k) => PHOTOS[(p0 + k) % PHOTOS.length]),
+    owner: {
+      name: ow[0], sub: ow[1],
+      ini: ow[0].split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join(""),
+      phone: `(323) 555-0${100 + Math.floor(R() * 899)}`,
+      email: `${first}@${first === "harbor" ? "harborholdings" : "mail"}.com`,
+      mail: `PO Box ${1000 + Math.floor(R() * 8999)}, Los Angeles`,
+    },
+    qe: { value: qeV, lo: qeV * 0.93, hi: qeV * 1.08 },
+    roi: l.roi, ub: l.ub,
+    dom: Math.round(4 + R() * 200),
+    isNew: R() < 0.2,
+    ptype: ptypeOfZone(l.zone),
+    pstyle: PSTYLES[Math.floor(R() * PSTYLES.length)],
+    feats: PFEATS.filter(() => R() < 0.35),
+    noQe: false,
+  };
+  lotListingCache.set(i, out);
+  return out;
+}
+/** The real lot at a point (its outline contains it, else the nearest centre within ~60 m). */
+export function lotAt(p: LngLat): { l: Lot; i: number } | null {
+  if (!inLotZone(p)) return null;
+  let best: { l: Lot; i: number } | null = null, bd = Infinity;
+  LOTS.forEach((l, i) => {
+    const d = Math.hypot((l.c[0] - p[0]) * 0.83, l.c[1] - p[1]);
+    if (d < bd) { bd = d; best = { l, i }; }
+  });
+  if (!best) return null;
+  const b = best as { l: Lot; i: number };
+  return pointInRings(p, [b.l.ring]) || bd < 0.00055 ? b : null;
+}
+
+/** One property at a point: the real lot there, else a generated one. */
+export function listingAt(key: string, p: LngLat, cityLabel = ""): Listing | undefined {
+  const hit = lotAt(p);
+  if (hit) return lotListing(hit.l, hit.i);
+  return makeListings(key, p, [p[0] - 5e-4, p[1] - 5e-4, p[0] + 5e-4, p[1] + 5e-4], null, 1, cityLabel)[0];
+}
+
+// Each lot has a fixed rank, so any search over the same streets shows the same homes.
+const lotRank = (apn: string) => rng(hashStr("rank:" + apn))();
+const RANKED_PIN_LOTS = [...PIN_LOTS].sort((a, b) => lotRank(a.l.apn) - lotRank(b.l.apn));
+
+export function makeListings(key: string, center: LngLat, bbox: BBox | undefined, rings: Ring[] | null, n = 28, cityLabel = "", dense = true): Listing[] {
   const R = rng(hashStr(key));
   const [w, s, e, nn] = bbox || [center[0] - 0.03, center[1] - 0.022, center[0] + 0.03, center[1] + 0.022];
   // keep listings within a reasonable window around the centre for big areas
   const span = Math.min(0.06, e - w), spanY = Math.min(0.045, nn - s);
+  // Inside the lot zone, homes are Pedro's real lots (listed or recently sold);
+  // the zone is dense, so it gets more of them. Fake listings fill in outside it.
+  const win: BBox = [Math.max(w, center[0] - span / 2), Math.max(s, center[1] - spanY / 2), Math.min(e, center[0] + span / 2), Math.min(nn, center[1] + spanY / 2)];
+  const real = boxesMeet(win, LOT_ZONE)
+    ? RANKED_PIN_LOTS.filter(({ l }) => inBox(l.c, win) && (!rings || !rings.length || pointInRings(l.c, rings))).slice(0, dense ? Math.max(n, 48) : n).map(x => lotListing(x.l, x.i))
+    : [];
+  if (real.length >= n) return real;
+  n -= real.length;
   const out: Listing[] = [];
   const level = priceLevel(center);
   // separate stream so adding filter attributes doesn't reshuffle the existing fake data
@@ -85,6 +172,7 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
     const lng = center[0] + (R() - 0.5) * span, lat = center[1] + (R() - 0.5) * spanY;
     if (lng < w || lng > e || lat < s || lat > nn) continue;
     if (rings && rings.length && !pointInRings([lng, lat], rings)) continue;
+    if (inLotZone([lng, lat])) continue; // real lots only in there
     const i = out.length;
     const price = Math.round((level * (0.45 + R() * 1.3)) / 5e3) * 5e3;
     const opp = OPP_TYPES[Math.floor(R() * OPP_TYPES.length)];
@@ -129,7 +217,7 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
       noQe: false,
     });
   }
-  return out;
+  return real.length ? [...real, ...out] : out;
 }
 
 // ---- Listings for a map box ("Search this area"), stable across searches ----
@@ -145,8 +233,8 @@ function cellListings(i: number, j: number) {
   let c = cellCache.get(key);
   if (!c) {
     const w = i * CELL, s = j * CELL;
-    c = makeListings(key, [w + CELL / 2, s + CELL / 2], [w, s, w + CELL, s + CELL], null, PER_CELL, "")
-      .map((l, k) => ({ l: { ...l, id: 1e10 + hashStr(key + ":" + k) }, rank: rng(hashStr(key + ":rank:" + k))() }));
+    c = makeListings(key, [w + CELL / 2, s + CELL / 2], [w, s, w + CELL, s + CELL], null, PER_CELL, "", false)
+      .map((l, k) => ({ l: l.apn ? l : { ...l, id: 1e10 + hashStr(key + ":" + k) }, rank: rng(hashStr(key + ":rank:" + (l.apn || k)))() }));
     if (cellCache.size > 5000) cellCache.clear();
     cellCache.set(key, c);
   }

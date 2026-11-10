@@ -1,6 +1,7 @@
 import type { Map as MbMap } from "mapbox-gl";
 import { config, hasRegrid } from "../config";
 import { BBox, LngLat, metersPerDegLat, metersPerDegLng } from "../geo";
+import { lotAt } from "../fake";
 
 // Framing a selected property or parcel (review feedback): the lot is fully
 // visible, centred in the free map space between the right-most panel and the
@@ -9,7 +10,18 @@ import { BBox, LngLat, metersPerDegLat, metersPerDegLng } from "../geo";
 
 /** Margin kept around the lot inside the free space, px. */
 export const FRAME_PAD = 64;
-const MAX_ZOOM = 21; // Regrid parcel tiles go to 21; small lots can then fill the space evenly
+const MAX_ZOOM = 19;
+/* Review: the parcel zoom was too tight (a small lot filled the whole space).
+   The frame always keeps at least this much ground across, so the street and
+   the neighbouring lots stay in view; bigger lots still fit whole. */
+const MIN_SPAN = 70; // m
+
+/** The box grown, around its centre, to at least MIN_SPAN on each side. */
+function atLeast([w, s, e, n]: BBox): BBox {
+  const cx = (w + e) / 2, cy = (s + n) / 2;
+  const hx = Math.max((e - w) / 2, MIN_SPAN / 2 / metersPerDegLng(cy)), hy = Math.max((n - s) / 2, MIN_SPAN / 2 / metersPerDegLat);
+  return [cx - hx, cy - hy, cx + hx, cy + hy];
+}
 
 const bboxOf = (ring: number[][]): BBox => {
   let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
@@ -58,8 +70,10 @@ export function frameLot(m: MbMap, opts: { ring?: number[][] | null; at: LngLat;
   // keep the margin proportionate when the free space is small
   const pad = Math.max(16, Math.min(FRAME_PAD, freeW / 6, freeH / 6));
   const padding = { left: opts.left + pad, right: pad, top: opts.top + pad, bottom: pad };
-  const fit = (b: BBox, duration: number) => m.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding, maxZoom: MAX_ZOOM, duration });
-  if (opts.ring && opts.ring.length > 2) { fit(bboxOf(opts.ring), 800); return; }
+  const fit = (b0: BBox, duration: number) => { const b = atLeast(b0); m.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding, maxZoom: MAX_ZOOM, duration }); };
+  // One of Pedro's real lots: its outline is known up front.
+  const ring = opts.ring && opts.ring.length > 2 ? opts.ring : lotAt(opts.at)?.l.ring;
+  if (ring) { fit(bboxOf(ring), 800); return; }
   fit(lotBox(opts.at, opts.lotAc), 800);
   // refine on the real parcel once it is drawn (skip if the user moved meanwhile or picked again)
   m.once("idle", () => {

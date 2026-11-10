@@ -357,8 +357,9 @@ export function FilterDropdown({ fs, listings }: { fs: FilterState; listings: Li
   const n = listings.filter(l => homeOk(l, F)).length;
   const close = () => setDd(null);
   const opts = (key === "ub"
-    ? [["Any build potential", 0], ["50% and above", 50], ["60% and above", 60], ["70% and above", 70], ["80% and above", 80]]
-    : [["Any ROI", 0], ["50% and above", 50], ["60% and above", 60], ["70% and above", 70], ["80% and above", 80]]) as [string, number][];
+    // Thresholds on the heat bands, so they match the real Silver Lake figures (ROI tops out near 55%).
+    ? [["Any build potential", 0], ["30% and above", 30], ["45% and above", 45], ["60% and above", 60], ["70% and above", 70]]
+    : [["Any ROI", 0], ["10% and above", 10], ["20% and above", 20], ["30% and above", 30], ["45% and above", 45]]) as [string, number][];
   const cur = key === "ub" ? (F.ub || 0) : F.roi;
   const canClear = !!dims[key]?.on;
   return (

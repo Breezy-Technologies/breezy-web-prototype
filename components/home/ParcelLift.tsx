@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
-import { Listing, makeListings } from "@/lib/fake";
+import { Listing, lotListing, makeListings } from "@/lib/fake";
+import { LOTS } from "@/lib/silverlake";
 import { HEAT_PALETTES, heatColorOf, parcelPct, useHeatPrefs } from "@/lib/heat";
 import { config, hasRegrid, isLiveMap } from "@/lib/config";
 import { OwnerRow, QeRow } from "./HoverCard";
@@ -21,18 +22,21 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   useEffect(() => {
     if (!map) return;
     const move = (e: any) => {
-      if (map.getZoom() < 15.4 || !map.getLayer("bz-par-fill")) { if (keyRef.current) { keyRef.current = ""; setHit(null); } return; }
-      const f = map.queryRenderedFeatures(e.point, { layers: ["bz-par-fill"] })[0];
+      const layers = ["bz-lots-fill", "bz-par-fill"].filter(id => map.getLayer(id));
+      if (map.getZoom() < 15.4 || !layers.length) { if (keyRef.current) { keyRef.current = ""; setHit(null); } return; }
+      const f = map.queryRenderedFeatures(e.point, { layers })[0];
       if (!f || f.geometry.type !== "Polygon") { if (keyRef.current) { keyRef.current = ""; setHit(null); } return; }
       const props: any = f.properties || {};
-      const key = String(f.id ?? props.ll_uuid ?? props.pid ?? props.parcelnumb ?? JSON.stringify(f.geometry.coordinates[0][0]));
+      const key = typeof props.lot === "number" ? "lot:" + props.lot : String(f.id ?? props.ll_uuid ?? props.pid ?? props.parcelnumb ?? JSON.stringify(f.geometry.coordinates[0][0]));
       if (key === keyRef.current) return;
       keyRef.current = key;
       const ring = (f.geometry.coordinates[0] as [number, number][]);
       const cx = ring.reduce((a, p) => a + p[0], 0) / ring.length, cy = ring.reduce((a, p) => a + p[1], 0) / ring.length;
       const addr = props.address || props.headline || props.saddress || "";
-      const l = makeListings("parcel:" + key, [cx, cy], [cx - 1e-5, cy - 1e-5, cx + 1e-5, cy + 1e-5], null, 1, "")[0];
-      if (addr) l.addr = String(addr);
+      // Pedro's lots carry their index; Regrid / demo parcels get a generated home.
+      const l = typeof props.lot === "number" ? lotListing(LOTS[props.lot], props.lot)
+        : { ...makeListings("parcel:" + key, [cx, cy], [cx - 1e-5, cy - 1e-5, cx + 1e-5, cy + 1e-5], null, 1, "")[0] };
+      if (addr && !l.apn) l.addr = String(addr);
       if (props.owner) l.owner = { ...l.owner, name: String(props.owner), ini: String(props.owner).split(" ").filter((w: string) => /^[A-Z]/.test(w)).slice(0, 2).map((w: string) => w[0]).join("") };
       setHit({ key, ring, cx, cy, addr: l.addr, listing: l });
     };
@@ -53,9 +57,10 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   const q = show.ring.map(ll => map.project(ll));
   const pts = q.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(" ");
   const sat = mode === "satellite";
-  // Same value the parcel is painted with: its feature state (Regrid), else the field at its centre.
+  // Same value the parcel is painted with: a real lot's own figure, its feature state (Regrid), else the field at its centre.
   let pct: number | null = null;
-  if (heat !== "none" && !sat) {
+  if (heat !== "none" && !sat && show.listing.apn) pct = heat === "roi" ? show.listing.roi : show.listing.ub;
+  else if (heat !== "none" && !sat) {
     try { const st = map.getFeatureState(hasRegrid() ? { source: "bz-par", sourceLayer: config.regridSourceLayer, id: show.key } : { source: "bz-par", id: show.key }); if (typeof st?.v === "number") pct = st.v; } catch {}
     if (pct === null) pct = parcelPct(heat, show.cx, show.cy, show.key);
   }

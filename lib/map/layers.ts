@@ -1,9 +1,10 @@
 import type { Map as MbMap, GeoJSONSource } from "mapbox-gl";
 import { config, hasRegrid } from "../config";
 import { Ring, metersPerDegLat, metersPerDegLng, rng, hashStr } from "../geo";
-import { cellToBoundary, cellToLatLng, polygonToCells } from "h3-js";
+import { cellToBoundary, cellToLatLng, latLngToCell, polygonToCells } from "h3-js";
 import { isStandardStyle } from "./breezyTheme";
 import { heatAlpha, heatColors, heatPct, heatStep, parcelPct } from "../heat";
+import { LOTS, heatAreaLatLng, inLotZone } from "../silverlake";
 
 export type HeatKind = "roi" | "ub" | "none";
 
@@ -30,7 +31,7 @@ export function ensureLayers(m: MbMap) {
     // submarket cells (bz-hex-sub) between zoom 11.9 and 13. No outlines; the
     // line layers stay invisible except for the onboarding wave's front.
     for (const [src, min, max] of [["bz-hex", 0, 13.2], ["bz-hex-sub", 11.9, 16]] as const) {
-      m.addSource(src, { type: "geojson", data: EMPTY });
+      m.addSource(src, { type: "geojson", data: hexData(src === "bz-hex" ? 7 : 8) });
       add({ id: src + "-fill", type: "fill", source: src, minzoom: min, maxzoom: max, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0, "fill-opacity-transition": { duration: 400 }, "fill-antialias": false } }); // no seams where translucent cells meet
       add({ id: src + "-line", type: "line", source: src, minzoom: min, maxzoom: max, paint: { "line-color": "rgba(0,0,0,0)", "line-width": 1, "line-opacity": 0 } });
     }
@@ -49,6 +50,13 @@ export function ensureLayers(m: MbMap) {
     add({ id: "bz-par-fill", type: "fill", source: "bz-par", ...sl, minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } });
     // Lot outlines, Pedro's style: thin warm grey, fading in with the fills.
     add({ id: "bz-par-line", type: "line", source: "bz-par", ...sl, minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } });
+  }
+  if (!m.getSource("bz-lots")) {
+    // Pedro's real Silver Lake / Echo Park lots: static, coloured by their own
+    // ROI / Underbuilt (properties `roi`, `ub`), same ramps as the parcels.
+    m.addSource("bz-lots", { type: "geojson", data: lotData() });
+    add({ id: "bz-lots-fill", type: "fill", source: "bz-lots", minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } });
+    add({ id: "bz-lots-line", type: "line", source: "bz-lots", minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } });
   }
   if (!m.getSource("bz-area")) {
     const Z = (a: number[]) => ["interpolate", ["exponential", 1.6], ["zoom"], ...a] as any;
@@ -76,10 +84,14 @@ export function applyHeatColors(m: MbMap, kind: HeatKind) {
   m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
   m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
   if (m.getLayer("bz-par-fill")) m.setPaintProperty("bz-par-fill", "fill-opacity", parcelOpacity(A));
+  if (m.getLayer("bz-lots-fill")) m.setPaintProperty("bz-lots-fill", "fill-opacity", parcelOpacity(A));
   if (kind === "none") return;
   const colors = heatColors(kind);
   const step = heatStep(kind, colors);
-  for (const id of ["bz-hex-fill", "bz-hex-line", "bz-hex-sub-fill", "bz-hex-sub-line"]) m.setPaintProperty(id, id.endsWith("fill") ? "fill-color" : "line-color", step);
+  // Hexes and lots carry both values, so switching layer is a repaint only.
+  const own = heatStep(kind, colors, ["get", kind]);
+  for (const id of ["bz-hex-fill", "bz-hex-line", "bz-hex-sub-fill", "bz-hex-sub-line"]) m.setPaintProperty(id, id.endsWith("fill") ? "fill-color" : "line-color", own);
+  if (m.getLayer("bz-lots-fill")) m.setPaintProperty("bz-lots-fill", "fill-color", own);
   if (!m.getLayer("bz-par-fill")) return;
   // Regrid parcels get their value as feature state (stampParcels); until a
   // parcel is stamped it stays clear rather than flashing the lowest band.
@@ -123,52 +135,55 @@ export function stampParcels(m: MbMap, kind: HeatKind) {
   if (stamped.size > 60000) stamped.clear(); // re-stamping is idempotent
 }
 
-// ---- Heat hexes on the fixed H3 grid ----
-// Cells are global and stable, so a hex never shifts as the map pans; only
-// which cells are listed changes. Tiers follow Pedro's derive.ts: res 7 city
-// cells (res 6 when far out, to bound the count) and res 8 submarket cells,
-// both listed while they crossfade. A cell's value is the field at its
-// centre; with real data it becomes the average of the lots inside it.
-const MAX_CELLS = 5000;
-
-function cellsIn(m: MbMap, res: number): string[] {
-  const b = m.getBounds();
-  if (!b) return [];
-  // pad by a fifth so cells whose centre sits just off screen still draw
-  const px = (b.getEast() - b.getWest()) * 0.2, py = (b.getNorth() - b.getSouth()) * 0.2;
-  const w = Math.max(-180, b.getWest() - px), e = Math.min(180, b.getEast() + px);
-  const s = Math.max(-85, b.getSouth() - py), n = Math.min(85, b.getNorth() + py);
-  for (; res >= 0; res--) {
-    const cells = polygonToCells([[[w, s], [e, s], [e, n], [w, n], [w, s]]], res, true);
-    if (cells.length <= MAX_CELLS) return cells;
+// ---- Heat hexes: fixed H3 cells over the demo circle, built once ----
+// Review: hexes kept redrawing and changing size (they were rebuilt for the
+// viewport after every pan, at a coarser resolution when zoomed out), and fake
+// heat across all of LA broke the behaviour. Now, as in Pedro's build, the
+// cells are listed once for a small circle (lib/silverlake HEAT_AREA) at two
+// fixed sizes: res 7 city cells and res 8 submarket cells. Their data never
+// changes after load; the layer switch only repaints.
+// A cell with more than 3 of Pedro's lots in it averages them (his derive.ts);
+// other cells read the fake field at their centre.
+const MIN_REAL = 3;
+const hexDataCache = new Map<number, GeoJSON.FeatureCollection>();
+function hexData(res: number): GeoJSON.FeatureCollection {
+  const hit = hexDataCache.get(res);
+  if (hit) return hit;
+  const real = new Map<string, { roi: number; ub: number; n: number }>();
+  for (const l of LOTS) {
+    const c = latLngToCell(l.c[1], l.c[0], res);
+    const a = real.get(c) || { roi: 0, ub: 0, n: 0 };
+    a.roi += l.roi; a.ub += l.ub; a.n++;
+    real.set(c, a);
   }
-  return [];
-}
-
-export function syncHeat(m: MbMap, kind: HeatKind) {
-  const city = m.getSource("bz-hex") as GeoJSONSource | undefined, sub = m.getSource("bz-hex-sub") as GeoJSONSource | undefined;
-  if (!city || !sub) return;
-  applyHeatColors(m, kind);
-  for (const id of ["bz-hex-fill", "bz-hex-line", "bz-hex-sub-fill", "bz-hex-sub-line"]) m.setLayoutProperty(id, "visibility", kind === "none" ? "none" : "visible");
-  if (kind === "none") return;
-  const z = m.getZoom();
-  city.setData({ type: "FeatureCollection", features: z < 13.2 ? cellsIn(m, z < 10 ? 6 : 7).map(h => hexFeature(h, kind)) : [] });
-  sub.setData({ type: "FeatureCollection", features: z >= 11.9 && z < 16 ? cellsIn(m, 8).map(h => hexFeature(h, kind)) : [] });
-}
-
-const hexCache = new Map<string, GeoJSON.Feature>();
-function hexFeature(h: string, kind: "roi" | "ub"): GeoJSON.Feature {
-  const key = kind + h;
-  let f = hexCache.get(key);
-  if (!f) {
+  const features: GeoJSON.Feature[] = polygonToCells([heatAreaLatLng()], res).map(h => {
     const [lat, lng] = cellToLatLng(h);
     const ring = cellToBoundary(h, true);
     ring.push(ring[0]);
-    f = { type: "Feature", properties: { h3: h, v: heatPct(kind, lng, lat), x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } };
-    if (hexCache.size > 40000) hexCache.clear();
-    hexCache.set(key, f);
-  }
-  return f;
+    const r = real.get(h);
+    const ok = !!r && r.n > MIN_REAL;
+    const roi = ok ? Math.round((r!.roi / r!.n) * 10) / 10 : heatPct("roi", lng, lat);
+    const ub = ok ? Math.round((r!.ub / r!.n) * 10) / 10 : heatPct("ub", lng, lat);
+    return { type: "Feature", properties: { h3: h, roi, ub, x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } };
+  });
+  const fc = { type: "FeatureCollection", features } as GeoJSON.FeatureCollection;
+  hexDataCache.set(res, fc);
+  return fc;
+}
+
+let lotFC: GeoJSON.FeatureCollection | null = null;
+function lotData(): GeoJSON.FeatureCollection {
+  return lotFC ||= {
+    type: "FeatureCollection",
+    features: LOTS.map((l, i) => ({ type: "Feature", id: i, properties: { lot: i, roi: l.roi, ub: l.ub, address: l.addr }, geometry: { type: "Polygon", coordinates: [l.ring] } })),
+  };
+}
+
+// Hex data is static: this only shows / hides and repaints.
+export function syncHeat(m: MbMap, kind: HeatKind) {
+  if (!m.getSource("bz-hex") || !m.getSource("bz-hex-sub")) return;
+  applyHeatColors(m, kind);
+  for (const id of ["bz-hex-fill", "bz-hex-line", "bz-hex-sub-fill", "bz-hex-sub-line"]) m.setLayoutProperty(id, "visibility", kind === "none" ? "none" : "visible");
 }
 
 // ---- Demo parcels when Regrid isn't configured ----
@@ -186,7 +201,7 @@ export function fakeParcelsFor(m: MbMap, heat: HeatKind): FakeParcel[] {
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
     const key = i + ":" + j;
     if (!parcelCache.has(key)) parcelCache.set(key, makeCell(i * cell, j * cell, cell, hashStr(key)));
-    all.push(...parcelCache.get(key)!);
+    all.push(...parcelCache.get(key)!.filter(p => !inLotZone([p.cx, p.cy]))); // Pedro's lots cover that zone
   }
   src.setData({
     type: "FeatureCollection",

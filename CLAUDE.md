@@ -24,7 +24,8 @@ Both routes share **one Mapbox GL map** that lives in the root layout (`componen
 | Area outlines | US Census TIGERweb through `app/api/boundary/route.ts` (city, ZIP, county, state) | Live. Outer rings come back **clockwise** and enclave holes **anticlockwise** (`lib/geo.ts`). The inner-glow edge depends on that: a positive `line-offset` means inside. `pointInRings` is even-odd, so holes count as outside. |
 | Search | Mapbox Geocoding v6 (`searchPlaces` / `searchPlacesStrict` in `lib/places.ts`) | Live. The hand-drawn gazetteer (Beverly Hills, Silver Lake, Dallas…) is the offline fallback. |
 | Coverage | `isCovered()` in `lib/places.ts` | California + Dallas. Outside that, the app shows an "unsupported area" state. |
-| Breezy data | `lib/fake.ts` | **Fake and deterministic per place / box:** listings, opportunity types, owners, quick estimates (on **every** property; `noQe`, no estimate, is only set by the Dev menu preview), ROI (24–90) and Underbuilt heat, listing detail. Each generator will be swapped for a real service: the listings API, JD's heat-map service, the owner data service, and Justin's quick-estimate endpoint. |
+| Silver Lake lots | Pedro's `pd-bittencourt/underbuilt-roi` (`src/mocks/data/lots.json`) → `scripts/extract-silverlake.mjs` → `lib/data/silverlake.json`, read by `lib/silverlake.ts` | **The demo's anchor.** 2,018 real Silver Lake + Echo Park lots: cadastral outline, address, zoning, lot / house figures, listed / sold. ROI = his loader's per-lot target (his model is calibrated to hit it), Underbuilt = 1 − built / by-right ft². They are the parcels there (`bz-lots` source), the pins (listed / sold lots, fixed rank) and the hex averages. Photos, owner, opportunity copy stay fake (seeded per lot). |
+| Breezy data | `lib/fake.ts` | **Fake and deterministic per place / box:** listings, opportunity types, owners, quick estimates (on **every** property; `noQe`, no estimate, is only set by the Dev menu preview), ROI (24–90; real per-lot figures in the Silver Lake lot zone) and Underbuilt heat, listing detail. Each generator will be swapped for a real service: the listings API, JD's heat-map service, the owner data service, and Justin's quick-estimate endpoint. |
 | Offline mode | No Mapbox token, a style error, or a 4 s timeout | Uses the georeferenced static images in `public/map/` (Beverly Hills, Silver Lake, plus a fake-satellite `sat-*` set). **Keep it working for demos without network.** |
 
 Env keys are listed in `.env.example`, set locally in `.env.local`, and stored for deploys in the Vercel project settings. They are never committed. `lib/config.ts` reads them.
@@ -33,7 +34,7 @@ Env keys are listed in `.env.example`, set locally in `.env.local`, and stored f
 
 `STEPS = where → radar → comps → ub → roi → heat → signup → cards`
 
-1. **where**: pick an area (search, or the Dallas chip). The outline draws with the inner-glow edge.
+1. **where**: pick an area (search, or the Silver Lake / Echo Park chips: the demo is anchored there). The outline draws with the inner-glow edge.
 2. **radar**: scan the area. Special opportunity pins (`OppPins`) pop in with a wave delay and a double pulse ring.
 3. **comps / ub / roi**: three "freebie" cards, each with its art (`FreebieArt`): the sparkle GIF for comps, the build render for Underbuilt, a graduated gauge for ROI. Flip cards show "Learn more".
 4. **heat**: heat map and market alerts are **merged** into one step, and the hexes reveal in a wave (`heatWave` / `heatWaveEnd`).
@@ -95,16 +96,16 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - photo carousel (arrows, dots, n/total), address, price per ft², specs, an **owner** row and a **quick estimate** chip (hidden for `noQe` listings);
   - "Get comps" is distinct from the quick estimate.
 - **Heat layers** (`lib/heat`, `lib/map/layers.ts`), matched like for like to Pedro's build (`pd-bittencourt/underbuilt-roi`, the benchmark):
-  - Hexes sit on the fixed **H3** grid: city cells (res 7, res 6 below zoom 10) crossfade into submarket cells (res 8) between zoom 11.9 and 13; submarket cells fade out 15 → 16. No hex outlines.
+  - Hexes sit on the fixed **H3** grid and are **built once**, only inside `HEAT_AREA` (a 3 km circle round the Silver Lake lots, `lib/silverlake.ts`; review: fake heat across all of LA broke the behaviour, and hexes rebuilt per viewport kept redrawing and changing size). City cells (res 7) crossfade into submarket cells (res 8) between zoom 11.9 and 13; submarket cells fade out 15 → 16. No hex outlines. A cell with more than 3 lots averages them (Pedro's derive.ts); other cells read the fake field. Each hex carries both `roi` and `ub`, so a layer switch is a repaint, never a `setData`.
   - **Parcels are coloured on load**, fading in 15.6 → 16.2 and strengthening to 17, with thin warm-grey lot lines (#8A7A72). Each lot has its own value (area value plus a fixed per-lot offset), so parcel zoom reads as a mosaic; hexes keep the area value.
-  - Live Regrid parcels get their value as feature state `v` (keyed by `ll_uuid`) as tiles load; demo parcels carry it as a property.
+  - Pedro's lots (`bz-lots`) carry their own `roi` / `ub`. Live Regrid parcels (Dallas) get their value as feature state `v` (keyed by `ll_uuid`) as tiles load; demo parcels carry it as a property and are left out of the lot zone.
   - Everything is translucent: each palette has a tuned layer opacity (Pedro's is 25%), so streets read through.
   - One colour scale for hexes, parcels, the lifted slab, the map key and the "Match heat layer" pin route. Values are real percentages; the 0–1 fake field is spread along the bands (ROI 0/5/10/20/30/45; 5-colour palettes use 0/10/20/35).
 - **Parcel hover, zoom ≥ 15.4** (`ParcelLift.tsx`):
   - The parcel lifts off the map as a solid slab: drop shadow, stacked sides, an **opaque** top and the house number, with a dashed outline on the ground.
   - With the heat map on, the slab keeps its parcel's band colour (softened 60% toward paper, since the slab is opaque); with it off, it's neutral.
   - In satellite: the rest of the map dims, the slab top is the satellite image (Mapbox Static) with a yellow edge, and there are no colour washes.
-- **Selection framing** (`lib/map/frame.ts`): opening a property (pin, card, saved property, address) or clicking a parcel fits the **whole lot** into the free map space between the detail panel and the viewport edge, below the filter bar, centred, with an even 64 px margin; the zoom follows from the fit (up to 21). A parcel uses its outline; a listing fits a lot-sized square first, then settles on the parcel under it once drawn.
+- **Selection framing** (`lib/map/frame.ts`): opening a property (pin, card, saved property, address) or clicking a parcel fits the **whole lot** into the free map space between the detail panel and the viewport edge, below the filter bar, centred, with an even 64 px margin. The frame keeps at least 70 m of ground across and stops at zoom 19 (review: the zoom was too tight), so the street and neighbours stay in view. A real lot uses its own outline. A parcel uses its outline; a listing fits a lot-sized square first, then settles on the parcel under it once drawn.
 - **Searched-area outline:** option 04, "inner glow edge". A thin clay line (rgb 147,89,75) plus a soft clay gradient inside the boundary; nothing outside. The glow widens with zoom while the line keeps a fixed width.
 - **Map controls**, bottom-right, from the bottom up: Layers (84 px card with thumbnail), zoom, my location, info. The Layers and info panels open to the left. Layers cover the data layer (ROI / Underbuilt / none) and the map type: Breezy light, Breezy dark, Streets, Satellite. Light ↔ dark switches presets in place; on dark, pale heat bands are blended toward the land so "neutral" doesn't read as a grey veil.
 
@@ -193,7 +194,7 @@ Every coloured opportunity circle (`SignalDot` in `components/PinPalette.tsx`: m
 - "New match" badge should clear on first interaction.
 - **Heat palette:** pick one with Ann and Jimsy and remove the switcher. Underbuilt band cut points are placeholders until JD's service defines them.
 - Pedro's smooth heat surface (canvas image + water clip) is not ported yet.
-- Pins: named places (Silver Lake, Dallas…) still generate their own listings; only "Search this area" uses the fixed grid. Move named places onto the grid too when the listings API lands.
+- Pins: inside the lot zone, every search shows real lots (`lotListing`, fixed rank); elsewhere named places still generate their own listings and only "Search this area" uses the fixed grid.
 - Regrid: ask for LA County coverage before the trial ends (4 Dec 2026).
 - **Breezy map theme:** duplicate Pedro's style in Studio as Breezy Light / Dark with the values in `docs/map-theme.md` (plus dark land #221d1b), then confirm with Ann and Jeff. Needs Mapbox access.
 - Dark map only: the app UI and the lifted parcel slab are still light.
@@ -223,7 +224,8 @@ lib/map/layers.ts           heat hexes (+ wave reveal), parcels (Regrid or demo)
 lib/map/theme.ts            optional Breezy palette over light-v11 (inactive)
 lib/places.ts               search, boundaries, gazetteer, viewportPlace, isCovered
 lib/geo.ts                  ring winding, bbox, point-in-rings
-lib/fake.ts                 demo data (listings, detail, owners, estimates, heat)
+lib/fake.ts                 demo data (listings, detail, owners, estimates, heat); lotListing / listingAt for real lots
+lib/silverlake.ts           Pedro's Silver Lake lots (lib/data/silverlake.json), HEAT_AREA circle, lot zone
 lib/filters.ts              filter model and defaults
 lib/pinColors.ts            signal pin colour families
 lib/heat/                   heat colour scale (scale.ts ported from underbuilt-roi), palettes, bands, values

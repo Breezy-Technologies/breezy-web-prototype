@@ -22,7 +22,7 @@ import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
 import { AreaReport, ReportsSheet, useReports } from "@/components/home/Reports";
-import { Listing, OppType, makeListings } from "@/lib/fake";
+import { Listing, OppType, listingAt } from "@/lib/fake";
 import { SortKey, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, pointInRings, ringBBox } from "@/lib/geo";
@@ -170,9 +170,10 @@ export default function HomeWeb() {
   const pickAddress = (p: Place) => {
     sv.setActive(null);
     const [lng, lat] = p.center;
-    const l = isCovered(p) ? makeListings("addr:" + p.id, p.center, [lng - 5e-4, lat - 5e-4, lng + 5e-4, lat + 5e-4], null, 1, p.label.split(", ").slice(1, 2).join(""))[0] : null;
+    const l = isCovered(p) ? listingAt("addr:" + p.id, p.center, p.label.split(", ").slice(1, 2).join("")) : null;
     if (!l) return showToast("No property found", "info");
-    openSavedProp({ ...l, lng, lat, addr: p.name });
+    // A real lot keeps its own spot and address; a generated home takes the searched ones.
+    openSavedProp(l.apn ? l : { ...l, lng, lat, addr: p.name });
   };
   // `onClearSearch` from the search step: back to Home with no area query.
   const clearSearch = () => { setAreaPill(false); sv.setActive(null); closeDetail(); setUnsup(null); setView("home"); setSortOpen(false); setSavedOpen(false); };

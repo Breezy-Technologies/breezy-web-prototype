@@ -303,7 +303,8 @@ function Where({ onPick }: { onPick: (p: Place) => void }) {
   const [busy, setBusy] = useState(false);
   const t = useRef<any>(null);
   useEffect(() => { clearTimeout(t.current); if (!q.trim()) { setRes([]); return; } t.current = setTimeout(() => searchPlaces(q).then(setRes), 180); }, [q]);
-  const chips = ["sl", "bh", "90210", "weho", "dallas"].map(id => GAZETTEER.find(p => p.id === id)!);
+  // The demo is anchored on Silver Lake (review): Pedro's real lots and the heat circle are there.
+  const chips = ["sl", "ep"].map(id => GAZETTEER.find(p => p.id === id)!);
   return (
     <div style={{ ...panel, justifyContent: "center", gap: 22 }}>
       <span style={{ display: "flex", alignItems: "center", gap: 10, position: "absolute", top: 32, left: 32 }}>
