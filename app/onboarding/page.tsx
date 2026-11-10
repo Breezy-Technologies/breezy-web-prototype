@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMapCtx } from "@/components/map/MapProvider";
+import { useMapCtx, useMapTick } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
 import { OppPins } from "@/components/onboarding/OppPins";
 import { SignalDot } from "@/components/PinPalette";
@@ -349,7 +349,8 @@ function RadarSweep({ active }: { active: boolean }) {
 }
 
 function PinWhy({ l, onClose, onMore }: { l: Listing; onClose: () => void; onMore: () => void }) {
-  const { map, tick } = useMapCtx();
+  const { map } = useMapCtx();
+  const tick = useMapTick();
   void tick;
   if (!map) return null;
   const p = map.project([l.lng, l.lat]);
@@ -373,7 +374,8 @@ function PinWhy({ l, onClose, onMore }: { l: Listing; onClose: () => void; onMor
 }
 
 function Freebie({ k, l, onBack, onNext }: { k: "comps" | "ub" | "roi"; l: Listing; onBack: () => void; onNext: () => void }) {
-  const { map, tick } = useMapCtx();
+  const { map } = useMapCtx();
+  const tick = useMapTick();
   void tick;
   const D = FREE[k], i = ["comps", "ub", "roi"].indexOf(k);
   const p = map ? map.project([l.lng, l.lat]) : { x: 0, y: 0 };

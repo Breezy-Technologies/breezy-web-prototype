@@ -1,13 +1,14 @@
 "use client";
 import { useRef, useState } from "react";
 import { MapOverlay } from "../map/Overlay";
-import { useMapCtx } from "../map/MapProvider";
+import { useMapCtx, useMapTick } from "../map/MapProvider";
 import { Listing, fullPrice, shortPrice } from "@/lib/fake";
 
 // Pin preview: scrollable photo carousel, address, price, owner and the
 // quick estimate (distinct from the full "Get comps" analysis).
 export function HoverCard({ l, onKeep, onLeave, onOpen }: { l: Listing; onKeep: () => void; onLeave: () => void; onOpen: () => void }) {
-  const { map, tick } = useMapCtx();
+  const { map } = useMapCtx();
+  const tick = useMapTick();
   const strip = useRef<HTMLDivElement>(null);
   const [ci, setCi] = useState(0);
   void tick;

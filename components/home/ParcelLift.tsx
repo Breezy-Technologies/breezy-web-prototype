@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { MapOverlay } from "../map/Overlay";
-import { useMapCtx } from "../map/MapProvider";
+import { useMapCtx, useMapTick } from "../map/MapProvider";
 import { Listing, lotListing, makeListings } from "@/lib/fake";
 import { LOTS } from "@/lib/silverlake";
 import { HEAT_PALETTES, heatColorOf, parcelPct, useHeatPrefs } from "@/lib/heat";
@@ -13,7 +13,8 @@ export type ParcelHit = { key: string; ring: [number, number][]; cx: number; cy:
 // Hovering a parcel (zoom ≥ 15.4) lifts it off the map as a solid slab. With the
 // heat map on the slab keeps the parcel's heat colour; otherwise it's neutral.
 export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: boolean; onOpen: (p: ParcelHit) => void; selected: ParcelHit | null }) {
-  const { map, tick, heat, mode } = useMapCtx();
+  const { map, heat, mode } = useMapCtx();
+  const tick = useMapTick();
   const palettes = useHeatPrefs();
   const [hit, setHit] = useState<ParcelHit | null>(null);
   const keyRef = useRef("");

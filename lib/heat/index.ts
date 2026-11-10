@@ -43,9 +43,9 @@ export const bandsFor = (kind: HeatLayer, n: number): Bands => (n === 5 ? BANDS_
 // need a little more to read at the same weight.
 export type HeatPalette = { name: string; sub: string; c: readonly string[]; alpha: number };
 export const HEAT_PALETTES = {
-  brandDiv: { name: "Breezy · slate → clay", sub: "5 bands. Diverging: dusty slate for weak, sand for neutral, Breezy clay for strong. No yellow, so the yellow pins stay distinct.", alpha: 0.34, c: ["#5E86A3", "#A9C0CF", "#EFE5D4", "#D8896C", "#A3412D"] },
+  brandDiv: { name: "Breezy · slate → clay", sub: "5 bands. Diverging: dusty slate for weak, sand for neutral, Breezy clay for strong. No yellow, so the yellow pins stay distinct.", alpha: 0.34, c: ["#5E86A3", "#A9C0CF", "#EFE5D4", "#DA9A7E", "#B4694F"] }, // top two softened toward clay (review: high ROI read too red)
   brandSeq: { name: "Breezy · sand → deep clay", sub: "5 bands. One brand hue, light to dark: the calmest option; reads as 'more is warmer'.", alpha: 0.38, c: ["#F2EADC", "#E2C0A6", "#CB9177", "#AC6650", "#86402F"] },
-  pedro5: { name: "Pedro, reduced", sub: "Pedro's blue → yellow → red, cut to 5 bands. Same balance, fewer colours.", alpha: 0.25, c: ["#2C7BB6", "#ABD9E9", "#FFF2B0", "#FDAE61", "#D7191C"] },
+  pedro5: { name: "Pedro, reduced", sub: "Pedro's blue → yellow → red, cut to 5 bands. Same balance, fewer colours.", alpha: 0.25, c: ["#2C7BB6", "#ABD9E9", "#FFF2B0", "#FDAE61", "#E2674A"] }, // top softened (review: too red)
   ...(Object.fromEntries(Object.entries(PEDRO).map(([k, v]) => [k, { name: v.name, c: v.c as readonly string[], alpha: 0.25, sub: k === "byr" ? "Pedro's build as shipped: 7 bands, the benchmark for balance." : "From Pedro's palette set, 7 bands." }])) as unknown as Record<keyof typeof PEDRO, HeatPalette>),
 } satisfies Record<string, HeatPalette>;
 export type PaletteId = keyof typeof HEAT_PALETTES;

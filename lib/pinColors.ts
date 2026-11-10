@@ -14,11 +14,12 @@ export type PinFamily = "alert" | "ub" | "roi" | "status" | "comps";
 type Shade = { light: RGB; base: RGB; ring: RGB; icon: string };
 
 export const PIN_FAMILIES: Record<PinFamily, Shade & { label: string }> = {
-  alert: { label: "Alerts", light: [236, 104, 84], base: [214, 72, 58], ring: [172, 52, 42], icon: "rgb(253,252,252)" },
-  ub: { label: "Underbuilt", light: [244, 200, 96], base: [228, 172, 62], ring: [184, 136, 44], icon: "rgb(18,18,18)" },
-  roi: { label: "ROI", light: [84, 170, 104], base: [58, 144, 80], ring: [40, 106, 58], icon: "rgb(253,252,252)" },
-  status: { label: "Status", light: [92, 164, 220], base: [62, 132, 192], ring: [44, 98, 146], icon: "rgb(253,252,252)" },
-  comps: { label: "Comps", light: [158, 128, 184], base: [130, 101, 158], ring: [98, 74, 124], icon: "rgb(253,252,252)" },
+  // Muted (review: the first set read too garish): same hues, lower saturation, a softer top light.
+  alert: { label: "Alerts", light: [214, 128, 112], base: [192, 98, 84], ring: [160, 80, 68], icon: "rgb(253,252,252)" },
+  ub: { label: "Underbuilt", light: [234, 204, 140], base: [216, 178, 104], ring: [180, 146, 82], icon: "rgb(18,18,18)" },
+  roi: { label: "ROI", light: [124, 168, 132], base: [94, 144, 106], ring: [74, 116, 84], icon: "rgb(253,252,252)" },
+  status: { label: "Status", light: [132, 164, 196], base: [100, 138, 176], ring: [80, 112, 144], icon: "rgb(253,252,252)" },
+  comps: { label: "Comps", light: [164, 146, 184], base: [138, 118, 160], ring: [112, 94, 132], icon: "rgb(253,252,252)" },
 };
 
 export const familyOf = (t: OppType): PinFamily =>
@@ -37,7 +38,7 @@ export function pinFill(type: OppType | PinFamily, selected = false, size = 22) 
   };
   return {
     background: `radial-gradient(circle at 50% 28%, ${rgb(f.light)} 0%, ${rgb(f.base)} 68%)`,
-    ring: `inset 0 0 0 ${ringW}px ${rgb(f.ring, 0.85)}`,
+    ring: `inset 0 0 0 ${ringW}px ${rgb(f.ring, 0.6)}`,
     icon: f.icon, rgb: f.base,
   };
 }

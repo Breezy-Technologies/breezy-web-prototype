@@ -80,7 +80,7 @@ export function setArea(m: MbMap, rings: Ring[] | null) {
 export function applyHeatColors(m: MbMap, kind: HeatKind) {
   if (!m.getLayer("bz-hex-fill")) return;
   lastKind = kind;
-  const A = kind === "none" ? 0 : heatAlpha(kind);
+  const A = kind === "none" ? 0 : heatAlpha(kind) * fadeA;
   m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
   m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
   if (m.getLayer("bz-par-fill")) m.setPaintProperty("bz-par-fill", "fill-opacity", parcelOpacity(A));
@@ -100,6 +100,43 @@ export function applyHeatColors(m: MbMap, kind: HeatKind) {
     : step);
 }
 let lastKind: HeatKind = "roi";
+
+// ---- Layer switch: fade out, swap, fade in ----
+// Review: Underbuilt flicked in. A colour change driven by the data can't be
+// transitioned by Mapbox, so the opacity ramps are scaled by `fadeA` (0..1)
+// frame by frame: the old layer fades out, the colours swap while it is
+// invisible, the new layer fades in. Interrupting a fade starts from where it is.
+let fadeA = 1, fadeRaf = 0;
+function setAlpha(m: MbMap, kind: HeatKind, f: number) {
+  if (kind === "none" || !m.getLayer("bz-hex-fill")) return;
+  const A = heatAlpha(kind) * f;
+  m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
+  m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
+  for (const id of ["bz-par-fill", "bz-lots-fill"]) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", parcelOpacity(A));
+}
+function animate(ms: number, f: (t: number) => void, done: () => void) {
+  const t0 = performance.now();
+  const step = (now: number) => {
+    const t = ms > 0 ? Math.min(1, (now - t0) / ms) : 1;
+    f(t);
+    if (t < 1) fadeRaf = requestAnimationFrame(step); else done();
+  };
+  fadeRaf = requestAnimationFrame(step);
+}
+const ease = (t: number) => t * t * (3 - 2 * t);
+export function fadeHeatTo(m: MbMap, kind: HeatKind) {
+  cancelAnimationFrame(fadeRaf);
+  const from = lastKind;
+  const fadeIn = () => {
+    fadeA = kind === "none" ? 1 : 0;
+    syncHeat(m, kind); // new colours and visibility, still at 0
+    if (kind === "none") return;
+    animate(360, t => { fadeA = ease(t); setAlpha(m, kind, fadeA); }, () => { fadeA = 1; });
+  };
+  if (from === "none" || from === kind) return fadeIn();
+  const a0 = fadeA;
+  animate(220 * a0, t => { fadeA = a0 * (1 - ease(t)); setAlpha(m, from, fadeA); }, fadeIn);
+}
 
 /* Zoom ramps, read off Pedro's layers.ts with his layer alpha A (0.25 there;
    here the palette's own, see lib/heat): city hexes fade out 11.8 → 13,

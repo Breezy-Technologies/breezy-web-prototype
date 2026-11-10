@@ -4,6 +4,7 @@ import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
 import { Listing, OPP, shortPrice } from "@/lib/fake";
 import { SignalDot } from "../PinPalette";
+import { pulseColor } from "@/lib/pinColors";
 import { ANCHOR_STYLE, useAnchors } from "../map/anchors";
 
 const DROP = "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 4px 12px rgba(30,18,12,.16)";
@@ -88,9 +89,15 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
               }}
             >
               {sig && (
-                <SignalDot l={l} type={l.opp} size={22} icon={12} selected={dark} ring="rgb(253,252,252)" ringW={dark ? 1.5 : 0} />
+                <span style={{ position: "relative", display: "flex" }}>
+                  {/* A soft pulse in the signal's colour, like the onboarding pins; seen or selected pins stay still. */}
+                  {!dark && !sn && <span style={{ position: "absolute", inset: 0, borderRadius: 9999, background: pulseColor(l.opp, 0.5), animation: `pulse 2.4s ease-out ${(l.id % 7) * 0.3}s infinite`, pointerEvents: "none" }} />}
+                  <span style={{ position: "relative", display: "flex" }}>
+                    <SignalDot l={l} type={l.opp} size={22} icon={12} selected={dark} ring="rgb(253,252,252)" ringW={dark ? 1.5 : 0} />
+                  </span>
+                </span>
               )}
-              {!isBlank && !sig && l.opp === "drop" && <i className="ph-fill ph-bell-simple" style={{ fontSize: 13, color: dark ? "var(--paper)" : "rgb(214,72,58)" }} />}
+              {!isBlank && !sig && l.opp === "drop" && <i className="ph-fill ph-bell-simple" style={{ fontSize: 13, color: dark ? "var(--paper)" : "rgb(192,98,84)" }} />}
               {!isBlank && <span style={{ font: "700 14px/1.26 var(--font-sans)", color: dark ? "var(--paper)" : "var(--ink)" }}>{lab}</span>}
             </span>
           </div>

@@ -3,12 +3,12 @@
 // between onboarding and Home Web keeps the same map instance, camera and
 // layers — no reload, no flash.
 import mapboxgl, { Map as MbMap } from "mapbox-gl";
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { config, isLiveMap } from "@/lib/config";
 import { MapMode, offlineStyle, styleFor } from "@/lib/map/style";
 import { applyBreezyTheme } from "@/lib/map/theme";
 import { applyBreezyBasemap, breezyTransformRequest } from "@/lib/map/breezyTheme";
-import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors, stampParcels } from "@/lib/map/layers";
+import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors, stampParcels, fadeHeatTo } from "@/lib/map/layers";
 import { HEAT_PALETTE_EVENT, setHeatDarkBase } from "@/lib/heat";
 import { Ring } from "@/lib/geo";
 
@@ -17,7 +17,6 @@ type Inset = { left: number; top: number; radius: number };
 type Ctx = {
   map: MbMap | null;
   ready: boolean;
-  tick: number; // bumps on every camera frame so DOM overlays can re-project
   mode: MapMode;
   setMode: (m: MapMode) => void;
   heat: HeatKind;
@@ -35,6 +34,13 @@ export const useMapCtx = () => {
   if (!c) throw new Error("useMapCtx outside MapProvider");
   return c;
 };
+/* The camera tick bumps on every frame while the map moves. It has its own
+   context so only the overlays that re-project through React (parcel lift,
+   hover card, onboarding labels) re-render per frame; before, everything that
+   read the map context did, the Home page and every price pin included, which
+   is what made the pins feel laggy (review). Pins move imperatively (anchors.ts). */
+const TickCtx = createContext(0);
+export const useMapTick = () => useContext(TickCtx);
 
 export function MapProvider({ children }: { children: React.ReactNode }) {
   const holder = useRef<HTMLDivElement>(null);
@@ -146,7 +152,8 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const setHeat = useCallback((h: HeatKind) => {
     heatRef.current = h;
     setHeatS(h);
-    if (map && map.getSource("bz-hex")) { syncHeat(map, h); setParcels(fakeParcelsFor(map, h)); stampParcels(map, h); }
+    // Fade the old layer out and the new one in (review: Underbuilt flicked in).
+    if (map && map.getSource("bz-hex")) { fadeHeatTo(map, h); setParcels(fakeParcelsFor(map, h)); stampParcels(map, h); }
   }, [map]);
 
   // Heat palette changed (Dev menu): repaint hexes and parcels in place.
@@ -162,8 +169,11 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     if (map && map.getSource("bz-area")) setArea(map, r);
   }, [map]);
 
+  const value = useMemo(() => ({ map, ready, mode, setMode, heat, setHeat, setAreaRings, inset, setInset, parcels, offline }),
+    [map, ready, mode, setMode, heat, setHeat, setAreaRings, inset, parcels, offline]);
   return (
-    <MapCtx.Provider value={{ map, ready, tick, mode, setMode, heat, setHeat, setAreaRings, inset, setInset, parcels, offline }}>
+    <MapCtx.Provider value={value}>
+    <TickCtx.Provider value={tick}>
       <div
         id="bz-map-shell"
         style={{
@@ -176,6 +186,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
         <div id="bz-overlay" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }} />
       </div>
       {children}
+    </TickCtx.Provider>
     </MapCtx.Provider>
   );
 }

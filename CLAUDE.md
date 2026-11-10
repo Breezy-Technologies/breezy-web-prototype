@@ -90,6 +90,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 
 **Map and pins**
 - **Price pins** (`PricePins.tsx`) are white pills with a soft shadow. Pins that would overlap a higher-priority pin collapse into small blank pills underneath, and hover reveals the price. Priority: price drops, then new. Hover / selection don't take part: that pin just draws full and on top, so neighbours never flip.
+- **Pin performance:** the per-frame camera `tick` has its own context (`useMapTick`), read only by the overlays that re-project through React (ParcelLift, HoverCard, onboarding labels). The rest of the app, price pins included, no longer re-renders on every frame.
 - **Pin stability:** every map pin (price pills, onboarding `OppPins`) is anchored with `components/map/anchors.ts`: its wrapper is moved on the map's `move` event, in the same frame the map draws (measured ≤ 0.01 px off during an animated pan / zoom). The collapse layout is recomputed only when the map comes to rest.
 - **Pin hover preview** (`HoverCard.tsx`):
   - opens after ~220 ms and closes on hover-out;
@@ -100,6 +101,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - **Parcels are coloured on load**, fading in 15.6 → 16.2 and strengthening to 17, with thin warm-grey lot lines (#8A7A72). Each lot has its own value (area value plus a fixed per-lot offset), so parcel zoom reads as a mosaic; hexes keep the area value.
   - Pedro's lots (`bz-lots`) carry their own `roi` / `ub`. Live Regrid parcels (Dallas) get their value as feature state `v` (keyed by `ll_uuid`) as tiles load; demo parcels carry it as a property and are left out of the lot zone.
   - Everything is translucent: each palette has a tuned layer opacity (Pedro's is 25%), so streets read through.
+  - Switching layer (ROI ↔ Underbuilt ↔ none) fades the old one out and the new one in (`fadeHeatTo`, ~0.6 s); it used to flick.
   - One colour scale for hexes, parcels, the lifted slab, the map key and the "Match heat layer" pin route. Values are real percentages; the 0–1 fake field is spread along the bands (ROI 0/5/10/20/30/45; 5-colour palettes use 0/10/20/35).
 - **Parcel hover, zoom ≥ 15.4** (`ParcelLift.tsx`):
   - The parcel lifts off the map as a solid slab: drop shadow, stacked sides, an **opaque** top and the house number, with a dashed outline on the ground.
@@ -149,7 +151,7 @@ A floating **"Heat: …" switcher** (`components/HeatPaletteSwitcher.tsx`) sits 
 
 | Palette | Bands | Notes |
 |---|---|---|
-| Breezy · slate → clay (default ROI) | 5 | Diverging: dusty slate, sand, Breezy clay. No yellow, so yellow pins stay distinct. |
+| Breezy · slate → clay (default ROI) | 5 | Diverging: dusty slate, sand, Breezy clay. No yellow, so yellow pins stay distinct. Top two bands softened toward clay (review: high ROI read too red). |
 | Breezy · sand → deep clay (default UB) | 5 | Single brand hue. Calmest, but neighbouring bands blur at parcel zoom. |
 | Pedro, reduced | 5 | Pedro's blue → yellow → red cut to 5. |
 | Pedro's set (Blue → Yellow → Red is his shipped default, etc.) | 7 | The benchmark for balance. |
@@ -162,14 +164,16 @@ Every coloured opportunity circle (`SignalDot` in `components/PinPalette.tsx`: m
 
 | Family | Signals | Base |
 |---|---|---|
-| Red | Alert related: price drops | rgb(214,72,58) |
-| Yellow | Underbuilt | rgb(228,172,62) |
-| Green | ROI | rgb(58,144,80) |
-| Blue | Status related: withdrawn, expired, stale, foreclosure | rgb(62,132,192) |
-| Purple | Comps | rgb(130,101,158) |
+| Red | Alert related: price drops | rgb(192,98,84) |
+| Yellow | Underbuilt | rgb(216,178,104) |
+| Green | ROI | rgb(94,144,106) |
+| Blue | Status related: withdrawn, expired, stale, foreclosure | rgb(100,138,176) |
+| Purple | Comps | rgb(138,118,160) |
+
+Muted in the 10 Nov review (the first set read too garish): same hues, lower saturation, softer ring.
 
 - Each circle is lit from the top (a lighter tint fading to the base) with a darker ring of its own shade. The icon is white, dark on yellow. **Selected is always black with a white icon.** White price pills never change; the price-drop bell uses the alert red.
-- Onboarding pins are 38 px (44 px selected) with a white outline and a pulse ring in the family colour. On Home they are 22 px.
+- Onboarding pins are 38 px (44 px selected) with a white outline and a pulse ring in the family colour. On Home they are 22 px and pulse softly too (staggered), until seen or selected.
 - The colour-route switcher is gone.
 
 ## Design rules (from review feedback; keep them)
