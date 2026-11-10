@@ -87,9 +87,15 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - opens after ~220 ms and closes on hover-out;
   - photo carousel (arrows, dots, n/total), address, price per ft², specs, an **owner** row and a **quick estimate** chip (hidden for `noQe` listings);
   - "Get comps" is distinct from the quick estimate.
+- **Heat layers** (`lib/heat`, `lib/map/layers.ts`), matched like for like to Pedro's build (`pd-bittencourt/underbuilt-roi`, the benchmark):
+  - Hexes sit on the fixed **H3** grid: city cells (res 7, res 6 below zoom 10) crossfade into submarket cells (res 8) between zoom 11.9 and 13; submarket cells fade out 15 → 16. No hex outlines.
+  - **Parcels are coloured on load**, fading in 15.6 → 16.2 and strengthening to 17, with thin warm-grey lot lines (#8A7A72). Each lot has its own value (area value plus a fixed per-lot offset), so parcel zoom reads as a mosaic; hexes keep the area value.
+  - Live Regrid parcels get their value as feature state `v` (keyed by `ll_uuid`) as tiles load; demo parcels carry it as a property.
+  - Everything is translucent: each palette has a tuned layer opacity (Pedro's is 25%), so streets read through.
+  - One colour scale for hexes, parcels, the lifted slab, the map key and the "Match heat layer" pin route. Values are real percentages; the 0–1 fake field is spread along the bands (ROI 0/5/10/20/30/45; 5-colour palettes use 0/10/20/35).
 - **Parcel hover, zoom ≥ 15.4** (`ParcelLift.tsx`):
   - The parcel lifts off the map as a solid slab: drop shadow, stacked sides, an **opaque** top and the house number, with a dashed outline on the ground.
-  - With the heat map on, the slab keeps its heat colour; with it off, it's neutral.
+  - With the heat map on, the slab keeps its parcel's band colour (softened 60% toward paper, since the slab is opaque); with it off, it's neutral.
   - In satellite: the rest of the map dims, the slab top is the satellite image (Mapbox Static) with a yellow edge, and there are no colour washes.
 - **Detail zoom:** opening a property panel (from a pin, card or saved property) or clicking a parcel eases to **zoom 18** (`DETAIL_ZOOM`), centred in the visible map between the panels.
 - **Searched-area outline:** option 04, "inner glow edge". A thin clay line (rgb 147,89,75) plus a soft clay gradient inside the boundary; nothing outside. The glow widens with zoom while the line keeps a fixed width.
@@ -122,6 +128,19 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Search failed / timed out / no recents
 - Property with no estimate
 - No-estimate banner side / full
+
+## Heat palette (exploration, not yet decided)
+
+A floating **"Heat: …" switcher** (`components/HeatPaletteSwitcher.tsx`) sits above the Pins switcher on both routes. It picks a palette per layer (ROI / Underbuilt) and can override the opacity. Saved in localStorage (`bz-heat-palette`); the map repaints in place. Palettes live in `lib/heat/index.ts`; Pedro's scale maths is ported as-is in `lib/heat/scale.ts`.
+
+| Palette | Bands | Notes |
+|---|---|---|
+| Breezy · slate → clay (default ROI) | 5 | Diverging: dusty slate, sand, Breezy clay. No yellow, so yellow pins stay distinct. |
+| Breezy · sand → deep clay (default UB) | 5 | Single brand hue. Calmest, but neighbouring bands blur at parcel zoom. |
+| Pedro, reduced | 5 | Pedro's blue → yellow → red cut to 5. |
+| Pedro's set (Blue → Yellow → Red is his shipped default, etc.) | 7 | The benchmark for balance. |
+
+Done when Ann signs the palette off as on-brand and Jimsy agrees it keeps Pedro's legibility; then remove the switcher.
 
 ## Special-pin colour routes (exploration, not yet decided)
 
@@ -162,7 +181,8 @@ A floating **"Pins: …" switcher** (`components/PinPalette.tsx`) sits at the bo
 - Make saved reports easier to reach, as on mobile.
 - Welcome-panel polish: rounder corners, no bottom padding between list items, skeleton loading piece by piece.
 - "New match" badge should clear on first interaction.
-- Heat hexes are still viewport-generated. Move them to stable cells (e.g. H3) so they don't shift between pans.
+- **Heat palette:** pick one with Ann and Jimsy and remove the switcher. Underbuilt band cut points are placeholders until JD's service defines them.
+- Pedro's smooth heat surface (canvas image + water clip) is not ported yet.
 - Pins should come from one listings source per area, refreshed on "Search this area".
 - Regrid: ask for LA County coverage before the trial ends (4 Dec 2026).
 - Dark mode (production's `navigation-night-v1` palette).
@@ -179,6 +199,7 @@ app/api/boundary/route.ts   Census TIGERweb lookup (winding + holes)
 components/AppState.tsx     place / areas, outline rings, listings, picks, onboarded (sessionStorage)
 components/SavedState.tsx   saved searches + properties, alert definitions
 components/PinPalette.tsx   SignalDot, pulse colour, PinRouteSwitcher
+components/HeatPaletteSwitcher.tsx  heat palette / opacity exploration control
 components/map/             MapProvider (inset, mode, heat, area), Overlay (portal into the map)
 components/home/            SideNav (+DevMenu), SearchBar, HomeCard, ForYouFeed, LeftPanel, Filters,
                             PricePins, HoverCard, ParcelLift, DetailPanel, MapControls, CompsFlow,
@@ -193,6 +214,7 @@ lib/geo.ts                  ring winding, bbox, point-in-rings
 lib/fake.ts                 demo data (listings, detail, owners, estimates, heat)
 lib/filters.ts              filter model and defaults
 lib/pinColors.ts            pin colour routes
+lib/heat/                   heat colour scale (scale.ts ported from underbuilt-roi), palettes, bands, values
 lib/css.ts                  converts canvas style strings to React styles
 ```
 

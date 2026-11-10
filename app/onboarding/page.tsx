@@ -5,6 +5,7 @@ import { useMapCtx } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
 import { OppPins } from "@/components/onboarding/OppPins";
 import { PinRouteSwitcher, SignalDot } from "@/components/PinPalette";
+import { HeatPaletteSwitcher } from "@/components/HeatPaletteSwitcher";
 import { MapOverlay } from "@/components/map/Overlay";
 import { Place, GAZETTEER, searchPlaces } from "@/lib/places";
 import { Listing, OPP, OPP_TYPES, OppType, fullPrice, shortPrice } from "@/lib/fake";
@@ -158,6 +159,7 @@ export default function Onboarding() {
   return (
     <>
       <PinRouteSwitcher style={{ right: 20, bottom: 20 }} />
+      <HeatPaletteSwitcher style={{ right: 20, bottom: 62 }} />
       {/* Step counter */}
       <div style={{ position: "fixed", left: "50%", top: 20, transform: "translateX(-50%)", zIndex: 45, display: "flex", alignItems: "center", gap: 10, height: 36, padding: "0 14px", borderRadius: 9999, background: "var(--paper)", boxShadow: "0 6px 18px rgba(30,18,12,.12)" }}>
         <span style={{ width: 20, height: 16, background: "linear-gradient(180deg,rgb(191,160,151),rgb(175,127,113))", WebkitMask: "url(/brand/brandmark.svg) center/contain no-repeat", mask: "url(/brand/brandmark.svg) center/contain no-repeat" }} />

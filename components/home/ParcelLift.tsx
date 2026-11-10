@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
 import { Listing, makeListings } from "@/lib/fake";
-import { PALETTES, heatColorOf, heatPct, useHeatPalettes } from "@/lib/heat";
+import { HEAT_PALETTES, heatColorOf, parcelPct, useHeatPrefs } from "@/lib/heat";
 import { config, hasRegrid, isLiveMap } from "@/lib/config";
 import { OwnerRow, QeRow } from "./HoverCard";
 
@@ -13,7 +13,7 @@ export type ParcelHit = { key: string; ring: [number, number][]; cx: number; cy:
 // heat map on the slab keeps the parcel's heat colour; otherwise it's neutral.
 export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: boolean; onOpen: (p: ParcelHit) => void; selected: ParcelHit | null }) {
   const { map, tick, heat, mode } = useMapCtx();
-  const palettes = useHeatPalettes();
+  const palettes = useHeatPrefs();
   const [hit, setHit] = useState<ParcelHit | null>(null);
   const keyRef = useRef("");
   const satUrls = useRef(new Map<string, string>()); // parcel key -> satellite image URL (fetched once per parcel)
@@ -57,13 +57,14 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   let pct: number | null = null;
   if (heat !== "none" && !sat) {
     try { const st = map.getFeatureState(hasRegrid() ? { source: "bz-par", sourceLayer: config.regridSourceLayer, id: show.key } : { source: "bz-par", id: show.key }); if (typeof st?.v === "number") pct = st.v; } catch {}
-    if (pct === null) pct = heatPct(heat, show.cx, show.cy);
+    if (pct === null) pct = parcelPct(heat, show.cx, show.cy, show.key);
   }
-  const hc = pct !== null && heat !== "none" ? heatColorOf(heat, pct, PALETTES[palettes[heat]].c) : null;
-  const hv = hc ? [1, 3, 5].map(i => parseInt(hc.slice(i, i + 2), 16)) : null;
+  const hc = pct !== null && heat !== "none" ? heatColorOf(heat, pct, HEAT_PALETTES[palettes[heat]].c) : null;
+  // The slab is opaque, so its band colour is softened toward paper to sit with the translucent parcels around it.
+  const hv = hc ? [1, 3, 5].map((i, k) => Math.round([253, 252, 252][k] + (parseInt(hc.slice(i, i + 2), 16) - [253, 252, 252][k]) * 0.6)) : null;
   const shade = (c: number[], f: number) => `rgb(${c.slice(0, 3).map(v => Math.round(v * f)).join(",")})`;
   const sideC = sat ? "rgb(122,112,100)" : hv ? shade(hv, 0.8) : "rgb(212,200,192)";
-  const topC = sat ? "rgb(246,243,238)" : hc || "rgb(253,251,248)";
+  const topC = sat ? "rgb(246,243,238)" : hv ? `rgb(${hv.join(",")})` : "rgb(253,251,248)";
   // Satellite: the slab top is the parcel's own satellite imagery, as if that
   // patch of ground were lifted up (review feedback). A Mapbox Static Images
   // request for the parcel's bbox, sized to its on-screen pixels so the
