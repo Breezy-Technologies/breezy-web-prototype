@@ -72,6 +72,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - When a property is open, the field shows its address with an × that deselects it.
 
 **Results** (`LeftPanel.tsx`)
+- The filter bar scrolls horizontally with round arrows; the row is clipped under each arrow's centre, so chips slide under the arrows (no cut edge, no fade band).
 - Filters (`Filters.tsx`, `lib/filters.ts`) default to relaxed: any status, any type. The "All filters" badge counts every active filter.
 - Sort menu, and a 1 / 2 / 3 column toggle (`ColsToggle`). Widening the column pans the map so the same spot stays centred.
 - Footer:
@@ -115,7 +116,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - An **Owner** section (56 px avatar, "View history" on the right), then the listing description. Owner contact lines copy on click.
 - **No estimate (`noQe`):** only reachable from the Dev menu ("Property with no estimate"; every property has an estimate). The full-width CTA layout (decided): title and one-line explanation with the illustration on the right, a full-width outline "Get price estimate" underneath; it loads, then shows the estimate and a positive toast.
 - "View more" buttons have no arrows.
-- Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). Pressing it unlocks the contact lines and scrolls the panel to the Owner section (switching to Summary if needed); the footer becomes Call owner + an email icon.
+- Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). Pressing it scrolls the panel to the Owner section (switching to Summary if needed); once the scroll settles, the phone, email and address are written in left to right by a soft clay → violet gradient edge (staggered 160 ms, a faint sheen behind), then settle to plain copyable text; the footer becomes Call owner + an email icon.
 
 **Flows and sheets**
 - **Report sheet** (`components/report/ReportFlow.tsx`, canvas `rptLayer` / `_wsTilt` / `_runFlow`): opened by **Get comps**, the **Max build** tile (Underbuilt) and the **Profit potential** tile (ROI).

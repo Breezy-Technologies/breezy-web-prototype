@@ -141,3 +141,6 @@ html[data-flow] #bz-map-shell, html[data-flow] [data-maparea], html[data-flow] [
 html[data-flow] #bz-map-shell { border-radius: 36px !important; }
 html[data-flow] [data-maparea] { pointer-events: none !important; }
 html[data-flow] [data-maparea] * { pointer-events: none !important; }
+/* Owner contact lines: gradient write-in after Contact owner (DetailPanel CopyLine) */
+@keyframes revealText { from { background-position: 100% 0 } to { background-position: 0% 0 } }
+@keyframes revealSheen { 0% { transform: translateX(-70%); opacity: 0 } 25% { opacity: 1 } 100% { transform: translateX(70%); opacity: 0 } }

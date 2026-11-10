@@ -307,7 +307,10 @@ export function FilterBar({ fs, left, hidden }: { fs: FilterState; left: number;
   const arrow = css("flex:none;width:40px;height:40px;border:none;border-radius:9999px;background:rgb(249,249,249);box-shadow:inset 0 0 0 .5px rgba(13,12,12,.24),0 4px 14px rgba(40,26,20,.1);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center;pointer-events:auto");
   return (
     <>
-      <div ref={row} onScroll={chk} className="no-scrollbar" style={css("position:absolute;top:18px;right:10px;z-index:2;left:" + left + "px;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 18px;pointer-events:none")}>
+      {/* The row is clipped under the centre of each scroll arrow (40 px wide, flush with the row's
+          edge), so the chips slide under the arrows instead of showing a cut edge (review feedback). */}
+      <div ref={row} onScroll={chk} className="no-scrollbar" style={css("position:absolute;top:18px;right:10px;z-index:2;left:" + left + "px;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 18px;pointer-events:none;"
+        + `clip-path:inset(0 ${edge.R ? 20 : 0}px 0 ${edge.L ? 20 : 0}px)`)}>
         <button onClick={openPanel} className="fb-pill" style={css("flex:none;display:flex;align-items:center;gap:8px;height:40px;box-sizing:border-box;padding:10px 16px;border:none;border-radius:9999px;cursor:pointer;white-space:nowrap;pointer-events:auto;background:rgb(249,249,249);box-shadow:inset 0 0 0 .5px rgba(13,12,12,.24);font:400 15px/20px var(--font-sans);color:rgb(17,16,16)")}>
           <span style={css("flex:none;width:16px;height:16px;background:currentColor;" + mask("/ui/f-sliders.svg"))} />
           <span>All filters</span>
@@ -326,14 +329,14 @@ export function FilterBar({ fs, left, hidden }: { fs: FilterState; left: number;
         })}
       </div>
       {edge.L && (
-        <div style={css("position:absolute;top:20px;z-index:3;height:40px;display:flex;align-items:center;padding-right:28px;pointer-events:none;background:linear-gradient(90deg,rgba(245,243,243,.95) 40%,rgba(245,243,243,0));left:" + (left - 4) + "px;padding-left:4px")}>
+        <div style={css("position:absolute;top:20px;z-index:3;height:40px;display:flex;align-items:center;pointer-events:none;left:" + left + "px")}>
           <button onClick={() => row.current?.scrollBy({ left: -260, behavior: "smooth" })} title="Scroll filters" className="fb-pill" style={arrow}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
           </button>
         </div>
       )}
       {edge.R && (
-        <div style={css("position:absolute;top:20px;right:6px;z-index:3;height:40px;display:flex;align-items:center;justify-content:flex-end;padding:0 4px 0 28px;pointer-events:none;background:linear-gradient(270deg,rgba(245,243,243,.95) 40%,rgba(245,243,243,0))")}>
+        <div style={css("position:absolute;top:20px;right:10px;z-index:3;height:40px;display:flex;align-items:center;justify-content:flex-end;pointer-events:none")}>
           <button onClick={() => row.current?.scrollBy({ left: 260, behavior: "smooth" })} title="Scroll filters" className="fb-pill" style={arrow}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
           </button>

@@ -67,17 +67,33 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   const ownerRef = useRef<HTMLDivElement>(null);
   // Contact owner reveals the contact lines and scrolls the Owner section into view,
   // just under the compact header and the sticky tabs (review feedback).
+  // Then, once the scroll has settled, the phone, email and address are revealed
+  // with a soft gradient sweep (review feedback): "wait" keeps them invisible but in
+  // place (so the scroll target is exact), "play" runs the reveal, "done" is plain text.
+  const [reveal, setReveal] = useState<"wait" | "play" | "done">("done");
   const contactOwner = () => {
     setRevealed(true);
+    setReveal("wait");
     if (tab !== "Summary") setTab("Summary");
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const sc = scroller.current, el = ownerRef.current;
-      if (!sc || !el) return;
+      if (!sc || !el) { setReveal("play"); return; }
       const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
       const sticky = 64 + (tabBar.current?.offsetHeight ?? 64); // compact header (shows past 210 px) + tab bar
-      sc.scrollTo({ top: Math.max(0, top - sticky - 8), behavior: "smooth" });
+      const to = Math.max(0, Math.min(top - sticky - 8, sc.scrollHeight - sc.clientHeight));
+      if (Math.abs(to - sc.scrollTop) < 2) { setReveal("play"); return; }
+      let fired = false;
+      const go = () => { if (fired) return; fired = true; sc.removeEventListener("scrollend", go); setReveal("play"); };
+      sc.addEventListener("scrollend", go);
+      setTimeout(go, 900); // browsers without scrollend
+      sc.scrollTo({ top: to, behavior: "smooth" });
     }));
   };
+  useEffect(() => {
+    if (reveal !== "play") return;
+    const t = setTimeout(() => setReveal("done"), 1700);
+    return () => clearTimeout(t);
+  }, [reveal]);
   const [gi, setGi] = useState(0);
   const [descOpen, setDescOpen] = useState(false);
   const [hdr, setHdr] = useState(false);
@@ -261,7 +277,13 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
             </div>
             {revealed
               // Canvas lists the lines with a 6px gap at 70px indent; the copy rows carry 8px padding, so 62px lines the text up.
-              ? <div style={{ display: "flex", flexDirection: "column", gap: 0, paddingLeft: 62, font: "400 14px/20px var(--font-sans)", color: INK, animation: "fadeIn .25s ease both" }}><CopyLine text={l.owner.phone} /><CopyLine text={l.owner.email} /><CopyLine text={l.owner.mail} muted /></div>
+              ? <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 0, paddingLeft: 62, font: "400 14px/20px var(--font-sans)", color: INK }}>
+                  {/* one faint warm sheen passes behind the lines as they appear */}
+                  {reveal === "play" && <span aria-hidden style={{ position: "absolute", left: 54, right: 0, top: -4, bottom: -4, borderRadius: 12, overflow: "hidden", pointerEvents: "none" }}>
+                    <span style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg,rgba(174,106,91,0) 0%,rgba(174,106,91,.10) 35%,rgba(186,160,251,.12) 55%,rgba(186,160,251,0) 80%)", animation: "revealSheen 1.5s cubic-bezier(.3,.7,.3,1) both" }} />
+                  </span>}
+                  <CopyLine text={l.owner.phone} reveal={reveal} delay={0} /><CopyLine text={l.owner.email} reveal={reveal} delay={160} /><CopyLine text={l.owner.mail} muted reveal={reveal} delay={320} />
+                </div>
               : <span style={css("padding-left:70px;font:400 13px/18px var(--font-sans);color:rgb(129,117,111)")}>Phone, email and mailing address unlock with Contact owner below.</span>}
           </div>
           <div style={css("display:flex;flex-direction:column;gap:24px;padding:24px 16px 0")}>
@@ -489,7 +511,9 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
 
 // Owner contact line: hovering shows a copy icon; clicking copies the value to
 // the clipboard and briefly shows a check (review feedback).
-function CopyLine({ text, muted }: { text: string; muted?: boolean }) {
+// While revealing, the text is painted by a gradient (ink, a clay → violet edge,
+// then transparent) that slides across it, so each line is written in left to right.
+function CopyLine({ text, muted, reveal = "done", delay = 0 }: { text: string; muted?: boolean; reveal?: "wait" | "play" | "done"; delay?: number }) {
   const [done, setDone] = useState(false);
   const copy = () => {
     // writeText is async and rejects when the page isn't focused; swallow that.
@@ -499,7 +523,11 @@ function CopyLine({ text, muted }: { text: string; muted?: boolean }) {
   };
   return (
     <button onClick={copy} title={done ? "Copied" : "Copy"} className="copy-line" style={{ display: "flex", alignItems: "center", gap: 8, height: 26, margin: 0, padding: "0 8px", border: "none", borderRadius: 8, background: "none", font: "inherit", color: muted ? "rgb(98,90,89)" : "var(--ink)", cursor: "pointer", textAlign: "left" }}>
-      <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{text}</span>
+      <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", ...(reveal === "wait" ? { opacity: 0 } : reveal === "play" ? {
+        color: "transparent", WebkitBackgroundClip: "text", backgroundClip: "text", backgroundSize: "300% 100%", backgroundRepeat: "no-repeat",
+        backgroundImage: `linear-gradient(100deg,${muted ? "rgb(98,90,89)" : "rgb(18,18,18)"} 0%,${muted ? "rgb(98,90,89)" : "rgb(18,18,18)"} 30%,rgb(174,106,91) 36%,rgb(186,160,251) 41%,rgba(186,160,251,0) 47%)`,
+        animation: `revealText 1s cubic-bezier(.4,.1,.3,1) ${delay}ms both`,
+      } : {}) }}>{text}</span>
       <i className={`ph-bold ph-${done ? "check" : "copy"} copy-ic`} style={{ flex: "none", fontSize: 15, color: done ? "rgb(49,140,96)" : "var(--fg-2)", opacity: done ? 1 : undefined }} />
     </button>
   );
