@@ -114,7 +114,14 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). After reveal, it becomes Call owner + an email icon.
 
 **Flows and sheets**
-- **Get comps** (`CompsFlow.tsx`): "Review the subject property data", then the full-screen "Let AI do the work" takeover, then the analysis, then results. A report that has already been run reopens straight on its result (cached). Area comps come from Create comps (`AreaCompsPreview`).
+- **Report sheet** (`components/report/ReportFlow.tsx`, canvas `rptLayer` / `_wsTilt` / `_runFlow`): opened by **Get comps**, the **Max build** tile (Underbuilt) and the **Profit potential** tile (ROI).
+  - The workspace (map + map-area panels) tilts back (perspective, rotateX 9°, scale .9, `html[data-flow]` in `globals.css`) and dims, while a white sheet rises from the bottom in perspective over everything right of the side nav (0.7 s).
+  - Loading stage per flow: progress bar in the flow's colour (comps purple, UB clay, ROI green), radar GIF (UB) or sparkle, "Analyzing …", one shimmering step every 700 ms, then the done title for 1.5 s.
+  - Comps first confirms the subject property (review modal), then "Let AI do the work" inside the sheet (auto-runs after 6.7 s unless the pointer rests on Get comps).
+  - Report header: Back to map, tabs **Upside analysis / Build guidelines / Comps** (a tab that hasn't run starts its flow), Share. A report that has run reopens on its result.
+  - **Build guidelines** = `UBReport.tsx`: version D ("Property") main column of the Underbuilt Report Versions design, no property card. Recorded from `design-reference/underbuilt-report/` by `scripts/extract-ub-report.mjs` into `public/ub-report/`; modals, expandable rules, build options (option × plan/section × roof), dots rail, glossary drawer and "Get Comps" links all work. Sample data (418 Wren Hollow Lane).
+  - **Upside analysis** body is a placeholder until Pedro's UB ROI variants are ported. **Comps** body is the existing comps result.
+  - Area comps come from Create comps (`AreaCompsPreview`, still the older full-screen view).
 - **Saved** (`Saved.tsx`, `SavedState.tsx`): save-search sheet, `SaveToggle`, the Saved sheet (opens from Home and Results).
 - **Alerts panel**, "Set custom alerts":
   - "Any activity" with an Active / Turn on pill.
@@ -179,6 +186,7 @@ A floating **"Pins: …" switcher** (`components/PinPalette.tsx`) sits at the bo
 
 - **No-estimate banner:** choose side vs full-width CTA.
 - **Pin colour route:** pick one (or keep yellow) and remove the switcher.
+- **Report sheet:** port Pedro's UB ROI page variants into Upside analysis; feed Build guidelines from the selected property instead of the sample report.
 - Draw-area tool: placement still undecided. The "Search this area" zone diagram is coming from William's Figma.
 - Make saved reports easier to reach, as on mobile.
 - Welcome-panel polish: rounder corners, no bottom padding between list items, skeleton loading piece by piece.
@@ -205,8 +213,9 @@ components/PinPalette.tsx   SignalDot, pulse colour, PinRouteSwitcher
 components/HeatPaletteSwitcher.tsx  heat palette / opacity exploration control
 components/map/             MapProvider (inset, mode, heat, area), Overlay (portal into the map)
 components/home/            SideNav (+DevMenu), SearchBar, HomeCard, ForYouFeed, LeftPanel, Filters,
-                            PricePins, HoverCard, ParcelLift, DetailPanel, MapControls, CompsFlow,
+                            PricePins, HoverCard, ParcelLift, DetailPanel, MapControls, CompsFlow (review modal, comps result, area comps),
                             Saved, Share, Reports, Toast
+components/report/          ReportFlow (report sheet + flows), UBReport (Underbuilt analysis)
 components/onboarding/      OppPins
 lib/config.ts               env-driven config, isLiveMap / hasRegrid
 lib/map/style.ts            live vs offline styles

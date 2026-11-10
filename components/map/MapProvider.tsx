@@ -154,10 +154,11 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   return (
     <MapCtx.Provider value={{ map, ready, tick, mode, setMode, heat, setHeat, setAreaRings, inset, setInset, parcels, offline }}>
       <div
+        id="bz-map-shell"
         style={{
           position: "fixed", top: inset.top, right: 0, bottom: 0, left: inset.left, overflow: "hidden",
           borderRadius: inset.radius, background: "rgb(243,240,236)", isolation: "isolate",
-          transition: "left .45s cubic-bezier(.2,.8,.2,1), top .45s cubic-bezier(.2,.8,.2,1), border-radius .45s",
+          transition: "left .45s cubic-bezier(.2,.8,.2,1), top .45s cubic-bezier(.2,.8,.2,1), border-radius .45s, transform .7s cubic-bezier(.2,.8,.2,1)",
         }}
       >
         <div ref={holder} style={{ position: "absolute", inset: 0 }} />

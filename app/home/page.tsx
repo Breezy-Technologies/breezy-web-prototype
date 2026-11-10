@@ -16,7 +16,8 @@ import { HoverCard } from "@/components/home/HoverCard";
 import { ParcelLift, ParcelHit } from "@/components/home/ParcelLift";
 import { DetailPanel, setQeRoute } from "@/components/home/DetailPanel";
 import { MapControls } from "@/components/home/MapControls";
-import { AreaCompsPreview, CompsFlow } from "@/components/home/CompsFlow";
+import { AreaCompsPreview } from "@/components/home/CompsFlow";
+import { FlowKind, ReportFlow } from "@/components/report/ReportFlow";
 import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
@@ -56,7 +57,8 @@ export default function HomeWeb() {
   const [selId, setSelId] = useState<number | null>(null);
   const [parcel, setParcel] = useState<ParcelHit | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
-  const [comps, setComps] = useState<Listing | null>(null);
+  // The report sheet (Comps / Build guidelines / Upside analysis) for a property.
+  const [flow, setFlow] = useState<{ l: Listing; kind: FlowKind } | null>(null);
   // Share (picked set, share modal) and saved Reports; see Share.tsx / Reports.tsx.
   const sh = useShare();
   const rp = useReports();
@@ -200,7 +202,8 @@ export default function HomeWeb() {
   const shareOne = (l: Listing) => { setShareL(l); sh.shareProp(l.id); };
   const shareItems = sh.only != null ? (shareL ? [shareL] : []) : picked.map(p => p.l);
   // A comps report that has already been run reopens on its result (sprint item).
-  const openComps = (l: Listing) => { setCompsCached(rp.has(l)); setComps(l); };
+  const openFlow = (l: Listing, kind: FlowKind) => { setCompsCached(rp.has(l)); setFlow({ l, kind }); };
+  const openComps = (l: Listing) => openFlow(l, "comps");
 
   const detailOpen = !!sel;
 
@@ -280,7 +283,7 @@ export default function HomeWeb() {
   const topOn = (view === "results" && ((!!fs.fd && !fs.panelOut) || ss.on)) || (rp.open && !rp.out);
   const depth = (svOn ? 1 : 0) + (topOn ? 1 : 0);
   const layerOn = depth > 0;
-  const pillOn = areaPill && !detailOpen && !searching && !comps && !areaComps && !layerOn && !savedOpen;
+  const pillOn = areaPill && !detailOpen && !searching && !flow && !areaComps && !layerOn && !savedOpen;
   const layerBack = () => { if (fs.fd) fs.closePanel(); if (ss.open) ss.requestClose(); if (savedOpen) closeSaved(); if (rp.open) rp.close(); };
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
@@ -310,7 +313,7 @@ export default function HomeWeb() {
         // Reports (side-nav footer) opens the saved reports sheet over the left column.
         if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
       }} />
-      <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1)" }}>
+      <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none" }}>
           <div style={{ pointerEvents: "auto" }}>
             {/* Entering the search step (`onSearchFocus`) closes dropdowns and the detail panel, as the canvas step change does. */}
@@ -353,7 +356,7 @@ export default function HomeWeb() {
         {detailOpen && (
           // The detail column steps back while the Alerts sheet sits on top of it (`dtT` / `dtF`).
           <div style={{ position: "absolute", left: GAP + COL + GAP, top: GAP, bottom: GAP, transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
-            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => openComps(sel!)}
+            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => openComps(sel!)} onFlow={k => openFlow(sel!, k)}
               alertN={alerts.count(sel)} onBell={() => alerts.open(sel!)} onShare={() => shareOne(sel!)} onToast={showToast} />
           </div>
         )}
@@ -393,8 +396,8 @@ export default function HomeWeb() {
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
         if (map) map.easeTo({ center: [p.cx, p.cy], zoom: DETAIL_ZOOM, offset: [(GAP + COL + GAP + 420) / 2, 0], duration: 800 });
       }} />
-      {comps && <CompsFlow key={comps.id + comps.addr} l={comps} cached={compsCached} onClose={() => setComps(null)}
-        onDone={() => { if (!rp.has(comps)) showToast("Report saved to Reports"); rp.save(comps); }} onShare={() => shareOne(comps)} />}
+      {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached} onClose={() => setFlow(null)}
+        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); }} onShare={() => shareOne(flow.l)} />}
       {areaComps && <AreaCompsPreview key={areaComps.title + areaComps.comps.length} {...areaComps} saved={rp.hasArea(areaComps)} onClose={() => setAreaComps(null)}
         onSave={() => { rp.saveArea(areaComps); showToast("Report saved to Reports"); }} />}
       {ss.modals}

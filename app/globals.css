@@ -124,3 +124,20 @@ input { font-family: inherit; }
 @keyframes cardArtIn { from { opacity: 0; translate: -50% calc(-50% + 22px); scale: .94 } to { opacity: 1; translate: -50% -50%; scale: 1 } }
 @keyframes cardTextIn { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
 .qe-outline:hover { background: rgba(18,18,18,.05) !important }
+
+/* ---- Report sheet (components/report/ReportFlow.tsx), from the canvas ---- */
+@keyframes flowRise { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+@keyframes stepIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+@keyframes lineShimmer { from { background-position: 120% 0 } to { background-position: -20% 0 } }
+@keyframes ub-pulse { 0%, 100% { transform: scale(.72); opacity: .45 } 50% { transform: scale(1.18); opacity: 1 } }
+@keyframes gcFill { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+/* While a report flow is open the workspace (map + map-area panels + its shade)
+   tilts back (canvas `_wsTilt`). Same box (left of the side nav) and origin for
+   all three, so pins, panels and map stay aligned through the tilt. */
+#bz-map-shell, [data-maparea], [data-ws-shade] { transform-origin: 50% 0%; }
+html[data-flow] #bz-map-shell, html[data-flow] [data-maparea], html[data-flow] [data-ws-shade] {
+  transform: perspective(1800px) translateY(10px) rotateX(9deg) scale(.9);
+}
+html[data-flow] #bz-map-shell { border-radius: 36px !important; }
+html[data-flow] [data-maparea] { pointer-events: none !important; }
+html[data-flow] [data-maparea] * { pointer-events: none !important; }

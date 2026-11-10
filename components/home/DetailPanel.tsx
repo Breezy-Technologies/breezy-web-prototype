@@ -53,7 +53,7 @@ const FEATS: Feat[] = [
 // replaces the estimate card. The CTA runs a short estimate, then reveals the card and
 // raises a positive snackbar via `onToast`. Estimated properties stay revealed this session.
 const estimated = new Set<string>();
-export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShare, onToast }: { l: Listing; onClose: () => void; onGetComps: () => void; alertN?: number; onBell?: () => void; onShare?: () => void; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
+export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell, onShare, onToast }: { l: Listing; onClose: () => void; onGetComps: () => void; onFlow?: (k: "ub" | "roi") => void; alertN?: number; onBell?: () => void; onShare?: () => void; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
   const d = useMemo(() => listingDetail(l), [l]);
   const qeKey = `${l.addr}|${l.lng.toFixed(5)},${l.lat.toFixed(5)}`;
   const qeRoute = useQeRoute();
@@ -236,10 +236,10 @@ export function DetailPanel({ l, onClose, onGetComps, alertN = 0, onBell, onShar
             </div>
             )}
           </div>
-          {/* Max build + Profit potential tiles (canvas `detailTiles`; the UB / ROI flows aren't ported yet) */}
+          {/* Max build + Profit potential tiles (canvas `detailTiles`): open the Underbuilt / ROI report flows */}
           <div style={css("position:relative;z-index:7;display:flex;gap:8px;padding:16px 16px 0")}>
             {tiles.map(([v, k, c, ic]) => (
-              <button key={k} className="dt-tile" style={css("flex:1;min-width:0;height:88px;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;padding:8px;border:none;border-radius:8px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
+              <button key={k} className="dt-tile" onClick={() => onFlow?.(k.startsWith("Max") ? "ub" : "roi")} title={k.startsWith("Max") ? "Underbuilt analysis" : "Upside analysis"} style={css("flex:1;min-width:0;height:88px;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;padding:8px;border:none;border-radius:8px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
                 <span style={css("height:24px;display:flex;align-items:center;gap:4px")}>
                   <span style={maskIco(ic, 16, c)} />
                   <span style={css("font:400 16px/1.48 var(--font-sans);white-space:nowrap;color:" + c)}>{v}</span>

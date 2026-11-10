@@ -21,9 +21,9 @@ Status: ✅ ported · 🟡 partial · ⬜ not started
   - Specs: MLS source pill, "AI found 6 features" banner, spec rows with icon tiles / thumbnails and AI Review → Confirmed toggles (`r.onReview`), Features & amenities chips (AI chips accept on click, others remove; `c.act`), Address and Identifiers.
   - Records: Listings / Tax Records / Mortgage segments (`sg.pick`); listing events grouped by year with change %, price, per ft², specs and Update.
   - Owners: Current / Former groups with Add to contacts toggles (`pp.add`).
-  - Not wired (no target in the app yet): the Max build / Profit tiles (UB / ROI flows), "Add feature", "Update", "More", MLS source pill, photo lightbox (`g.open`, see Lightbox), `onFlipHero` (peek card), `onViewProperty` / `onCloseSel` (peek step). "View more" under Listing history / Features opens Records / Specs (no handler in the canvas).
+  - The Max build / Profit tiles open the UB / ROI flows (see Comps flow below). Not wired: "Add feature", "Update", "More", MLS source pill, photo lightbox (`g.open`, see Lightbox), `onFlipHero` (peek card), `onViewProperty` / `onCloseSel` (peek step). "View more" under Listing history / Features opens Records / Specs (no handler in the canvas).
 - 🟡 Map controls + layers — `onZoomIn/Out`, `onRecenter`, `onInfoToggle`, `onToggleLayers`, `onLayersEnter`, `onLayerBack`, `lt.pick`, `ml.pick`, `mt.pick`
-- 🟡 Comps flow — `onGetComps`, `onReviewClose`, `onReviewConfirm`, `r.onReview`, `onBackSummary`, `onCompsBack`, `onCompSelf`, `onResultBack`, `onResultComps`, `onResultEdit`, `gcPause`
+- 🟡 Comps / UB / ROI flows — `components/report/ReportFlow.tsx`. ✅ the container: `rptLayer` rise + `_wsTilt` workspace tilt + `wsShade`, `startFlow`, `_runFlow` (700 ms steps, done title, 1.5 s), `flowIcon` / `flowTitles` / `flowRows` / `barFill` per flow, `isChoose` + `gcPause` / `gcResume` auto-run, `rptTabs`, `onCompsBack` / `onResultBack`, `got` (reopen on result). ✅ UB result: Underbuilt Report Versions version D main column (`UBReport.tsx`). 🟡 Comps result: our earlier card grid, not the canvas `resIsComps` layout (map, subject card, comp cards with Included switches). ⬜ ROI result (`resIsROI`): placeholder until Pedro's variants.
 
 ## Not yet ported
 
