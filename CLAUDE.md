@@ -233,7 +233,7 @@ lib/css.ts                  converts canvas style strings to React styles
 ## Workflow
 
 - **Repo:** `Breezy-Technologies/breezy-web-prototype`, linked to the Vercel project `breezy-web-prototype` (team `breezy18`).
-- **`main` is the demo:** https://breezy-web-prototype.vercel.app. William has asked for **changes to go straight to `main`**. Use a branch only for larger explorations (Vercel then builds `breezy-web-prototype-git-<branch>-breezy18.vercel.app`, behind a Vercel sign-in).
+- **`main` is the demo:** https://breezy-web-prototype.vercel.app. William has asked for **changes to go straight to `main`**. Use a branch only for larger explorations (Vercel then builds `breezy-web-prototype-git-<branch>-breezy18.vercel.app`). Deployment protection (Vercel Authentication) is **off** for the project since 10 Nov 2026, so branch and deployment URLs are public like production; share them freely with the team.
 - **Review loop:**
   1. William comments with the Vercel toolbar.
   2. Claude reads the open threads (Vercel MCP `list_toolbar_threads`), fixes the issues, and pushes.
