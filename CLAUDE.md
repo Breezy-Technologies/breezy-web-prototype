@@ -181,6 +181,7 @@ Muted in the 10 Nov review (the first set read too garish): same hues, lower sat
 - **Side nav:**
   - Collapse toggle at the top, with the Breezy wordmark next to it when expanded.
   - Items: Map, Comps, Underbuilt, AI Notes, Assistant. **No News.**
+  - **Exploring (10 Nov review): actions version, on by default.** Comps and Underbuilt become actions at the top, like Claude's "New chat" / "Search": "Run comps", "Find underbuilt", plain rows in regular weight with their existing icons and no selected pill. A hairline, then the places (Map, AI Notes, Assistant) in regular weight, keeping the dark pill. The Dev menu switches "Side nav: classic / actions" (localStorage `bz-nav-style`). The actions aren't wired to flows yet.
   - Icons are transparent isometric PNG / SVG in `public/nav` (`map-iso`, `comps-iso`, `radar`, `ai-notes-new`, `assistant`), optically equalised by `ICON_SCALE`.
   - The active item has a **dark pill**. Icons never fade.
   - Footer: Upgrade to team, Reports, Settings, Dev menu, avatar.
