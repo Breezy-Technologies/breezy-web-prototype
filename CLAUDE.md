@@ -11,7 +11,7 @@ This repo is a standalone Next.js 15 + React 19 + TypeScript app. It shows two t
 - the **V5 onboarding and activation flow** (`/onboarding`, also the `/` redirect);
 - the **Home Web** core experience it hands off to (`/home`).
 
-Both routes share **one Mapbox GL map** that lives in the root layout (`components/map/MapProvider.tsx`). Camera, layers and the chosen area carry over with no reload. `window.__bzMap` exposes the map in the browser console.
+Both routes share **one Mapbox GL map** that lives in the root layout (`components/map/MapProvider.tsx`). Camera, layers and the chosen area carry over with no reload. `window.__bzMap` exposes the map in the browser console. A ResizeObserver keeps the canvas the size of its container (any change, not only window resizes).
 
 **Source of truth for the UI:** the Claude Design canvas, pages "Home Web" and "Home Web V5 Prototype". A runnable copy lives in `design-reference/` (see its README). Before building any Home Web UI, find the matching handlers in `design-reference/project/Home Web.dc.html` and port from there. `design-reference/PORTING.md` tracks what's done. The canvas's Mapbox token sits in the gitignored `design-reference/project/local-config.js`, never in the committed file.
 
@@ -57,6 +57,9 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - **Special pins** (yellow signal circles) appear on the map **only while For you is the visible tab**. They follow the feed's signal filter.
   - A pin reverts to a plain white price pill once its detail has been opened ("seen").
   - The "+" on a card picks the property. Picked properties show in the `PickedFooter`, and their thumbnails open the Saved sheet.
+- Under "Hello <name>": the user's location (browser geolocation, reverse-geocoded to "Neighbourhood, City", cached for the session), falling back to the first area of the session (the onboarding market).
+- Searches and Properties show their **whole list** (no "View all"); hover shows the delete button.
+- For you cards: the photo is a carousel (up to 5 photos, dots) that swipes with a mouse drag or touch; a drag never opens the card.
 - **Searches:** saved searches, each with an "n new" badge (red) until the search is **clicked** (hover doesn't count), then Active (pulsing green); and alerts.
 - **Properties:** saved properties. Unviewed ones carry a red dot; opening one marks it viewed. Properties you save yourself start viewed.
 - The Searches / Properties tab bells show only while something is unseen (a search with new matches, a property with its red dot).
@@ -110,7 +113,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - A floating **Quick estimate** card with the big number and a **Get comps** button.
   - Max build + Profit potential tiles.
   - An **Owner** section (56 px avatar, "View history" on the right), then the listing description. Owner contact lines copy on click.
-- **No estimate (`noQe`):** only reachable from the Dev menu (every property has an estimate). A banner with a "Get price estimate" CTA, which loads, then shows the estimate and a positive toast. There are two layout routes, **side CTA** and **full-width CTA**, switched from the Dev menu (localStorage `bz-qe-route`). *Waiting on William to choose (Vercel thread K9edXzqfVf9j).*
+- **No estimate (`noQe`):** only reachable from the Dev menu ("Property with no estimate"; every property has an estimate). The full-width CTA layout (decided): title and one-line explanation with the illustration on the right, a full-width outline "Get price estimate" underneath; it loads, then shows the estimate and a positive toast.
 - "View more" buttons have no arrows.
 - Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text). Pressing it unlocks the contact lines and scrolls the panel to the Owner section (switching to Summary if needed); the footer becomes Call owner + an email icon.
 
@@ -137,7 +140,6 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Snackbars (neutral / positive / negative)
 - Search failed / timed out / no recents
 - Property with no estimate
-- No-estimate banner side / full
 
 ## Heat palette (exploration, not yet decided)
 
@@ -183,7 +185,6 @@ Every coloured opportunity circle (`SignalDot` in `components/PinPalette.tsx`: m
 
 ## Open items
 
-- **No-estimate banner:** choose side vs full-width CTA.
 - **Report sheet:** port Pedro's UB ROI page variants into Upside analysis; feed Build guidelines from the selected property instead of the sample report.
 - Draw-area tool: placement still undecided. The "Search this area" zone diagram is coming from William's Figma.
 - Make saved reports easier to reach, as on mobile.

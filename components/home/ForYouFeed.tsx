@@ -23,24 +23,52 @@ const GROUPS: [string, Item[]][] = [
 ];
 
 
+// Photo carousel on a feed card: drag with the mouse (or swipe on touch) to move
+// between photos (review feedback). A drag never opens the card; a click does.
+const MAX_PHOTOS = 5;
+function PhotoStrip({ photos }: { photos: string[] }) {
+  const ph = photos.slice(0, MAX_PHOTOS);
+  const [i, setI] = useState(0);
+  const [dx, setDx] = useState(0);
+  const drag = useRef<{ x: number; id: number; moved: boolean } | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const end = (e: React.PointerEvent) => {
+    const d = drag.current; if (!d) return;
+    drag.current = null;
+    const w = box.current?.clientWidth || 300, off = e.clientX - d.x;
+    if (Math.abs(off) > Math.min(40, w * 0.15)) setI(n => Math.max(0, Math.min(ph.length - 1, n + (off < 0 ? 1 : -1))));
+    setDx(0);
+    // a real drag swallows the click that follows, so the card doesn't open
+    if (d.moved) box.current?.addEventListener("click", ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+  };
+  return (
+    <div ref={box} style={{ position: "absolute", inset: 0, overflow: "hidden", touchAction: "pan-y", cursor: drag.current ? "grabbing" : "grab", userSelect: "none" }}
+      onPointerDown={e => { if (e.button !== 0) return; drag.current = { x: e.clientX, id: e.pointerId, moved: false }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }}
+      onPointerMove={e => { const d = drag.current; if (!d) return; const off = e.clientX - d.x; if (Math.abs(off) > 5) d.moved = true; if (d.moved) setDx(off); }}
+      onPointerUp={end} onPointerCancel={end} onDragStart={e => e.preventDefault()}>
+      <div style={{ display: "flex", height: "100%", transform: `translateX(calc(${-i * 100}% + ${dx}px))`, transition: dx ? "none" : "transform .35s cubic-bezier(.2,.8,.2,1)" }}>
+        {ph.map((src, k) => <span key={k} style={{ flex: "none", width: "100%", height: "100%", background: `url('${src}') center/cover no-repeat` }} />)}
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 12, display: "flex", justifyContent: "center", alignItems: "center", gap: 6, pointerEvents: "none" }}>
+        {ph.map((_, k) => <span key={k} style={{ width: k === i ? 16 : 6, height: 6, borderRadius: 9999, background: k === i ? "rgb(253,252,252)" : "rgba(253,252,252,.55)", transition: "width .2s, background .2s" }} />)}
+      </div>
+    </div>
+  );
+}
+
 function FeedCard({ l, fresh, onOpen, onHover }: { l: Listing; fresh: boolean; onOpen: () => void; onHover: (on: boolean) => void }) {
   const sv = useSaved();
   return (
     <div onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} className="fy-card"
       style={{ flex: "none", display: "flex", flexDirection: "column", gap: 12, margin: "0 -8px", padding: "8px 8px 14px", borderRadius: 24, cursor: "pointer", transition: "background .16s" }}>
       <div style={{ position: "relative", flex: "none", height: 244, borderRadius: 20, overflow: "hidden", background: "rgb(241,231,228)" }}>
-        <span style={{ position: "absolute", inset: 0, background: `url('${l.photos[0]}') center/cover no-repeat` }} />
+        <PhotoStrip photos={l.photos} />
         <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px 0 6px", borderRadius: 9999, background: "rgba(243,242,241,.88)", backdropFilter: "blur(12px)", font: "400 13px/16px var(--font-sans)", color: "rgb(17,16,16)", whiteSpace: "nowrap" }}>
           <SignalDot l={l} type={l.opp} size={18} icon={11} />
           {fresh && <span style={{ flex: "none", width: 8, height: 8, borderRadius: 9999, background: "rgb(214,53,41)" }} />}
           {OPP[l.opp].lb}
         </span>
         <SaveToggle saved={sv.isSaved(l)} onToggle={() => sv.toggleProp(l)} />
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 12, display: "flex", justifyContent: "center", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 16, height: 6, borderRadius: 9999, background: "rgb(253,252,252)" }} />
-          <span style={{ width: 6, height: 6, borderRadius: 9999, background: "rgba(253,252,252,.55)" }} />
-          <span style={{ width: 6, height: 6, borderRadius: 9999, background: "rgba(253,252,252,.55)" }} />
-        </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", padding: "0 8px" }}>
         <span style={{ font: "700 14px/19px var(--font-sans)", letterSpacing: ".25px", color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.addr}{l.city ? ", " + l.city.split(",")[0] : ""}</span>

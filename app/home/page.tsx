@@ -13,7 +13,7 @@ import { HeatPaletteSwitcher } from "@/components/HeatPaletteSwitcher";
 import { PricePins } from "@/components/home/PricePins";
 import { HoverCard } from "@/components/home/HoverCard";
 import { ParcelLift, ParcelHit } from "@/components/home/ParcelLift";
-import { DetailPanel, setQeRoute } from "@/components/home/DetailPanel";
+import { DetailPanel } from "@/components/home/DetailPanel";
 import { MapControls } from "@/components/home/MapControls";
 import { AreaCompsPreview } from "@/components/home/CompsFlow";
 import { FlowKind, ReportFlow } from "@/components/report/ReportFlow";
@@ -305,8 +305,6 @@ export default function HomeWeb() {
       // None in this area: open the first listing on its own, flagged as having no estimate.
       if (listings[0]) { alerts.close(); setParcel(null); setSelId(null); setSoloL({ ...listings[0], noQe: true }); }
     } },
-    { label: "No-estimate banner: side CTA", icon: "ph-layout", run: () => setQeRoute("side") },
-    { label: "No-estimate banner: full-width CTA", icon: "ph-rows", run: () => setQeRoute("full") },
   ];
   return (
     <>
@@ -328,7 +326,7 @@ export default function HomeWeb() {
               active={detailOpen ? null : active} onManage={() => openSheet(active)} onClearActive={clearActive} />
           </div>
           {searching ? null : view === "home"
-            ? <HomeCard name={user.name} forYou={forYou} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
+            ? <HomeCard name={user.name} area={place.label} forYou={forYou} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
                 picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals}
                 onOpenSaved={() => { setSavedOut(false); setSavedOpen(true); }} />

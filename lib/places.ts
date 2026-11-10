@@ -209,3 +209,29 @@ export async function resolveArea(a: Area, near?: LngLat): Promise<Place | null>
   const r = await searchPlaces(a.label, near);
   return r.find(p => p.kind !== "address") || null;
 }
+
+// The user's own location for the Home greeting ("Hello James · <here>"):
+// the browser's position, reverse-geocoded to "Neighbourhood, City". null when
+// location is denied or unavailable (the caller keeps its fallback). Cached
+// for the session so the Home card doesn't re-ask on every visit.
+let userLoc: Promise<string | null> | null = null;
+export function userLocationLabel(): Promise<string | null> {
+  if (userLoc) return userLoc;
+  userLoc = (async () => {
+    try { const s = sessionStorage.getItem("bz-user-loc"); if (s) return s; } catch {}
+    if (typeof navigator === "undefined" || !navigator.geolocation) return null;
+    const c = await new Promise<LngLat | null>(res => {
+      const t = setTimeout(() => res(null), 8000);
+      navigator.geolocation.getCurrentPosition(
+        p => { clearTimeout(t); res([p.coords.longitude, p.coords.latitude]); },
+        () => { clearTimeout(t); res(null); },
+        { timeout: 7500, maximumAge: 300000 });
+    });
+    if (!c) return null;
+    const p = await reversePlace(c);
+    const label = p.label.split(", ").slice(0, 2).join(", ");
+    try { sessionStorage.setItem("bz-user-loc", label); } catch {}
+    return label;
+  })();
+  return userLoc;
+}

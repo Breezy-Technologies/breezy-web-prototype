@@ -113,6 +113,17 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [map]);
 
+  // The canvas follows its container whatever changes its size (inset, the side
+  // nav, browser chrome, the Vercel toolbar), not just window resizes: a stale
+  // canvas left a strip at the bottom of the map (review feedback).
+  useEffect(() => {
+    if (!map || !holder.current || typeof ResizeObserver === "undefined") return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => map.resize()); });
+    ro.observe(holder.current);
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  }, [map]);
+
   // Keep the canvas in sync with the container inset (side nav width etc).
   useEffect(() => {
     if (!map) return;

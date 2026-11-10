@@ -50,7 +50,7 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
   const n = Math.max(1, cols || 1), multi = n > 1;
   return (
     <div style={{ ...card, flex: 1, minHeight: 0 }}>
-      <div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "20px 16px 12px 16px" }}>
+      <div style={{ flex: "none", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, padding: "20px 16px 12px 16px" }}>
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ font: "700 19px/24px var(--font-sans)" }}>{title}</span>
           <span style={{ font: "400 14px/18px var(--font-sans)", color: "var(--fg-2)" }}>{meta}</span>

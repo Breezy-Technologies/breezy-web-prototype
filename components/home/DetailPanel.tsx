@@ -56,7 +56,6 @@ const estimated = new Set<string>();
 export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell, onShare, onToast }: { l: Listing; onClose: () => void; onGetComps: () => void; onFlow?: (k: "ub" | "roi") => void; alertN?: number; onBell?: () => void; onShare?: () => void; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
   const d = useMemo(() => listingDetail(l), [l]);
   const qeKey = `${l.addr}|${l.lng.toFixed(5)},${l.lat.toFixed(5)}`;
-  const qeRoute = useQeRoute();
   const [qeState, setQeState] = useState<"none" | "loading" | "ready">(() => !l.noQe || estimated.has(qeKey) ? "ready" : "none");
   const getEstimate = () => {
     if (qeState !== "none") return;
@@ -207,10 +206,8 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
           {/* Quick estimate (floating card) + Get comps */}
           <div style={css("display:flex;flex-direction:column;padding:16px 16px 0")}>
             {qeState !== "ready" ? (
-              // No quick estimate (review feedback): two routes to compare, switched from the Developer menu.
-              // "side": equal 16px padding all round, illustration as tall as the text, CTA on the far right.
-              // "full": text with the illustration on the right, full-width outline CTA underneath.
-              qeRoute === "full" ? (
+              // No quick estimate: the full-width CTA route (review decision): text with the
+              // illustration on the right, full-width outline "Get price estimate" underneath.
                 <div style={css("display:flex;flex-direction:column;gap:16px;padding:20px;border-radius:20px;background:rgb(243,240,238)")}>
                   <div style={css("display:flex;align-items:center;gap:16px")}>
                     <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:6px")}>
@@ -224,19 +221,6 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                     {qeState === "loading" ? "Estimating" : "Get price estimate"}
                   </button>
                 </div>
-              ) : (
-                <div style={css("display:flex;align-items:center;gap:12px;padding:16px;border-radius:16px;background:rgb(243,240,238)")}>
-                  <img src="/iso/no-estimate.png" alt="" style={css("flex:none;height:38px;width:auto;display:block")} />
-                  <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:2px")}>
-                    <span style={css("font:700 14px/18px var(--font-sans);color:rgb(18,18,18);white-space:nowrap")}>No quick estimate yet</span>
-                    <span style={css("font:400 12px/18px var(--font-sans);color:rgb(98,90,89)")}>{qeState === "loading" ? "Checking nearby sales…" : "Too few nearby sales"}</span>
-                  </span>
-                  <button className="fb-dark dt-press" onClick={getEstimate} disabled={qeState === "loading"} style={css("flex:none;display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 13px/18px var(--font-sans);color:rgb(253,252,252);cursor:pointer;white-space:nowrap")}>
-                    {qeState === "loading" && <i className="ph-bold ph-circle-notch" style={{ fontSize: 14, animation: "spin .8s linear infinite" }} />}
-                    {qeState === "loading" ? "Estimating" : "Get price estimate"}
-                  </button>
-                </div>
-              )
             ) : (
             <div style={css("display:flex;align-items:flex-end;gap:12px;padding:16px;border-radius:20px;background:rgb(255,255,255);box-shadow:0 0 0 .5px rgba(13,12,12,.08),0 10px 28px rgba(40,26,20,.12);" + (l.noQe ? "animation:fadeIn .3s ease both" : ""))}>
               <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:2px")}>
@@ -521,20 +505,3 @@ function CopyLine({ text, muted }: { text: string; muted?: boolean }) {
   );
 }
 
-// Which "no quick estimate" layout to show while the two routes are being compared.
-// Set from the Developer menu; remembered in localStorage.
-export type QeRoute = "side" | "full";
-export function setQeRoute(r: QeRoute) {
-  try { localStorage.setItem("bz-qe-route", r); } catch {}
-  window.dispatchEvent(new CustomEvent("bz-qe-route", { detail: r }));
-}
-function useQeRoute(): QeRoute {
-  const [r, setR] = useState<QeRoute>("side");
-  useEffect(() => {
-    try { const v = localStorage.getItem("bz-qe-route"); if (v === "full" || v === "side") setR(v); } catch {}
-    const on = (e: Event) => setR((e as CustomEvent).detail);
-    window.addEventListener("bz-qe-route", on);
-    return () => window.removeEventListener("bz-qe-route", on);
-  }, []);
-  return r;
-}

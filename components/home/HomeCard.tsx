@@ -10,6 +10,7 @@ import { Listing, OppType, fullPrice } from "@/lib/fake";
 import { CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
 import { PickedFooter } from "./Saved";
 import { ForYouFeed } from "./ForYouFeed";
+import { userLocationLabel } from "@/lib/places";
 
 export type Tab = "For you" | "Searches" | "Properties";
 type Sort = "Default" | "Newest" | "Oldest";
@@ -126,8 +127,8 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
   );
 }
 
-export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals }: {
-  name: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void; onOpenSaved?: () => void;
+export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals }: {
+  name: string; area?: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void; onOpenSaved?: () => void;
   onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void;
   onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
@@ -142,6 +143,13 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
   const [sort, setSort] = useState<Sort>("Default");
   const [sortOpen, setSortOpen] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
+  // Under the greeting: where the user is (browser location, reverse-geocoded), else the
+  // market they set up in onboarding: the first area this session, not later searches.
+  const [where, setWhere] = useState(() => {
+    try { const k = "bz-home-area", v = sessionStorage.getItem(k); if (v) return v; if (area) sessionStorage.setItem(k, area); } catch {}
+    return area || "Silver Lake, Los Angeles";
+  });
+  useEffect(() => { let on = true; userLocationLabel().then(l => { if (on && l) setWhere(l); }); return () => { on = false; }; }, []);
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -177,7 +185,7 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
       <span style={{ font: "300 26px/1.26 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>Hello {name.split(" ")[0]}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 4, height: 18, font: "400 12px/18px var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)" }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="rgb(98,90,89)" style={{ flex: "none" }}><path d="M21 3 3 10.5l7.5 2.6L13.2 21z" /></svg>
-        Silver Lake, Los Angeles
+        {where}
       </span>
     </>
   );
@@ -195,7 +203,7 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
               {forYouList}
             </>}
             {tab === "Searches" && <>
-              {searchList(searches.slice(0, 3), false)}
+              {searchList(searches, true)}
               {searches.length === 0 && (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "20px 0", textAlign: "center" }}>
                   <span style={mask("/ui/bell.svg", 24, "rgb(196,146,134)")} />
@@ -207,15 +215,11 @@ export function HomeCard({ name, forYou, seen, onOpen, onHover, onOpenSearch, on
                 </div>
               )}
             </>}
-            {tab === "Properties" && propList(props.slice(0, 3), false)}
+            {tab === "Properties" && propList(props, true)}
           </div>
           {/* Homes saved with "+" from the feed: thumbnails open the Properties tab, Share opens the share report (review feedback). */}
           {tab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved ? onOpenSaved() : setTab("Properties")} onShare={onSharePicked} />}
-          {tab !== "For you" && (tab === "Properties" ? props.length > 0 : searches.length > 0) && (
-            <div style={{ flex: "none", marginTop: 20, display: "flex", alignItems: "center", gap: 16, padding: "12px 20px 20px", boxShadow: "inset 0 1px 0 rgba(13,12,12,.16)" }}>
-              <button onClick={() => { setFromH(cardRef.current?.offsetHeight || 520); setFullTab(tab === "Properties" ? "Properties" : "Searches"); setFull(true); }} className="btn-soft" style={{ flex: 1, height: 43 }}>View all</button>
-            </div>
-          )}
+          {/* The whole list shows by default, with no "View all" (review feedback). */}
         </div>
       ) : (
         <div style={{ ...card, position: "relative", flex: 1, minHeight: 0, ["--hcH" as any]: fromH + "px", animation: "hcGrow .55s cubic-bezier(.3,.8,.2,1) both" }}>
