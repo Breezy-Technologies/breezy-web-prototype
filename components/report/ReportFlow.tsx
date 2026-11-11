@@ -12,11 +12,13 @@
 // "Back to map" and the three tabs. A report that has run opens straight on
 // its result. Comps first confirms the subject property (review modal over
 // the map), then offers "Let AI do the work" inside the sheet.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Listing, shortPrice } from "@/lib/fake";
 import { css } from "@/lib/css";
 import { CompsResult, CompsReview } from "../home/CompsFlow";
 import { UBReport } from "./UBReport";
+import { UpsideReport } from "./upside/UpsideReport";
+import { upsideOf } from "@/lib/roi";
 
 export type FlowKind = "comps" | "ub" | "roi";
 
@@ -114,7 +116,8 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   const prog = phase === "report" ? 1 : phase === "run" ? 0.06 + 0.86 * Math.min(step, n) / n : done ? 1 : 0;
   const rows = steps.concat(["Opening your report"]);
   const ri = done ? rows.length - 1 : Math.min(step, n - 1);
-  const doneTitle = { comps: "5 sold and 1 active\nproperties found", ub: "Your report is ready", roi: `This property could\nbe worth ${shortPrice(l.qe.value * (1 + l.roi / 100))}` }[kind];
+  const upGross = useMemo(() => (kind === "roi" ? upsideOf(l).sc.rec.gross : 0), [l, kind]);
+  const doneTitle = { comps: "5 sold and 1 active\nproperties found", ub: "Your report is ready", roi: `This property could\nbe worth ${shortPrice(upGross)}` }[kind];
   const loading = phase === "run" || phase === "done";
 
   return (
@@ -210,13 +213,8 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
               </div>
             </div>
             {kind === "comps" && <CompsResult l={l} />}
-            {kind === "ub" && <UBReport onComps={() => pick("comps")} />}
-            {kind === "roi" && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24, textAlign: "center", background: "rgb(250,248,247)" }}>
-                <span style={{ font: "300 40px/48px var(--font-sans)", letterSpacing: "-.01em" }}>{doneTitle.replace("\n", " ")}</span>
-                <span style={{ maxWidth: 460, font: "400 16px/22px var(--font-sans)", color: "rgb(77,71,69)" }}>The Upside analysis page (Pedro&apos;s UB ROI variants) is the next piece to port into this sheet.</span>
-              </div>
-            )}
+            {kind === "ub" && <UBReport l={l} onComps={() => pick("comps")} />}
+            {kind === "roi" && <UpsideReport l={l} onComps={() => pick("comps")} />}
           </div>
         )}
       </div>

@@ -8,6 +8,7 @@ import { Listing, fullPrice, listingDetail, shortPrice } from "@/lib/fake";
 import { F_TYPES } from "@/lib/filters";
 import { css } from "@/lib/css";
 import { hashStr } from "@/lib/geo";
+import { ledger, siteOf, upsideOf } from "@/lib/roi";
 import { BellButton } from "./Saved";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
@@ -114,7 +115,12 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   const gal = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const tabBar = useRef<HTMLDivElement>(null);
-  const maxBuild = Math.min(96, l.ub + 20), profit = (l.price * l.roi) / 100;
+  // The same figures the reports they open show: Build guidelines' Underbuilt % and the
+  // Upside analysis' estimated profit for its recommended build (lib/roi, Pedro's model).
+  const { maxBuild, profit } = useMemo(() => {
+    const { p, sc } = upsideOf(l);
+    return { maxBuild: siteOf(l).ub, profit: ledger(p, sc.rec, {}).profit };
+  }, [l]);
   const n = l.photos.length;
   const galStep = (dir: number) => gal.current?.scrollBy({ left: dir * (gal.current.clientWidth + 4), behavior: "smooth" });
 
@@ -131,7 +137,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   };
 
   const stats: [string, string, number][] = [[String(l.beds), "Bed", 56], [String(l.baths), "Bath", 64], [l.sqft.toLocaleString("en-US"), "ft² Home", 72], [String(l.lotAc), "/ac Lot", 72], ["$" + d.hoa, "/mo HOA", 72]];
-  const tiles: [string, string, string, string][] = [[`${maxBuild}%`, "Max\nbuild", "rgb(147,89,75)", "/ui/act-target.svg"], [shortPrice(profit), "Profit\npotential", "rgb(13,87,57)", "/ui/act-chart.svg"]];
+  const tiles: [string, string, string, string][] = [[`${maxBuild}%`, "Max\nbuild", "rgb(147,89,75)", "/ui/act-target.svg"], [profit > 0 ? shortPrice(profit) : "None", "Profit\npotential", "rgb(13,87,57)", "/ui/act-chart.svg"]];
   const typeImg = (F_TYPES.find(([k]) => k === l.ptype) || F_TYPES[0])[1];
 
   type SpecRow = { k: string; label: string; value: string; sub?: string; img?: string; ai?: string };

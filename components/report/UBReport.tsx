@@ -12,8 +12,21 @@
 //   - build options: option × Plan/Section × Pitched/Flat (data-ubgrp, options)
 //   - "Get Comps" links switch the sheet to Comps (data-ubact="comps")
 //   - the dots rail and the Glossary drawer are rebuilt around the content
-// Sample data (418 Wren Hollow Lane) until the Underbuilt service is wired in.
-import { useEffect, useRef, useState } from "react";
+//
+// The recording is a sample report (418 Wren Hollow Lane, a 24,000 ft² lot in
+// a New Jersey township). `personalize` rewrites it for the open property:
+// every figure about the lot and the house (address and street, lot area,
+// width and depth, living area, footprint, coverage, the by-right maximum, the
+// Underbuilt %, the ft² left to build, buildable area, ADU size, the options'
+// figures) comes from lib/roi/property.ts `siteOf`, the same site facts the
+// Upside tab prices, so the two tabs agree with each other and with the map's
+// Underbuilt %. Setbacks become LA R1's (20 / 5 / 15 ft). The rest of the rule
+// framework (coverage x 2.5 stories, heights, uses, § references) stays the sample's, renamed to the
+// City of Los Angeles; a note at the top says so. Swap for the Underbuilt
+// service's report when it exists.
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Listing } from "@/lib/fake";
+import { siteOf } from "@/lib/roi";
 
 type Report = {
   bg: string; toc: { id: string; label: string }[];
@@ -27,10 +40,95 @@ const load = () => (cache ??= Promise.all([
   fetch("/ub-report/report.css").then(r => r.text()),
 ]));
 
+/* ---- personalisation of the recorded sample ---- */
+const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
+const pctS = (n: number) => (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, "");
+const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Sample text → this property's, as [sample, ours] pairs (numbers matched whole). */
+function replacements(l: Listing): [string, string][] {
+  const S = siteOf(l);
+  const L = S.lot, W = S.lotW, D = S.lotD, Ex = S.Ex, Smax = Math.round(S.Smax);
+  const fpMax = Math.round(Smax / 2.5), fp = Math.min(S.footprint, fpMax);
+  const imperv = Math.round(L * 0.35);
+  // Setbacks: the City of LA's R1 defaults (front 20, sides 5, rear 15 ft), not the sample's 35 / 15 / 30.
+  const { F, Sd, Rr } = SETBACK;
+  const bw = Math.max(W - 2 * Sd, 0), bd = Math.max(D - F - Rr, 0), buildable = bw * bd;
+  const adu = Math.round(Math.min(800, Ex * 0.3));
+  const used = Smax > 0 ? Math.round((100 * Ex) / Smax) : 0;
+  return [
+    // names: the most specific first
+    ["418 Wren Hollow Lane", S.addr], ["WREN HOLLOW LANE", S.street.toUpperCase()], ["Wren Hollow Lane", S.street],
+    ["Wren Hollow Estates", `${S.hood} Tract`], ["Wren Hollow", S.street],
+    ["Larchmere Township Code", "Los Angeles Municipal Code"], ["Larchmere Township Zoning Office", "Los Angeles City Planning"],
+    ["Larchmere Township", "City of Los Angeles"], ["Larchmere Water Utility", "LADWP"], ["Larchmere MUA", "LA Sanitation"], ["Larchmere", "Los Angeles"],
+    // setbacks, wherever the sample states them as such
+    ["Front 35 · Sides 15 · Rear 30 ft", `Front ${F} · Sides ${Sd} · Rear ${Rr} ft`],
+    ["35 ft from the front, 15 ft from each side, 30 ft from the rear", `${F} ft from the front, ${Sd} ft from each side, ${Rr} ft from the rear`],
+    ["Front yard 35 ft; each side yard 15 ft; rear yard 30 ft", `Front yard ${F} ft; each side yard ${Sd} ft; rear yard ${Rr} ft`],
+    ["Front 35 ft", `Front ${F} ft`], ["Rear 30 ft", `Rear ${Rr} ft`], ["Side 15 ft", `Side ${Sd} ft`],
+    ["− 30", `− ${2 * Sd}`], ["− 65", `− ${F + Rr}`],
+    ["and the setbacks leave far more room than that", buildable >= fpMax ? "and the setbacks leave more room than that" : "and the setbacks leave even less room than that"],
+    ["Ocean Bay County, NJ", "Los Angeles County, CA"], ["Ocean Bay County", "Los Angeles County"],
+    ["(township)", "(city)"], ["township", "city"], ["Township", "City"], ["NJ", "CA"], ["R-40", S.zone],
+    // figures
+    ["12,000", fmt(Smax)], ["2,640", fmt(Ex)], ["9,360", fmt(Smax - Ex)], ["24,000", fmt(L)], ["23,880", fmt(Math.round(L * 0.995 / 10) * 10)],
+    ["4,800", fmt(fpMax)], ["1,980", fmt(fp)], ["2,820", fmt(fpMax - fp)], ["12,150", fmt(buildable)], ["8,400", fmt(imperv)],
+    ["21,400", fmt(Math.round(L * 0.89 / 100) * 100)], ["9,600", fmt(fpMax * 2)], ["3,600", fmt(imperv - fpMax)],
+    ["3,432", fmt(Ex + adu)], ["2,772", fmt(fp + adu)], ["792", fmt(adu)],
+    ["0.55", (L / 43560).toFixed(2)], ["0.50", (Smax / L).toFixed(2)], ["8.3%", pctS((100 * fp) / L) + "%"],
+    ["49%", Math.round(100 * (1 - buildable / L)) + "%"], ["75% / 68%", `${Math.round((100 * bw) / W)}% / ${Math.round((100 * bd) / D)}%`],
+    ["22%", used + "%"], ["78%", S.ub + "%"], ["78", String(S.ub)], ["20%", pctS((100 * fpMax) / L) + "%"],
+    ["120", String(W)], ["200", String(D)], ["90", String(bw)], ["135", String(bd)],
+  ];
+}
+
+const SETBACK = { F: 20, Sd: 5, Rr: 15 };
+/* A bare "35 ft" / "30 ft" / "15 ft" is the front / rear / side setback (setbacks table,
+   garage rows, the options drawing) unless its row is about height. */
+const BARE: Record<string, string> = { "35 ft": `${SETBACK.F} ft`, "30 ft": `${SETBACK.Rr} ft`, "15 ft": `${SETBACK.Sd} ft` };
+function bareSetback(n: Node): string | null {
+  const v = (n.nodeValue || "").trim();
+  if (!BARE[v]) return null;
+  let a = n.parentElement;
+  for (let i = 0; i < 3 && a?.parentElement; i++) a = a.parentElement;
+  return /height|tall|stor(y|ies)|roof/i.test(a?.textContent || "") ? null : (n.nodeValue || "").replace(v, BARE[v]);
+}
+
+/** Rewrites the text (and title / aria-label) of a recorded fragment in one pass, so nothing is replaced twice. */
+function personalizer(l: Listing) {
+  const pairs = replacements(l), map = new Map(pairs);
+  const re = new RegExp(pairs.map(([k]) => /^[\d.,%/ ]+$/.test(k) ? `(?<![\\d.,])${esc(k)}(?![\\d]|[.,]\\d)` : esc(k)).join("|"), "g");
+  const fix = (t: string) => t.replace(re, m => map.get(m) ?? m);
+  const ub = siteOf(l).ub;
+  return (html: string) => {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = html.replace('stroke-dasharray="254.8 326.7"', `stroke-dasharray="${((326.7 * ub) / 100).toFixed(1)} 326.7"`);
+    const walk = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (n.nodeType === 3) {
+        if (n.nodeValue && /\S/.test(n.nodeValue) && !/^(STYLE|SCRIPT)$/.test(n.parentElement?.tagName || "")) n.nodeValue = bareSetback(n) ?? fix(n.nodeValue);
+        continue;
+      }
+      const el = n as Element;
+      for (const a of ["title", "aria-label"]) { const v = el.getAttribute(a); if (v) el.setAttribute(a, fix(v)); }
+    }
+    return tpl.innerHTML;
+  };
+}
+
+function personalize(r: Report, l: Listing): Report {
+  const f = personalizer(l);
+  const each = (o: Record<string, string>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, f(v)]));
+  const note = `<p style="margin:0 0 -48px;padding:12px 16px;border-radius:12px;background:rgb(245,243,243);font:400 13px/18px var(--font-sans);color:rgb(98,90,89)">Lot, house and build figures are this property\u2019s. Setbacks are LA R1 defaults; the other zoning rules (heights, uses, code sections) are sample data until the Underbuilt service covers this city.</p>`;
+  return { ...r, main: f(r.main).replace(/(<main\b[^>]*>)/, `$1${note}`), rows: each(r.rows), options: each(r.options), modals: each(r.modals), glossary: f(r.glossary) };
+}
+
 const isClose = (el: Element) => /close|dismiss/i.test(el.getAttribute("aria-label") || "") || /^(×|✕|Close)$/.test((el.textContent || "").trim());
 
-export function UBReport({ onComps }: { onComps: () => void }) {
-  const [data, setData] = useState<[Report, string] | null>(null);
+export function UBReport({ l, onComps }: { l: Listing; onComps: () => void }) {
+  const [raw, setRaw] = useState<[Report, string] | null>(null);
+  const data = useMemo<[Report, string] | null>(() => (raw ? [personalize(raw[0], l), raw[1]] : null), [raw, l]);
   const [layer, setLayer] = useState<string | null>(null); // modal / glossary html on top
   const [active, setActive] = useState<string>("");
   const scroller = useRef<HTMLDivElement>(null);
@@ -39,7 +137,7 @@ export function UBReport({ onComps }: { onComps: () => void }) {
   const opt = useRef<Record<string, string>>({});
   const rowOther = useRef<Record<string, string>>({}); // row key → the html it swaps to next
 
-  useEffect(() => { let on = true; load().then(d => { if (on) setData(d); }); return () => { on = false; }; }, []);
+  useEffect(() => { let on = true; load().then(d => { if (on) setRaw(d); }); return () => { on = false; }; }, []);
 
   // Mount the recorded column once; interactions mutate it in place.
   useEffect(() => {

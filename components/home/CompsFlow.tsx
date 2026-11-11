@@ -39,6 +39,12 @@ export function CompsReview({ l, onClose, onConfirm }: { l: Listing; onClose: ()
 }
 
 export function CompsResult({ l }: { l: Listing }) {
+  // Matches the loading stage's "5 sold and 1 active properties found". A vacant
+  // parcel (no house, sqft 0) is comped against lots: lot size, no beds.
+  const lotFt = Math.round(l.lotAc * 43560);
+  const spec = (i: number) => l.sqft > 0
+    ? `${l.beds > 0 ? `${l.beds} bd · ` : ""}${Math.round(l.sqft * (0.9 + i * 0.04)).toLocaleString("en-US")} ft²`
+    : `Lot · ${Math.round((lotFt || 6000) * (0.9 + i * 0.04)).toLocaleString("en-US")} ft²`;
   return (
     <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "24px 48px 48px", animation: "flowRise .6s cubic-bezier(.2,.8,.2,1) both" }}>
       <span style={{ font: "700 13px/16px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--fg-3)" }}>AI comps · {l.addr}</span>
@@ -52,8 +58,8 @@ export function CompsResult({ l }: { l: Listing }) {
           return (
             <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ height: 160, borderRadius: 18, background: `url(${l.photos[(i + 1) % l.photos.length]}) center/cover` }} />
-              <span style={{ font: "700 15px/20px var(--font-sans)" }}>{["Sold", "Sold", "Sold", "Active", "Pending", "Sold"][i]} · {fullPrice(p)}</span>
-              <span style={{ font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{(0.1 + i * 0.07).toFixed(1)} mi away · {l.beds} bd · {(l.sqft * (0.9 + i * 0.04)).toFixed(0)} ft²</span>
+              <span style={{ font: "700 15px/20px var(--font-sans)" }}>{["Sold", "Sold", "Sold", "Active", "Sold", "Sold"][i]} · {fullPrice(p)}</span>
+              <span style={{ font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{(0.1 + i * 0.07).toFixed(1)} mi away · {spec(i)}</span>
               <span style={{ height: 6, borderRadius: 9999, background: "rgba(13,12,12,.08)" }}><span style={{ display: "block", height: 6, width: sc + "%", borderRadius: 9999, background: sc >= 70 ? "rgb(96,201,172)" : "rgb(221,171,71)" }} /></span>
               <span style={{ font: "400 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>{sc}% comparable</span>
             </div>

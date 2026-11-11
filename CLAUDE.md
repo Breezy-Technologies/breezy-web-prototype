@@ -121,7 +121,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Photo carousel, address, specs row, then sticky tabs: **Summary / Specs / Records / Owners**.
 - Summary only:
   - A floating **Quick estimate** card with the big number and a **Get comps** button.
-  - Max build + Profit potential tiles.
+  - Max build + Profit potential tiles: the same figures as the reports they open (Build guidelines' Underbuilt %, Upside's estimated profit; "None" when no build pays).
   - An **Owner** section (56 px avatar, "View history" on the right), then the listing description. Owner contact lines copy on click, and each says **Verified** (green seal) or **Unverified** (11 Nov comment; fake, stable per value).
 - **No estimate (`noQe`):** only reachable from the Dev menu ("Property with no estimate"; every property has an estimate). The full-width CTA layout (decided): title and one-line explanation with the illustration on the right, a full-width outline "Get price estimate" underneath; it loads, then shows the estimate and a positive toast.
 - "View more" buttons have no arrows.
@@ -134,8 +134,9 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - Loading stage per flow: progress bar in the flow's colour (comps purple, UB clay, ROI green), radar GIF (UB) or sparkle, "Analyzing …", one shimmering step every 700 ms, then the done title for 1.5 s.
   - Comps first confirms the subject property (review modal), then "Let AI do the work" inside the sheet (auto-runs after 6.7 s unless the pointer rests on Get comps).
   - Report header: Back to map, tabs **Upside analysis / Build guidelines / Comps** (a tab that hasn't run starts its flow), Share. A report that has run reopens on its result.
-  - **Build guidelines** = `UBReport.tsx`: version D ("Property") main column of the Underbuilt Report Versions design, no property card, spread to the full sheet width on white (review feedback) like the Comps result. Recorded from `design-reference/underbuilt-report/` by `scripts/extract-ub-report.mjs` into `public/ub-report/`; modals, expandable rules, build options (option × plan/section × roof), dots rail, glossary drawer and "Get Comps" links all work. Sample data (418 Wren Hollow Lane).
-  - **Upside analysis** body is a placeholder until Pedro's UB ROI variants are ported. **Comps** body is the existing comps result.
+  - **Build guidelines** = `UBReport.tsx`: version D ("Property") main column of the Underbuilt Report Versions design, no property card, spread to the full sheet width on white (review feedback) like the Comps result. Recorded from `design-reference/underbuilt-report/` by `scripts/extract-ub-report.mjs` into `public/ub-report/`; modals, expandable rules, build options (option × plan/section × roof), dots rail, glossary drawer and "Get Comps" links all work. The recorded sample is rewritten per property in one pass (address, lot area / width × depth, living area, by-right max and Underbuilt %, coverage, ADU sizes, every build option's figures; zone = the lot's; setbacks LA R1 defaults 20 / 5 / 15 ft). Heights, uses, density and code sections are still the sample's, flagged by a grey note at the top.
+  - **Upside analysis** = Pedro's Upside tab (`components/report/upside/`, CSS scoped under `.bz-up` in `upside.css`, art in `public/report/`), run by his model copied unchanged into `lib/roi/` (one change: no remodel / ADU jobs on a vacant lot). Pedro agreed to his code and data being in this repo and on the public preview (11 Nov). Inputs from the Listing via `lib/roi/property.ts`: real lot outline / zone / house figures for his lots and county parcels; by-right = sqft / (1 − ub), bonus and largest-nearby seeded. Like his `calibrate.ts`, the sale price per ft² is tuned so the recommended build's return equals `l.roi`, so the gauge agrees with the map. Hero + gauge (in the current ROI palette), Buy → Improve → Sell → Profit, build size chart + slider, ledger, scenarios, neighbourhood (fake stats), live "Adjust assumptions" panel.
+  - **Comps** body is the existing comps result (5 sold + 1 active, matching the loading title; vacant parcels compare lot sizes).
   - Area comps come from Create comps (`AreaCompsPreview`, still the older full-screen view).
 - **Saved** (`Saved.tsx`, `SavedState.tsx`): save-search sheet, `SaveToggle`, the Saved sheet (opens from Home and Results).
 - **Alerts panel**, "Set custom alerts":
@@ -199,7 +200,7 @@ Muted in the 10 Nov review (the first set read too garish): same hues, lower sat
 
 ## Open items
 
-- **Report sheet:** port Pedro's UB ROI page variants into Upside analysis; feed Build guidelines from the selected property instead of the sample report.
+- **Report sheet:** Build guidelines still uses the sample's zoning rules (heights, uses, code sections, ADU wording that's wrong for California) until the Underbuilt service covers LA; Upside's neighbourhood stats and comp count are fake.
 - Draw-area tool: placement still undecided. The "Search this area" zone diagram is coming from William's Figma.
 - Make saved reports easier to reach, as on mobile.
 - Welcome-panel polish: rounder corners, no bottom padding between list items, skeleton loading piece by piece.

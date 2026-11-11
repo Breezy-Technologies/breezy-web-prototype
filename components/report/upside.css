@@ -1,0 +1,1711 @@
+/* Upside analysis: ported from Pedro's report (pd-bittencourt/underbuilt-roi,
+   src/routes/-report/report.css + src/components/RoiGauge.css), the Upside
+   tab's rules only, scoped under .bz-up so nothing leaks into the app.
+   Asset urls point at public/report/. Fonts: the app's Akkurat (--font-sans). */
+
+.bz-up :where(*) { box-sizing: border-box; margin: 0; padding: 0 }
+.bz-up :where(button) { font: inherit; color: inherit; background: none; border: 0; cursor: pointer }
+.bz-up :where(img) { display: block; max-width: 100% }
+.bz-up :where(input) { font: inherit; color: inherit }
+
+.bz-up {
+  --wrap-pad: 80px;
+  --card-pad: 64px;
+  --f: var(--font-sans);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  font-weight: 400;
+  color: #121212;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 1399px) {
+  .bz-up {
+    --wrap-pad: clamp(48px, calc(48px + (100vw - 1200px) * .16), 80px);
+    --card-pad: clamp(48px, calc(48px + (100vw - 1200px) * .08), 64px)
+  }
+}
+@media (max-width: 1199px) { .bz-up { --wrap-pad: 64px; --card-pad: 48px } }
+@media (max-width: 1023px) { .bz-up { --wrap-pad: 32px; --card-pad: 40px } }
+
+.bz-up {
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap }
+
+  /* the sections below read their own width off this (the compact step) */
+  .rp-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    container: rp-main / inline-size
+  }
+
+  /* Figma's Section > container: full-width band, centred content column */
+  .rp-sec {
+    display: flex;
+    justify-content: center
+  }
+
+  .rp-wrap {
+    width: 100%;
+    max-width: 1280px;
+    padding-inline: var(--wrap-pad)
+  }
+
+  /* =============== hero (Figma 1260:41605) =============== */
+  /* the tint behind this band belongs to the page, not the section */
+  .rp-sec-hero {
+    padding-block: 80px 40px
+  }
+
+  .rp-hero {
+    display: flex;
+    align-items: center;
+    gap: 60px;
+
+    & .left {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      color: #070606
+    }
+
+    & h1 {
+      font-size: 52px;
+      font-weight: 300;
+      line-height: 1.2;
+      letter-spacing: -.52px
+    }
+
+    /* the gradient painted into the glyphs, top to bottom; clone gives each
+       wrapped line its own run of it. The flat colour is the fallback. */
+    & h1 b {
+      font-weight: 700;
+      color: #5E3A31;
+
+      @supports (background-clip: text) or (-webkit-background-clip: text) {
+        background: linear-gradient(180deg, #7C4B3E, #4A2E27);
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent
+      }
+    }
+
+    /* the text column only: the gauge beside it brings its own type */
+    & .left p {
+      font-size: 18px;
+      line-height: 1.5
+    }
+
+    & .left p b {
+      font-weight: 700
+    }
+  }
+
+  /* the gauge is the shared component; it only needs its slot here. Its own
+     16px padding is spent sideways against the hero's 60px gap, so the
+     text column keeps its width. */
+  .rp-hero .ub-gauge {
+    flex: none;
+    margin-inline: -16px
+  }
+
+  /* =============== buy → improve → sell → profit (Figma 1260:40984) =============== */
+  /* Figma's widths (139px columns, a 373px card) are the minimum. Wider, the
+     spare room goes 1 : 1 : 2, so the card's two columns keep pace with the
+     two outside it. */
+  .rp-steps {
+    display: flex;
+    align-items: flex-start;
+    padding-block: 38px 118px;
+
+    & > .step:first-child {
+      margin-left: 24px
+    }
+
+    /* level with the card's columns: its 1px border plus 29px padding */
+    & > .step {
+      margin-top: 30px
+    }
+
+    & .step {
+      position: relative;
+      flex: 1 1 139px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    & > .step + .step {
+      margin-left: 60px
+    }
+
+    /* From just past the icon to just short of the next column. The dashes
+       repeat to any length; only the Figma arrowhead end is drawn from the
+       export, so stretching never distorts it. */
+    & .arrow {
+      position: absolute;
+      left: 48px;
+      right: -22.5px;
+      top: 9px;
+      height: 7.36px;
+      background:
+        url('/report/step-arrow.svg') right center / 114.5px 7.36px no-repeat,
+        repeating-linear-gradient(90deg, #625A59 0 3px, transparent 3px 6px) left center / calc(100% - 114px) 1px no-repeat
+    }
+
+    /* the next column sits inside the card: 45px gap plus 30px inset */
+    & > .step + .step .arrow {
+      right: -29.5px
+    }
+
+    & .out {
+      position: relative;
+      flex: 2 1 373px;
+      min-width: 0;
+      display: flex;
+      gap: 36px;
+      margin-left: 45px;
+      padding: 29px;
+      min-height: 320px;
+      background: #FDFCFC;
+      border: 1px solid #F5F0EE;
+      border-radius: 16px;
+      box-shadow:
+        0 5px 10px rgba(96, 89, 87, .1),
+        0 18px 18px rgba(96, 89, 87, .09),
+        0 42px 25px rgba(96, 89, 87, .05),
+        0 74px 30px rgba(96, 89, 87, .01)
+    }
+
+    & .ic {
+      width: 24px;
+      height: 24px;
+      flex: none
+    }
+
+    & .k {
+      font-size: 36px;
+      font-weight: 300;
+      line-height: 1.26;
+      letter-spacing: -1px;
+      color: #070606
+    }
+
+    & .k.strong {
+      font-weight: 700
+    }
+
+    & .l {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.5;
+      color: #121212
+    }
+
+    & .d {
+      font-size: 12px;
+      line-height: 1.5;
+      color: #625A59
+    }
+
+    & .x {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #C49286
+    }
+
+    & .x.note {
+      font-size: 12px
+    }
+
+    & .x span {
+      display: block
+    }
+
+    & .x button {
+      display: block;
+      text-decoration: underline;
+      text-underline-position: from-font
+    }
+
+    /* Figma 234:9072 / 234:9075 — the scenario switches under Buy and Improve.
+       Not .chip: that is the map's glass filter pill, shadow and all. */
+    & .rp-toggle {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      padding: 3px 12px;
+      border-radius: 9999px;
+      box-shadow: inset 0 0 0 1px rgba(18, 18, 18, .16);
+      font-size: 12px;
+      line-height: 1.5;
+      color: #121212;
+      transition: background-color .15s, color .15s, box-shadow .15s
+    }
+
+    & .rp-toggle:hover {
+      box-shadow: inset 0 0 0 1px rgba(18, 18, 18, .4)
+    }
+
+    & .rp-toggle.on {
+      background: #121212;
+      box-shadow: inset 0 0 0 1px #625A59;
+      color: #FDFCFC
+    }
+
+    /* Figma 234:7636 — bottom right of the sell/profit card */
+    & .adjust {
+      position: absolute;
+      right: 29px;
+      bottom: 22px
+    }
+
+    & .x button:hover {
+      color: #93594B
+    }
+  }
+
+  /* =============== cards =============== */
+  .rp-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 24px
+  }
+
+  .rp-sec-foot {
+    padding-block: 40px
+  }
+
+  .rp-card {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    padding: var(--card-pad);
+    background: #FFFFFF;
+    border: 1px solid rgba(13, 12, 12, .16);
+    border-radius: 24px;
+    scroll-margin-top: 24px;
+
+    & h2 {
+      font-size: 37px;
+      font-weight: 300;
+      line-height: 48px;
+      color: #070606
+    }
+
+    & .intro {
+      max-width: 531px;
+      font-size: 16px;
+      line-height: 1.6;
+      letter-spacing: .08px;
+      color: #605B57
+    }
+  }
+
+  /* ---- how big should you build? (Figma 1260:41023) ---- */
+  .rp-tiles {
+    display: flex;
+    gap: 8px
+  }
+
+  .rp-tile {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    border: 1px solid rgba(0, 0, 0, .1);
+    border-radius: 16px;
+    text-align: left;
+    transition: border-color .15s, background .15s;
+
+    &:hover {
+      border-color: rgba(0, 0, 0, .24)
+    }
+
+    &.on {
+      border-color: #2E6D5B;
+      background: linear-gradient(180deg, rgba(237, 252, 243, .56), rgba(237, 252, 243, 0))
+    }
+
+    & .tag {
+      position: absolute;
+      left: 50%;
+      top: -13px;
+      transform: translateX(-50%);
+      height: 24px;
+      padding: 4px 8px 4px 7px;
+      border-radius: 9999px;
+      background: #0D5739;
+      box-shadow: 0 1px 2px rgba(18, 18, 18, .04), 0 2px 4px rgba(18, 18, 18, .06);
+      color: #FDFCFC;
+      font-size: 12px;
+      line-height: 1.26;
+      letter-spacing: .25px;
+      white-space: nowrap
+    }
+
+    & .name {
+      font-size: 13px;
+      line-height: 1.6;
+      letter-spacing: .325px;
+      color: #8B857B
+    }
+
+    &.on .name {
+      color: #316859
+    }
+
+    & .size {
+      font-size: 24px;
+      font-weight: 300;
+      line-height: 1.3;
+      letter-spacing: .12px;
+      color: #605B57;
+      white-space: nowrap
+    }
+
+    & .size .u {
+      margin-left: 2px
+    }
+
+    & .size sup {
+      font-size: 15.48px;
+      line-height: 0
+    }
+
+    & .why {
+      font-size: 12px;
+      line-height: 1.4;
+      letter-spacing: .06px;
+      color: #8B857B
+    }
+  }
+
+  /* the illustration pieces, placed in px as in the Figma frames (1260:41029,
+     1266:42978) over a fixed 124×137 stage centred in the tile */
+  .rp-illus {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    height: 137px;
+
+    & .stage {
+      position: relative;
+      flex: none;
+      width: 124px;
+      height: 137px
+    }
+
+    & img {
+      position: absolute;
+      max-width: none
+    }
+
+    & .base {
+      left: 50%;
+      top: calc(50% + .5px);
+      width: 157.333px;
+      height: 118px;
+      transform: translate(-50%, -50%)
+    }
+
+    & .shadow {
+      left: 46px;
+      top: 41px;
+      width: 32px;
+      height: 14px
+    }
+
+    & .sparkle {
+      left: 51px;
+      top: 24px;
+      width: 24px;
+      height: 24px
+    }
+
+    & .adu-a {
+      left: 77px;
+      top: 57px;
+      width: 26.353px;
+      height: 28.556px
+    }
+
+    & .adu-b {
+      left: 68px;
+      top: 67.27px;
+      width: 9px;
+      height: 18.239px
+    }
+
+    /* the roof: Figma bleeds it 1%/1.73% past its frame for the stroke */
+    & .adu-c {
+      left: 67.65px;
+      top: 51.65px;
+      width: 36.061px;
+      height: 21.154px
+    }
+  }
+
+  .rp-sum {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px 40px;
+    padding: 32px 0;
+    border-top: 1px solid #EAD7D2;
+
+    & > div {
+      flex: 1;
+      min-width: 120px;
+      display: flex;
+      flex-direction: column
+    }
+
+    & em {
+      margin-bottom: 8px;
+      font-style: normal;
+      font-size: 13px;
+      line-height: 1.3;
+      letter-spacing: .065px;
+      color: #8B857B
+    }
+
+    & b {
+      font-weight: 400;
+      font-size: 18px;
+      line-height: 26px;
+      color: #625A59
+    }
+
+    & b.ink {
+      color: #070606
+    }
+
+    & small {
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.3;
+      color: #C49286
+    }
+  }
+
+  /* profit chart (Figma 1260:41079). Bars and column shades share one grid,
+     one track per bar, so the slider below can line its thumb up with them. */
+  .rp-chart {
+    position: relative;
+    height: 250px;
+
+    & .cols,
+    & .bars {
+      position: absolute;
+      left: 40px;
+      right: 0;
+      display: grid;
+      grid-template-columns: repeat(var(--n), minmax(0, 1fr))
+    }
+
+    & .cols {
+      top: 0;
+      height: 220px
+    }
+
+    & .cols i {
+      grid-row: 1;
+      background: #FFFFFF;
+      border-right: 1px solid #EAD7D2
+    }
+
+    & .cols i:last-child {
+      border-right: 0
+    }
+
+    & .bars {
+      top: 40px;
+      height: 173px
+    }
+
+    /* one in-flow cell per bar; the bar is placed inside it */
+    & .bars .cell {
+      position: relative;
+      grid-row: 1
+    }
+
+    /* profit is grey, a loss is light red, and the size we recommend is green */
+    & .bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      max-width: 40px;
+      min-height: 1px;
+      margin: 0 auto;
+      width: calc(100% - 6px);
+      border-radius: 8px 8px 0 0;
+      background: #C7CECC;
+      transition: filter .15s, box-shadow .15s
+    }
+
+    & .bar.down {
+      border-radius: 0 0 8px 8px;
+      background: #F7C4C0
+    }
+
+    /* the recommendation says whether it pays; the card above stays green */
+    & .bar.rec.gain {
+      background: #1F5F46
+    }
+
+    & .bar.rec.loss {
+      background: #A33A30
+    }
+
+    & .bar.rec.even {
+      background: #6F6865
+    }
+
+    /* the size being read right now, wherever the slider or a card put it */
+    & .bar.on {
+      outline: 2px solid rgba(18, 18, 18, .45);
+      outline-offset: 1px
+    }
+
+    & .bar:hover {
+      filter: brightness(.94)
+    }
+
+    & .axis {
+      position: absolute;
+      left: 0;
+      font-size: 10px;
+      line-height: 1.6;
+      letter-spacing: .05px;
+      color: #605B57;
+      opacity: .5;
+      white-space: nowrap
+    }
+
+    & .rule {
+      position: absolute;
+      left: 36px;
+      right: 0;
+      height: 0;
+      border-top: 1px solid rgba(13, 12, 12, .08)
+    }
+  }
+
+  .rp-slider {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 40px;
+
+    & .track {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+      height: 8px
+    }
+
+    & .track i {
+      grid-row: 1
+    }
+
+    & .track i:first-of-type {
+      border-radius: 999px 0 0 999px
+    }
+
+    & .track i:last-of-type {
+      border-radius: 0 999px 999px 0
+    }
+
+    & .track i:only-of-type {
+      border-radius: 999px
+    }
+
+    /* The native range, stretched so value i puts the thumb over bar i's
+       centre: its travel runs from the first track's middle to the last's. */
+    & input {
+      position: absolute;
+      top: -6px;
+      left: calc(100% / var(--n) / 2 - 10px);
+      width: calc(100% * (var(--n) - 1) / var(--n) + 20px);
+      height: 20px;
+      margin: 0;
+      background: transparent;
+      appearance: none;
+      cursor: pointer
+    }
+
+    & input::-webkit-slider-runnable-track {
+      height: 20px;
+      background: transparent
+    }
+
+    & input::-webkit-slider-thumb {
+      width: 20px;
+      height: 20px;
+      border: 1px solid #625A59;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .9);
+      box-shadow: 0 1px 3px rgba(18, 18, 18, .12);
+      appearance: none;
+      cursor: grab
+    }
+
+    & input::-moz-range-track {
+      background: transparent
+    }
+
+    & input::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      box-sizing: border-box;
+      border: 1px solid #625A59;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .9);
+      box-shadow: 0 1px 3px rgba(18, 18, 18, .12);
+      cursor: grab
+    }
+
+    & .ends {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      line-height: 1.6;
+      letter-spacing: .06px;
+      color: #605B57;
+      opacity: .8;
+      white-space: nowrap
+    }
+
+    & .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      padding-top: 8px
+    }
+
+    & .legend span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      line-height: 1.6;
+      letter-spacing: .06px;
+      color: #605B57;
+      opacity: .8;
+      white-space: nowrap
+    }
+
+    & .legend i {
+      width: 17px;
+      height: 6px;
+      border-radius: 999px
+    }
+  }
+
+  .rp-notes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 60px;
+    padding: 24px;
+    border-radius: 16px;
+    background: #FAF7F6;
+
+    & h3 {
+      margin-bottom: 4px;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: #121212
+    }
+
+    & p {
+      font-size: 14px;
+      font-weight: 300;
+      line-height: 1.26;
+      color: #070606
+    }
+  }
+
+  /* the way into the assumptions, in the hero card and on section headers */
+  .rp-adjbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 9999px;
+    box-shadow: inset 0 0 0 1px #A8A3A2;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #121212;
+    white-space: nowrap;
+    transition: background-color .15s, box-shadow .15s
+  }
+
+  .rp-adjbtn:hover {
+    background: #F5F0EE
+  }
+
+  .rp-adjbtn.on {
+    background: #121212;
+    box-shadow: inset 0 0 0 1px #625A59;
+    color: #FDFCFC
+  }
+
+  /* Figma 144:22285 — title left, the assumptions button level with it */
+  .rp-cardhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px
+  }
+
+  /* ---- where every dollar goes (Figma 1260:41163) ---- */
+  .rp-led {
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
+
+    & > div {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column
+    }
+
+    & h3 {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.48;
+      color: #121212
+    }
+
+    & .note {
+      margin-top: 24px;
+      font-size: 12px;
+      line-height: 1.6;
+      letter-spacing: .06px;
+      color: #605B57
+    }
+  }
+
+  .rp-led-r {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 8px 0;
+    border-bottom: 1px solid #F1E7E4;
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: .07px;
+    color: #605B57;
+
+    /* the label gives way to the adjust link rather than wrapping the row */
+    & span {
+      flex: 1;
+      min-width: 0;
+      padding-right: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    & b {
+      font-weight: 400;
+      white-space: nowrap
+    }
+
+    &.tot {
+      font-weight: 700;
+      margin-bottom: 8px
+    }
+
+    &.tot b {
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: .08px
+    }
+
+    /* The assumption behind this row, on hover. It takes no room until then,
+       so the label keeps the full width, and the number never moves. */
+    & .adj {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex: none;
+      max-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      opacity: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #AE6A5B;
+      transition: opacity .12s, max-width .12s
+    }
+
+    & .adj :is(svg, i) {
+      display: none
+    }
+
+    &.can:hover .adj,
+    & .adj:focus-visible {
+      max-width: 220px;
+      padding-right: 8px;
+      opacity: 1
+    }
+
+    & .adj:hover span {
+      text-decoration: underline;
+      text-underline-position: from-font
+    }
+  }
+
+  /* no hover to give: mark the editable rows with a pencil instead */
+  @media (hover: none) {
+    .rp-led-r .adj {
+      max-width: none;
+      padding-right: 8px;
+      opacity: 1
+    }
+
+    .rp-led-r .adj span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%)
+    }
+
+    .rp-led-r .adj :is(svg, i) {
+      display: block
+    }
+  }
+
+  /* the two figures in the closing note that lead to their assumption */
+  .rp-led .note .tie {
+    color: #AE6A5B;
+    text-decoration: underline;
+    text-underline-position: from-font;
+    font: inherit
+  }
+
+  .rp-wif {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    & h3 {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.6;
+      letter-spacing: .08px;
+      color: #121212
+    }
+
+    & .sens {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 16px;
+      border-radius: 16px;
+      background: linear-gradient(90deg, #F5F0EE, #FDFCFC);
+      line-height: 1.6
+    }
+
+    & .sens > span {
+      flex: 1;
+      min-width: 0;
+      font-size: 14px;
+      letter-spacing: .07px;
+      color: #121212
+    }
+
+    & .sens > div {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+      white-space: nowrap
+    }
+
+    /* Figma 234:7582 — the icon rides in a white circle */
+    & .sens .ic {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      flex: none;
+      border-radius: 999px;
+      background: #FDFCFC
+    }
+
+    & .sens b {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: .08px;
+      color: #121212
+    }
+
+    & .sens b.neg {
+      color: #C34137
+    }
+
+    & .sens small {
+      font-size: 12px;
+      letter-spacing: .06px;
+      color: #8B857B
+    }
+
+    & > p {
+      font-size: 14px;
+      line-height: 1.6;
+      letter-spacing: .07px;
+      color: #605B57
+    }
+  }
+
+  /* ---- neighborhood insights (Figma 1260:41262) ---- */
+  /* the comps illustration: the export's pieces on the design's 132.5px square */
+  .rp-hoodart {
+    position: relative;
+    display: block;
+    width: 132.5px;
+    height: 132.5px;
+    flex: none
+  }
+
+  .rp-hoodart img {
+    position: absolute;
+    max-width: none
+  }
+
+  .rp-hood {
+    padding: 40px var(--card-pad);
+
+    & .head {
+      display: flex;
+      align-items: flex-end;
+      gap: 24px
+    }
+
+    & .head h2 {
+      flex: 1;
+      font-size: 31px;
+      line-height: 40px
+    }
+
+    & .head span {
+      padding-bottom: 6px;
+      font-size: 12px;
+      font-weight: 300;
+      line-height: 16px;
+      color: #605B57;
+      white-space: nowrap
+    }
+
+    /* Figma 234:73373 — the comps card down the left, six tiles beside it */
+    & .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px
+    }
+
+    & .comps {
+      grid-column: 1;
+      grid-row: 1 / span 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 16px;
+      border-radius: 16px;
+      box-shadow: inset 0 0 0 1px rgba(18, 18, 18, .16);
+      font-size: 14px;
+      line-height: 1.48;
+      letter-spacing: .25px;
+      color: #605B57;
+      transition: background-color .15s
+    }
+
+    & .comps:hover {
+      background: #F7F6F5
+    }
+
+    /* the tiles are placed by the card's grid, not a grid of their own */
+    & .stats {
+      display: contents
+    }
+
+    & .stats > div {
+      align-self: start;
+      padding: 15px 16px;
+      border-radius: 16px;
+      background: #F5F0EE
+    }
+
+    & .stats em {
+      display: block;
+      font-style: normal;
+      font-size: 10px;
+      line-height: 1.6;
+      letter-spacing: .05px;
+      text-transform: uppercase;
+      color: #908C89
+    }
+
+    & .stats p {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      padding: 8px 0
+    }
+
+    & .stats b {
+      font-size: 24px;
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: .12px;
+      color: #111010
+    }
+
+    & .stats span {
+      font-size: 12px;
+      line-height: 1;
+      letter-spacing: .06px;
+      color: #605B57
+    }
+
+    & .stats sup {
+      font-size: 7.74px
+    }
+  }
+
+  /* =============== build guidelines (Figma 1260:39635) =============== */
+
+  /* the hero reuses .rp-hero's type; it just sits in a taller band */
+  /* ---- please note (Figma 1260:41343) ---- */
+  .rp-notice {
+    flex-direction: row;
+    gap: 40px;
+    padding: 40px var(--card-pad);
+
+    & h2 {
+      flex: 0 0 260px;
+      font-size: 31px;
+      line-height: 40px
+    }
+
+    & p {
+      flex: 1;
+      padding: 8px 0;
+      font-size: 15px;
+      line-height: 20px;
+      color: #070606;
+      opacity: .65
+    }
+  }
+  /* ---- the sidebar's assumptions face ---- */
+  .rp-adj {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #FDFCFC;
+    border: 1px solid #F1E7E4;
+    border-radius: 32px;
+    padding: 24px 24px 0;
+    /* clip, not hidden: the title stays, the fields scroll, the footer is pinned */
+    overflow: clip;
+
+    /* the fields between the title and the footer */
+    & .body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none
+    }
+
+    & .body::-webkit-scrollbar {
+      display: none
+    }
+
+    & header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px
+    }
+
+    & h2 {
+      font-size: 24px;
+      font-weight: 300;
+      line-height: 1.26;
+      color: #070606
+    }
+
+    & .close {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      border-radius: 9999px;
+      background: rgba(13, 12, 12, .06);
+      color: #111010;
+      transition: background .15s
+    }
+
+    & .close:hover {
+      background: rgba(13, 12, 12, .12)
+    }
+
+    /* the fields scroll under this, so it reads as a header */
+    & .lede {
+      margin-top: 8px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #F1E7E4;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #605B57
+    }
+
+    & .grp {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-block: 20px;
+      border-bottom: 1px solid #F1E7E4
+    }
+
+    & .grp:last-of-type {
+      border-bottom: none
+    }
+
+    & h3 {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.48;
+      letter-spacing: .25px;
+      color: #121212
+    }
+
+    /* a choice between two: the label like a field's, the options in one
+       pill on the right, the chosen one lifted out of the track */
+    & .seg {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px
+    }
+
+    & .seg .lbl {
+      font-size: 14px;
+      line-height: 1.4;
+      color: #121212
+    }
+
+    & .seg .track {
+      flex: none;
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 9999px;
+      background: #F5F0EE;
+      box-shadow: inset 0 0 0 1px #F1E7E4
+    }
+
+    & .seg button {
+      height: 30px;
+      padding: 0 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.26;
+      color: #625A59;
+      white-space: nowrap;
+      transition: background .15s, color .15s, box-shadow .15s
+    }
+
+    & .seg button:hover {
+      color: #070606
+    }
+
+    & .seg button.on {
+      background: #FFFFFF;
+      color: #070606;
+      box-shadow: 0 1px 1px rgba(18, 18, 18, .04), 0 2px 4px rgba(18, 18, 18, .08)
+    }
+
+    & .seg button:focus-visible {
+      outline: 2px solid #93594B;
+      outline-offset: 1px
+    }
+
+    & .gnote {
+      font-size: 12px;
+      line-height: 1.5;
+      color: #8B857B
+    }
+
+    & footer {
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-inline: -24px;
+      padding: 16px 24px 20px;
+      border-top: 1px solid #F1E7E4;
+      background: #FDFCFC;
+      font-size: 13px;
+      color: #625A59
+    }
+
+    & footer button {
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 9999px;
+      box-shadow: inset 0 0 0 1px rgba(13, 12, 12, .16);
+      font-size: 13px;
+      font-weight: 700;
+      color: #111010
+    }
+
+    & footer button:disabled {
+      opacity: .4;
+      cursor: default
+    }
+
+    /* one number: label left, value right, the default under it once changed */
+    & .fld {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 132px;
+      align-items: center;
+      column-gap: 12px;
+      row-gap: 4px
+    }
+
+    & .fld label {
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+      line-height: 1.4;
+      color: #121212
+    }
+
+    & .fld label small {
+      font-size: 12px;
+      line-height: 1.4;
+      color: #8B857B
+    }
+
+    & .fld .in {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      padding: 0 10px;
+      border-radius: 10px;
+      background: #FFFFFF;
+      box-shadow: inset 0 0 0 1px rgba(13, 12, 12, .16);
+      font-size: 14px;
+      color: #8B857B;
+      transition: box-shadow .15s
+    }
+
+    & .fld .in:focus-within {
+      box-shadow: inset 0 0 0 1.5px #93594B
+    }
+
+    & .fld input {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      font: inherit;
+      font-size: 14px;
+      color: #121212;
+      text-align: right
+    }
+
+    & .fld .pre {
+      margin-right: 2px
+    }
+
+    & .fld .suf {
+      margin-left: 3px;
+      white-space: nowrap
+    }
+
+    /* where a link from the analysis just landed */
+    & .fld.hit .in {
+      box-shadow: inset 0 0 0 2px #93594B;
+      background: #FBF6F4
+    }
+
+    & .fld.hit label span {
+      color: #93594B
+    }
+
+    & .fld.changed .in {
+      background: #FBF6F4;
+      box-shadow: inset 0 0 0 1px #D0AFA4
+    }
+
+    & .fld.changed input {
+      font-weight: 700
+    }
+
+    & .fld .reset {
+      grid-column: 2;
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #93594B
+    }
+
+    & .fld .reset:hover {
+      text-decoration: underline
+    }
+
+    & .fld.off {
+      opacity: .45
+    }
+
+    & .fld.off .in {
+      background: #F5F0EE
+    }
+  }
+
+  /* =============== staged reveal (-report/stage.ts) =============== */
+
+  /* 0–10s: the whole screen, over the page as it builds underneath */
+}
+@keyframes rp-line {
+  from { opacity: 0; transform: translateY(6px) }
+  to { opacity: 1; transform: none }
+}
+
+@keyframes rp-rise {
+  from { opacity: 0; transform: translateY(8px) }
+  to { opacity: 1; transform: none }
+}
+
+@keyframes rp-fade-in {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+
+@keyframes rp-fade-out {
+  from { opacity: 1 }
+  to { opacity: 0 }
+}
+
+@keyframes rp-shimmer {
+  to { background-position: 250% 0, 0 0 }
+}
+
+/* ============================================================
+   OVERRIDES BY WIDTH. Last in the file on purpose: they restate rules from
+   above at the same weight, so they have to come after them.
+   ============================================================ */
+
+/* Smaller tablets: the display type steps down about one size (headings
+   and the big figures only), so a headline isn't a stack of single words.
+   Body copy (16px) and small print (14px and under) stay as designed. */
+@media (max-width: 1023px) {
+  .bz-up {
+    & .rp-hero h1 {
+      font-size: 44px;
+      letter-spacing: -.44px
+    }
+
+    & .rp-hero .left p {
+      font-size: 17px
+    }
+
+    & .rp-card h2 {
+      font-size: 32px;
+      line-height: 42px
+    }
+
+    & :is(.rp-hood .head, .rp-notice) h2 {
+      font-size: 28px
+    }
+
+    & :is(.rp-steps, .rp-sizes) .k {
+      font-size: 32px
+    }
+
+    & .rp-sum b {
+      font-size: 16px
+    }
+
+    & .rp-tile .size {
+      font-size: 22px
+    }
+
+    & .rp-ring .val b {
+      font-size: 42px
+    }
+
+    & .ub-gauge .val {
+      font-size: 36px
+    }
+  }
+}
+
+/* Below 1400 the design's title breaks are no longer the ones drawn, so
+   let the browser even the lines out rather than leave one word alone. */
+@media (max-width: 1399px) {
+  .bz-up :is(.rp-hero h1, .rp-card h2) {
+    text-wrap: balance
+  }
+}
+
+/* ============================================================
+   COMPACT: the analysis column under 830px (RESPONSIVE-UPDATE.md). With the
+   fluid sidebar this is only the drawer at 768–841px (at 1200 the column is
+   834px, so the sidebar layout never goes compact), where a card's inside
+   is about 610px. Only what still crowds there changes.
+   ============================================================ */
+@container rp-main (max-width: 829px) {
+  .bz-up {
+    /* buy and improve on one row, the sell-and-profit card under them with
+       room for both columns; the button joins the card's flow at its foot */
+    & .rp-steps {
+      flex-wrap: wrap;
+      row-gap: 40px;
+      padding-bottom: 64px
+    }
+
+    & .rp-steps > .step:first-child {
+      margin-left: 0
+    }
+
+    & .rp-steps > .step + .step .arrow {
+      display: none
+    }
+
+    & .rp-steps .out {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+      margin-left: 0;
+      min-height: 0
+    }
+
+    /* the two columns fill the first line, so the button wraps to the foot */
+    & .rp-steps .out > .step {
+      flex: 1 1 40%
+    }
+
+    & .rp-steps .adjust {
+      position: static;
+      margin-left: auto
+    }
+
+    /* the tile illustration's 124px stage, drawn smaller so it fits a
+       tile about 140px wide */
+    & .rp-tile {
+      padding: 12px
+    }
+
+    & .rp-illus .stage {
+      scale: .82
+    }
+
+    & .rp-notes {
+      column-gap: 32px
+    }
+
+    /* the heading goes above the note instead of a 260px column beside it */
+    & .rp-notice {
+      flex-direction: column;
+      gap: 16px
+    }
+
+    & .rp-notice h2 {
+      flex: none
+    }
+
+    & .rp-guide .name {
+      flex-basis: 140px
+    }
+
+    & .rp-sizes {
+      gap: 32px
+    }
+
+    /* the loading skeleton's steps take the same two rows, at the heights
+       measured off the real ones at 768px, so nothing moves at 5s */
+    & .rp-skel .steps {
+      flex-wrap: wrap;
+      row-gap: 40px;
+      padding-bottom: 86px
+    }
+
+    & .rp-skel .steps .bone {
+      flex: 1 1 40%;
+      height: 233px
+    }
+
+    & .rp-skel .steps .bone.out {
+      flex: 1 1 100%;
+      height: 321px;
+      margin-top: 0
+    }
+
+    /* the facts' rule spans the card, so it follows their padding */
+    & .rp-comp .facts {
+      column-gap: 12px;
+      padding-inline: 16px 12px
+    }
+
+    & .rp-comp .rule {
+      margin-inline: -16px -12px
+    }
+  }
+}
+
+
+/* ============================================================
+   TOUCH (tablets). A finger needs about 44px. The slider gets a taller
+   strip and a bigger thumb; small buttons keep their look and get an
+   invisible hit area around them. Hover-only links already have their
+   touch form (the ledger's pencil, under hover: none above).
+   ============================================================ */
+@media (pointer: coarse) {
+  .bz-up {
+    & .rp-slider input {
+      top: -18px;
+      left: calc(100% / var(--n) / 2 - 14px);
+      width: calc(100% * (var(--n) - 1) / var(--n) + 28px);
+      height: 44px
+    }
+
+    & .rp-slider input::-webkit-slider-runnable-track {
+      height: 44px
+    }
+
+    & .rp-slider input::-webkit-slider-thumb {
+      width: 28px;
+      height: 28px;
+      margin-top: 8px
+    }
+
+    & .rp-slider input::-moz-range-thumb {
+      width: 28px;
+      height: 28px
+    }
+
+    /* :where, so this never outweighs a button's own positioning */
+    & :where(.rp-toggle, .rp-adjbtn, .rp-guide .more, .rp-adj .seg button, .rp-adj .close, .psum-tab, .rp-tabs .pill button) {
+      position: relative
+    }
+
+    & :where(.rp-toggle, .rp-adjbtn, .rp-guide .more, .rp-adj .seg button, .rp-adj .close, .psum-tab, .rp-tabs .pill button)::before {
+      content: "";
+      position: absolute;
+      inset: -10px -2px
+    }
+  }
+}
+
+/* The underbuilt ring's tip had max-width 240px but kept its text on one
+   line, so the text ran out of its box at every width: it wraps now. The
+   ring also sits at the hero's right edge, where the tip, centred under it
+   and only transparent while hidden, would widen the page; under 920px it
+   opens leftwards. After the original rule so it wins at equal weight. */
+.bz-up .rp-ring .tip {
+  width: max-content;
+  max-width: 240px;
+  white-space: normal
+}
+
+@container rp-main (max-width: 919px) {
+  .bz-up .rp-ring .tip {
+    left: auto;
+    right: 0;
+    transform: none
+  }
+}
+
+/* ---- RoiGauge (src/components/RoiGauge.css) ---- */
+.bz-up .ub-gauge {
+  width: 269.559px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.bz-up .ub-gauge svg {
+  flex: none;
+  display: block;
+}
+
+.bz-up .ub-gauge .txt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.bz-up .ub-gauge .cap {
+  font-size: 14px;
+  line-height: 1.48;
+  letter-spacing: .25px;
+  color: #494341;
+}
+
+.bz-up .ub-gauge .val {
+  /* the design nudges the number right of centre, off the "%" beside it */
+  padding-left: 8px;
+  font-size: 40px;
+  line-height: 20px;
+  color: #111010;
+}
+
+.bz-up .ub-gauge .val span {
+  font-size: 20px;
+  line-height: 20px;
+  color: rgba(18, 18, 18, .4);
+}
+
+/* ---- Breezy: the assumptions slide in at the right of the report sheet
+   (Pedro's sidebar face), the analysis column narrows beside them ---- */
+.bz-up .bz-up-side {
+  flex: none;
+  width: 400px;
+  height: 100%;
+  padding: 16px 16px 16px 0;
+  animation: bz-up-in .3s cubic-bezier(.2, .8, .2, 1) both
+}
+@keyframes bz-up-in {
+  from { opacity: 0; transform: translateX(24px) }
+  to { opacity: 1; transform: none }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bz-up .bz-up-side { animation: none }
+}

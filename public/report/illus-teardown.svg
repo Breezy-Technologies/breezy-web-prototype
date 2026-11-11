@@ -1,0 +1,22 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="157.333" height="118" viewBox="0 0 157.333 118" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="illustration" clip-path="url(#clip0_0_112)">
+<g id="Vector" opacity="0.55" filter="url(#filter0_f_0_112)">
+<path d="M78.6667 75.52C109.948 75.52 135.307 71.998 135.307 67.6533C135.307 63.3087 109.948 59.7867 78.6667 59.7867C47.3853 59.7867 22.0267 63.3087 22.0267 67.6533C22.0267 71.998 47.3853 75.52 78.6667 75.52Z" fill="#E9E1D7"/>
+</g>
+<path id="Vector_2" d="M78.6642 23.4427L136.248 56.64L78.6642 89.8374L21.0802 56.64L78.6642 23.4427Z" fill="#F4EEE6" stroke="#DFD4C6" stroke-width="0.786667" stroke-dasharray="3.15 2.36"/>
+<path id="Vector_3" d="M28.32 33.04L78.6667 62.1467V85.7467L28.32 56.64V33.04Z" fill="#A3907F"/>
+<path id="Vector_4" d="M129.013 33.04L78.6667 62.1467V85.7467L129.013 56.64V33.04Z" fill="#BCAA9B"/>
+<path id="Vector_5" d="M78.6667 3.93333L129.013 33.04L78.6667 62.1467L28.32 33.04L78.6667 3.93333Z" fill="#D3C4B7" stroke="#96826F" stroke-width="0.708" stroke-linejoin="round"/>
+<path id="Vector_6" opacity="0.9" d="M78.6667 12.2721L105.02 27.5334L78.6667 42.7161L52.3133 27.5334L78.6667 12.2721Z" stroke="white" stroke-width="0.865333" stroke-dasharray="2.36 2.36"/>
+</g>
+<defs>
+<filter id="filter0_f_0_112" x="-12.5867" y="25.1733" width="182.507" height="84.96" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="17.3067" result="effect1_foregroundBlur_0_112"/>
+</filter>
+<clipPath id="clip0_0_112">
+<rect width="157.333" height="118" fill="white"/>
+</clipPath>
+</defs>
+</svg>
