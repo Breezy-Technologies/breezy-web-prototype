@@ -266,7 +266,9 @@ export default function HomeWeb() {
     const bb: BBox = [Math.min(a.lng, b.lng), Math.min(a.lat, b.lat), Math.max(a.lng, b.lng), Math.max(a.lat, b.lat)];
     const p = viewportPlace(bb);
     setAreaPill(false); sv.setActive(null); closeDetail(); setSearching(false); setSortOpen(false);
-    setView("results");
+    // On Home's For you tab the search stays there (review comment): the feed and its
+    // special pins refresh for the newly searched area. Elsewhere it opens Results.
+    if (!fyOn) setView("results");
     setUnsup(isCovered(p) ? null : { label: "This area", placed: true });
     chooseAreas([p]);
   };

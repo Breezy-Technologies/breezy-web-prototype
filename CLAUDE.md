@@ -57,7 +57,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 **Home card** (`HomeCard.tsx`), always full height, with three tabs:
 - **For you:** the V5 feed (`ForYouFeed.tsx`), with a signal filter dropdown and `SignalDot` badges.
   - **Read state (decided 10 Nov):** an item is **seen when it's opened** (clicked); hover doesn't count. Each opportunity is dated by when Breezy found it (fake, 0–3 days ago) and the feed is grouped under bold date dividers ("Today · November 11", "Yesterday · …"); a divider has a red dot and "n new" while anything under it is unread. Unread cards carry a red **"New"** label (the bell read as an alert someone set up); opened cards carry no label (review: no "Seen" label needed).
-  - **Unread toggle** (11 Nov review: one button like Apple Mail, styled like Slack's "Unread messages"): right-aligned on the signal filter's row, an outlined "Unread" button with the notification icon that fills (clay tint) when on. No red dot on it. No result count on For you. A card opened while filtering by Unread stays listed until the filter is switched. When nothing is unread: "You're all caught up" (with "Show all" in the Unread view).
+  - **Unread toggle** (11 Nov review: one button like Apple Mail, styled like Slack's "Unread messages"): right-aligned on the signal filter's row, an "Unread" button with the notification icon in Breezy's secondary style (grey pill, `btn-soft`), ink when on like the type filter. No red dot on it. No result count on For you. A card opened while filtering by Unread stays listed until the filter is switched. When nothing is unread: "You're all caught up" (with "Show all" in the Unread view).
   - The feed follows the same 1 / 2 / 3 column setting as Results (toggle top-right of the Home card, For you only); each day's cards form a grid.
   - **Special pins** (yellow signal circles) appear on the map **only while For you is the visible tab**. They follow the feed's signal filter.
   - A pin reverts to a plain white price pill once its detail has been opened ("seen"). Until then it pulses (a disc and a ring in its colour, reaching well past the pill, staggered) and carries a red unread dot.
@@ -91,7 +91,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Shows only after a *user* pan / zoom, never after the app's own `easeTo` / `fitBounds`. Two triggers:
   - the centre of the visible map has left the searched area;
   - more than half of a 4 × 3 grid over the visible map has no pins.
-- Clicking it searches the visible box: the field reads "Map area", the outline clears, and the camera stays put.
+- Clicking it searches the visible box: the field reads "Map area", the outline clears, and the camera stays put. From Home's **For you** tab it stays on For you: the feed and its special pins refresh for the new area (review comment); from anywhere else it opens Results.
 - Pins already inside the box are kept (same id, same spot); the rest come from a fixed global grid of listings (~500 m cells, `areaListings` in `lib/fake.ts`), so searching overlapping boxes finds the same homes in the same places.
 
 **Map and pins**
