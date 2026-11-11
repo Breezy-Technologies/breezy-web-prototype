@@ -102,10 +102,14 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   useEffect(() => {
     if (phase !== "choose" || gcPaused) return;
     gcAt.current = Date.now();
-    const id = setTimeout(() => setPhase("run"), gcLeft.current);
+    const id = setTimeout(() => compsNow(), gcLeft.current);
     return () => { clearTimeout(id); gcLeft.current = Math.max(0, gcLeft.current - (Date.now() - gcAt.current)); };
   }, [phase, gcPaused]);
 
+  // Comps skip the loading stage (review: progressive disclosure): the report opens on
+  // the subject and its estimate, and the comps arrive one by one (CompsReport reveal).
+  const [reveal, setReveal] = useState(false);
+  const compsNow = () => { got.add(gotKey(l, "comps")); setReveal(true); setPhase("report"); onDone?.("comps"); };
   const pick = (k: FlowKind) => {
     if (k === kind && phase === "report") return;
     prev.current = { kind, phase };
@@ -151,7 +155,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <button onClick={() => { got.add(gotKey(l, "comps")); setPhase("report"); onDone?.("comps"); }} className="btn-soft" style={css("width:200px;height:48px;padding:0 20px;border:none;border-radius:9999px;background:rgb(245,240,238);font:700 15px/20px var(--font-sans);color:rgb(17,16,16);cursor:pointer;white-space:nowrap")}>I&apos;ll comp myself</button>
-                  <button onClick={() => setPhase("run")} onMouseEnter={() => setGcPaused(true)} onMouseLeave={() => setGcPaused(false)}
+                  <button onClick={() => compsNow()} onMouseEnter={() => setGcPaused(true)} onMouseLeave={() => setGcPaused(false)}
                     style={css("position:relative;width:200px;height:48px;overflow:hidden;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 15px/20px var(--font-sans);color:rgb(253,252,252);cursor:pointer;white-space:nowrap")}>
                     {/* auto-run countdown fill (`gcRing`) */}
                     <span style={{ position: "absolute", inset: 0, transformOrigin: "0 50%", background: "linear-gradient(89.442deg,rgb(84,55,157) 0.06%,rgb(142,67,158) 97.94%)", animation: `gcFill ${AUTO_MS}ms linear both`, animationPlayState: gcPaused ? "paused" : "running" }} />
@@ -215,7 +219,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
                 )}
               </div>
             </div>
-            {kind === "comps" && <CompsReport l={l} />}
+            {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
             {kind === "ub" && <UBReport l={l} onComps={() => pick("comps")} />}
             {kind === "roi" && <UpsideReport l={l} onComps={() => pick("comps")} />}
           </div>

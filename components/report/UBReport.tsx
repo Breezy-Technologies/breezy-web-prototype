@@ -207,6 +207,14 @@ function personalizer(l: Listing) {
       for (const a of ["title", "aria-label"]) { const v = el.getAttribute(a); if (v) el.setAttribute(a, fix(v)); }
     }
     rebuildUses(tpl.content, z);
+    // The banner's "Verified" label: these rules are summaries, not verified (yet).
+    const w2 = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT);
+    for (let n = w2.nextNode(); n; n = w2.nextNode()) {
+      if ((n.nodeValue || "").trim() !== "Verified") continue;
+      let a = n.parentElement;
+      for (let i = 0; i < 3 && a && !/Summarised from the LA Municipal Code/.test(a.textContent || ""); i++) a = a.parentElement;
+      if (a && /Summarised from the LA Municipal Code/.test(a.textContent || "")) n.nodeValue = (n.nodeValue || "").replace("Verified", "Summary");
+    }
     // "Open the LA Municipal Code" links go to the code itself.
     tpl.content.querySelectorAll("a").forEach(a => { if (a.textContent?.trim() === "Open the LA Municipal Code") { a.setAttribute("href", LAMC_URL); a.setAttribute("target", "_blank"); a.setAttribute("rel", "noopener"); } });
     return tpl.innerHTML;
@@ -329,7 +337,8 @@ export function UBReport({ l, onComps }: { l: Listing; onComps: () => void }) {
     <div className="ubr" style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", background: "rgb(255,255,255)" }}>
       <style>{css}</style>
       <div ref={scroller} className="no-scrollbar" style={{ flex: 1, minWidth: 0, overflowY: "auto", overscrollBehavior: "contain" }}>
-        <div onClick={onClick} ref={body} style={{ padding: "40px 88px 96px 48px" }} />
+        {/* Narrower, centred column (review: the line length made the eye travel too far). */}
+        <div onClick={onClick} ref={body} style={{ maxWidth: 1080, margin: "0 auto", padding: "40px 112px 96px" }} />
       </div>
       {/* The dots rail (version D's .d-dots): a dash per section; hover shows every title. */}
       <nav className="d-dots" aria-label="Report sections" style={{ position: "absolute" }}>

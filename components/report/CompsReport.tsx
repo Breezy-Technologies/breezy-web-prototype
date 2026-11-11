@@ -13,6 +13,7 @@
 // Comps are real lots (lib/comps.ts); list prices, dates, days on market and
 // garages are seeded (compDetail).
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Listing, fullPrice, shortPrice } from "@/lib/fake";
 import { type Comp, compDetail, compPool, compsFor, shortDate } from "@/lib/comps";
 import { config, isLiveMap } from "@/lib/config";
@@ -220,7 +221,11 @@ function Table({ rows, isOn, onToggle }: { rows: { c: Comp; n: number; of: numbe
   );
 }
 
-export function CompsReport({ l }: { l: Listing }) {
+/* Progressive disclosure (review): no loading screen. The subject and its estimate show
+   at once; the comps then arrive one by one, each fading in with a slight lift, as if
+   estimated in turn. `reveal` plays it (first run); a report that has run opens whole. */
+const REVEAL_MS = 420;
+export function CompsReport({ l, reveal = false }: { l: Listing; reveal?: boolean }) {
   const base = useMemo(() => compsFor(l), [l]);
   const pool = useMemo(() => compPool(l), [l]);
   const [added, setAdded] = useState<Comp[]>([]);
@@ -249,7 +254,17 @@ export function CompsReport({ l }: { l: Listing }) {
   const average = avg(incAll.map(c => compDetail(c).sold ?? compDetail(c).listed));
   const candidates = [...pool.sold, ...pool.active].filter(c => ![...sold, ...active].some(x => x.i === c.i)).slice(0, 8);
 
-  const shown = (list: Comp[]) => list.map((c, j) => ({ c, n: j + 1, of: list.length })).filter(x => !hideExcl || isOn(x.c));
+  const total = sold.length + active.length;
+  const [ready, setReady] = useState(reveal ? 0 : Infinity);
+  useEffect(() => {
+    if (ready >= total) return;
+    const t = setTimeout(() => setReady(n => n + 1), ready === 0 ? 650 : REVEAL_MS);
+    return () => clearTimeout(t);
+  }, [ready, total]);
+  const loading = ready < total;
+  const order = [...sold, ...active].map(c => c.i);
+  const isReady = (c: Comp) => order.indexOf(c.i) < ready;
+  const shown = (list: Comp[]) => list.map((c, j) => ({ c, n: j + 1, of: list.length })).filter(x => (!hideExcl || isOn(x.c)) && isReady(x.c));
   const R = hashStr("last-sold:" + key);
   const lastSold = shortDate(new Date(2008 + (R % 16), (R >> 4) % 12, 1 + ((R >> 8) % 27)));
   const city = (l.city || "Los Angeles").split(",")[0];
@@ -262,24 +277,12 @@ export function CompsReport({ l }: { l: Listing }) {
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", animation: "flowRise .6s cubic-bezier(.2,.8,.2,1) both" }}>
-      <style>{`.cr-nav{opacity:0;transition:opacity .15s}.cr-photo:hover .cr-nav{opacity:1}.cr-act:hover{background:rgb(228,225,223)!important}`}</style>
-      {/* Top: the subject, n comps · average, Set Your Estimate */}
-      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 16, padding: "14px 24px 2px" }}>
-        <span style={{ flex: "0 1 auto", minWidth: 0, display: "flex", alignItems: "center", gap: 10, height: 48, padding: "0 18px 0 6px", borderRadius: 9999, boxShadow: "inset 0 0 0 1px rgb(228,224,221)", font: "400 15px/20px var(--font-sans)", color: INK }}>
-          <span style={{ flex: "none", width: 36, height: 36, borderRadius: 9999, background: `url('${l.photos[0]}') center/cover` }} />
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.addr}, {city}</span>
-        </span>
-        <span style={{ flex: 1 }} />
-        <span style={{ flex: "none", display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-          <span style={{ font: "400 15px/20px var(--font-sans)", color: INK }}><b>{incAll.length}</b> Comps</span>
-          <span style={{ font: "400 15px/20px var(--font-sans)", color: INK }}>Average: <b style={{ color: GREEN, fontWeight: 700 }}>{average ? fullPrice(Math.round(average / 1000) * 1000) : "—"}</b></span>
-        </span>
-        <button onClick={() => setEstOpen(true)} style={{ flex: "none", height: 48, padding: "0 22px", border: "none", borderRadius: 9999, background: INK, font: "700 15px/20px var(--font-sans)", color: "rgb(253,252,252)", cursor: "pointer" }}>{mine ? "Edit Your Estimate" : "Set Your Estimate"}</button>
-      </div>
-
-      <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 16, padding: "12px 12px 0 24px" }}>
+      <style>{`.cr-nav{opacity:0;transition:opacity .15s}.cr-photo:hover .cr-nav{opacity:1}.cr-act:hover{background:rgb(228,225,223)!important}
+@keyframes crIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}.cr-in{animation:crIn .55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes crShim{from{background-position:120% 0}to{background-position:-20% 0}}.cr-skel{background:linear-gradient(100deg,rgb(244,241,239) 30%,rgb(250,248,247) 50%,rgb(244,241,239) 70%) 0 0/250% 100%;animation:crShim 1.4s linear infinite}`}</style>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 20, padding: "16px 12px 0 24px" }}>
         {/* Left: subject */}
-        <div className="no-scrollbar" style={{ flex: "1 1 0", minWidth: 460, maxWidth: 720, display: "flex", flexDirection: "column", gap: 12, overflowY: "auto", paddingBottom: 16 }}>
+        <div className="no-scrollbar" style={{ flex: "1 1 0", minWidth: 540, maxWidth: 720, display: "flex", flexDirection: "column", gap: 12, overflowY: "auto", paddingBottom: 16 }}>
           <div style={{ position: "relative", flex: "none", height: 420 }}>
             {analytics ? <Analytics sold={incSold} active={active.filter(isOn)} onHide={() => setAnalytics(false)} />
               : mapView && bigMap ? (
@@ -298,8 +301,8 @@ export function CompsReport({ l }: { l: Listing }) {
                 </Carousel>
               )}
           </div>
-          <div style={{ flex: "none", display: "flex", flexWrap: "wrap", gap: 12 }}>
-            <div style={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14, padding: "20px 24px" }}>
+          <div style={{ flex: "none", display: "flex", gap: 12 }}>
+            <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: 14, padding: "20px 24px" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <span style={{ font: "400 14px/18px var(--font-sans)", color: INK }}>{city}</span>
                 <span style={{ font: "300 28px/1.2 var(--font-sans)", letterSpacing: "-.4px", color: INK }}>{l.addr}</span>
@@ -319,7 +322,7 @@ export function CompsReport({ l }: { l: Listing }) {
                 <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}><span style={{ font: "400 13px/16px var(--font-sans)", color: MUTED }}>Last sold</span><span style={{ font: "400 16px/21px var(--font-sans)", color: INK }}>{lastSold}</span></span>
               </div>
             </div>
-            <div style={{ flex: "1 1 220px", maxWidth: 360, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: "20px 16px", boxSizing: "border-box", borderRadius: 24, background: "rgb(240,237,235)", textAlign: "center" }}>
+            <div style={{ flex: "none", width: 236, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: "20px 16px", boxSizing: "border-box", borderRadius: 24, background: "rgb(240,237,235)", textAlign: "center" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <span style={{ font: "700 14px/18px var(--font-sans)", color: INK }}>{mine ? "Your estimate" : lotMode ? "Lot price" : "Home price"}</span>
                 <span style={{ font: "400 13px/17px var(--font-sans)", color: INK, textWrap: "balance" } as React.CSSProperties}>{mine ? "Set by you. Comps and averages stay as they are." : lotMode ? "Based on lot size averages from selected comps" : "Based on home size averages from selected comps"}</span>
@@ -331,16 +334,18 @@ export function CompsReport({ l }: { l: Listing }) {
                 </button>
               )}
               {mine && <button className="btn-soft" onClick={() => { myEstimates.delete(key); setMine(undefined); }} style={{ height: 44, padding: "0 18px", font: "700 15px/20px var(--font-sans)" }}>Use comps estimate</button>}
+              <button onClick={() => setEstOpen(true)} style={{ height: 32, padding: "0 4px", border: "none", background: "none", font: "700 14px/18px var(--font-sans)", color: INK, textDecoration: "underline", textUnderlineOffset: 3, cursor: "pointer" }}>{mine ? "Edit your estimate" : "Set your estimate"}</button>
             </div>
           </div>
         </div>
 
         {/* Right: the comps */}
-        <div style={{ flex: "1 1 520px", minWidth: 420, overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, padding: "8px 12px 32px", scrollbarWidth: "thin" }}>
+        <div style={{ flex: "1 1 0", minWidth: 340, overflowY: "auto", display: "flex", flexDirection: "column", gap: 20, padding: "8px 12px 32px", scrollbarWidth: "thin" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <span style={{ font: "400 30px/36px var(--font-sans)", letterSpacing: "-.02em", color: INK }}>{sold.length + active.length} Comps to review</span>
-            <div style={{ display: "flex", gap: 20 }}>
-              {[[`${sold.length} Sold`, SOLD], [`${active.length} Active`, ACTIVE]].map(([t, c]) => <span key={t} style={{ display: "flex", alignItems: "center", gap: 8, font: "400 17px/22px var(--font-sans)", color: INK }}><span style={{ width: 10, height: 10, borderRadius: 9999, background: c }} />{t}</span>)}
+            <span style={{ font: "400 30px/36px var(--font-sans)", letterSpacing: "-.02em", color: INK }}>{loading ? <>Estimating comps <span style={{ color: MUTED }}>{Math.min(ready, total)} of {total}</span></> : `${total} Comps to review`}</span>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 20px" }}>
+              {[[`${sold.filter(isReady).length} Sold`, SOLD], [`${active.filter(isReady).length} Active`, ACTIVE]].map(([t, c]) => <span key={t} style={{ display: "flex", alignItems: "center", gap: 8, font: "400 17px/22px var(--font-sans)", color: INK }}><span style={{ width: 10, height: 10, borderRadius: 9999, background: c }} />{t}</span>)}
+              {!loading && average > 0 && <span style={{ font: "400 17px/22px var(--font-sans)", color: INK }}>Average <b style={{ color: GREEN }}>{fullPrice(Math.round(average / 1000) * 1000)}</b></span>}
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 10 }}>
@@ -350,17 +355,20 @@ export function CompsReport({ l }: { l: Listing }) {
               </button>
             ))}
           </div>
+          {loading && ready === 0 && <div className="cr-skel" style={{ height: 520, borderRadius: 24 }} />}
           {table
             ? <Table rows={[...shown(sold), ...shown(active)]} isOn={isOn} onToggle={toggle} />
-            : ([["S", sold, SOLD, "Sold"], ["L", active, ACTIVE, "Active"]] as [string, Comp[], string, string][]).map(([st, list, color, label]) => list.length > 0 && (
+            : ([["S", sold, SOLD, "Sold"], ["L", active, ACTIVE, "Active"]] as [string, Comp[], string, string][]).map(([st, list, color, label]) => list.some(isReady) && (
               <div key={st} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "8px 0" }}>
                   <span style={{ flex: 1, height: 1, background: "rgba(13,12,12,.1)" }} />
-                  <span style={{ height: 40, padding: "0 20px", borderRadius: 9999, background: color, font: "700 16px/40px var(--font-sans)", color: "rgb(253,252,252)" }}>{list.length} {label}</span>
+                  <span className="cr-in" style={{ height: 40, padding: "0 20px", borderRadius: 9999, background: color, font: "700 16px/40px var(--font-sans)", color: "rgb(253,252,252)" }}>{list.filter(isReady).length} {label}</span>
                   <span style={{ flex: 1, height: 1, background: "rgba(13,12,12,.1)" }} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 14 }}>
-                  {shown(list).map(({ c, n, of }) => <CompCard key={c.i} c={c} n={n} of={of} on={isOn(c)} vacant={vacant} onToggle={() => toggle(c)} />)}
+                  {shown(list).map(({ c, n, of }) => <div key={c.i} className="cr-in"><CompCard c={c} n={n} of={of} on={isOn(c)} vacant={vacant} onToggle={() => toggle(c)} /></div>)}
+                  {/* the next comp being estimated */}
+                  {loading && list.some(c => !isReady(c)) && list.some(isReady) && <div className="cr-skel" style={{ height: 520, borderRadius: 24 }} />}
                 </div>
               </div>
             ))}
@@ -401,16 +409,19 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     window.addEventListener("keydown", k, true);
     return () => window.removeEventListener("keydown", k, true);
   }, [onClose]);
-  return (
-    <div onClick={onClose} style={{ position: "absolute", inset: 0, zIndex: 20, background: "rgba(23,17,16,.28)", display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .2s ease both" }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: 480, maxWidth: "calc(100% - 32px)", display: "flex", flexDirection: "column", gap: 12, padding: 24, borderRadius: 28, background: "rgb(253,252,252)", boxShadow: "0 24px 60px rgba(30,18,12,.22)", animation: "bzModalIn .26s cubic-bezier(.2,.8,.2,1) both" }}>
+  // Portalled to <body>: the report's entry animation leaves a transform on its
+  // ancestors, which would make `fixed` relative to the sheet instead of the screen.
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(23,17,16,.28)", display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .2s ease both" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 480, maxWidth: "calc(100% - 32px)", display: "flex", flexDirection: "column", gap: 12, padding: 24, borderRadius: 28, background: "rgb(253,252,252)", boxShadow: "0 24px 60px rgba(30,18,12,.22)", animation: "riseIn .26s cubic-bezier(.2,.8,.2,1) both" }}>
         <div style={{ display: "flex", alignItems: "center" }}>
           <span style={{ flex: 1, font: "300 26px/1.2 var(--font-sans)", letterSpacing: "-.4px" }}>{title}</span>
           <button onClick={onClose} aria-label="Close" className="btn-ghost" style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-x" /></button>
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
