@@ -207,6 +207,14 @@ function personalizer(l: Listing) {
       for (const a of ["title", "aria-label"]) { const v = el.getAttribute(a); if (v) el.setAttribute(a, fix(v)); }
     }
     rebuildUses(tpl.content, z);
+    // The limiting rule's row (collapsed and expanded): in LA it's floor area, not the
+    // sample's lot coverage, so its subtitle and figure are the floor-area limit.
+    tpl.content.querySelectorAll("span").forEach(q => {
+      if (q.textContent?.trim() !== "How much floor area can the house have?") return;
+      const sub = q.nextElementSibling, val = q.parentElement?.nextElementSibling;
+      if (sub) sub.textContent = z.limiter;
+      if (val && /ft²/.test(val.textContent || "")) val.textContent = `${Math.round(S.Smax).toLocaleString("en-US")} ft²`;
+    });
     // The banner's "Verified" label: these rules are summaries, not verified (yet).
     const w2 = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT);
     for (let n = w2.nextNode(); n; n = w2.nextNode()) {
