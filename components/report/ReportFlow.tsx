@@ -15,7 +15,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Listing, shortPrice } from "@/lib/fake";
 import { css } from "@/lib/css";
-import { CompsResult, CompsReview } from "../home/CompsFlow";
+import { CompsReview } from "../home/CompsFlow";
+import { CompsReport } from "./CompsReport";
 import { UBReport } from "./UBReport";
 import { compsFor } from "@/lib/comps";
 import { UpsideReport } from "./upside/UpsideReport";
@@ -214,7 +215,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
                 )}
               </div>
             </div>
-            {kind === "comps" && <CompsResult l={l} />}
+            {kind === "comps" && <CompsReport l={l} />}
             {kind === "ub" && <UBReport l={l} onComps={() => pick("comps")} />}
             {kind === "roi" && <UpsideReport l={l} onComps={() => pick("comps")} />}
           </div>

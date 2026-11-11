@@ -10,6 +10,7 @@
 // Neighbourhood: lib/data/sl-hood.json (scripts/build-hood-stats.mjs) over Pedro's
 // lots and LA County's parcels, plus Pedro's sales.
 import { cellToLatLng, gridDisk, latLngToCell } from "h3-js";
+import { hashStr, rng } from "./geo";
 import type { Listing } from "./fake";
 import { lotListing } from "./fake";
 import { LOTS, type Lot } from "./silverlake";
@@ -28,7 +29,9 @@ export const milesBetween = (a: [number, number], b: [number, number]) => {
 };
 
 const cache = new Map<string, { sold: Comp[]; active: Comp[] }>();
-export function compsFor(l: Listing): { sold: Comp[]; active: Comp[] } {
+/** Up to 12 sold and 6 active comps; `pool` returns the next candidates too (Add comps). */
+export function compsFor(l: Listing): { sold: Comp[]; active: Comp[] } { const p = compPool(l); return { sold: p.sold.slice(0, 12), active: p.active.slice(0, 6) }; }
+export function compPool(l: Listing): { sold: Comp[]; active: Comp[] } {
   const key = `${l.id}|${l.addr}`, hit = cache.get(key);
   if (hit) return hit;
   const at: [number, number] = [l.lng, l.lat];
@@ -45,7 +48,7 @@ export function compsFor(l: Listing): { sold: Comp[]; active: Comp[] } {
   };
   const all = LOTS.map(rank).filter((c): c is Comp => !!c && c.st !== ("O" as string));
   const best = (st: "S" | "L", n: number) => all.filter(c => c.st === st).sort((a, b) => b.score - a.score).slice(0, n);
-  const out = { sold: best("S", 5), active: best("L", 1) };
+  const out = { sold: best("S", 20), active: best("L", 10) };
   cache.set(key, out);
   return out;
 }
@@ -91,4 +94,27 @@ export function hoodStats(lat: number, lng: number): HoodStats {
     salesN: sales.filter(s => (s.sm || 99) <= 12).length,
     ub50Share: n ? ub50 / n : 0, medianYear: own?.year || 0, medianSqft: own?.sqft || 0, homesN: n,
   };
+}
+
+/* The listing history no data carries yet, seeded per comp so it never changes: the
+   list price (a few % off the sale), days on market, the dates, garage spaces and
+   photos. A sale's month is Pedro's (`sm`); the rest is plausible, not recorded. */
+export type CompDetail = { listed: number; sold: number | null; diff: number; dom: number; listedOn: Date; soldOn: Date | null; garage: number; photos: string[]; perLot: number };
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const shortDate = (d: Date) => `${MON[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+const detailCache = new Map<number, CompDetail>();
+export function compDetail(c: Comp): CompDetail {
+  const hit = detailCache.get(c.i);
+  if (hit) return hit;
+  const R = rng(hashStr("comp:" + c.i));
+  const k1 = (n: number) => Math.round(n / 1000) * 1000;
+  const dom = 5 + Math.floor(R() * 55), now = new Date();
+  const soldOn = c.st === "S" ? new Date(now.getFullYear(), now.getMonth() - (c.sm || 1), 1 + Math.floor(R() * 27)) : null;
+  const listedOn = new Date((soldOn || now).getTime() - dom * 864e5);
+  const sold = c.st === "S" ? k1(c.price) : null;
+  const diff = c.st === "S" ? Math.round((R() * 7 - 3) * 10) / 10 : 0; // sold vs listed, %
+  const listed = sold ? k1(sold / (1 + diff / 100)) : k1(c.price);
+  const out = { listed, sold, diff, dom, listedOn, soldOn, garage: Math.floor(R() * 3), photos: lotListing(LOTS[c.i], c.i).photos.slice(0, 5), perLot: c.lot ? Math.round((sold || listed) / c.lot) : 0 };
+  detailCache.set(c.i, out);
+  return out;
 }

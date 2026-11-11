@@ -30,7 +30,8 @@ const r6 = v => Math.round(v * 1e6) / 1e6;
 const rows = [];
 for (const f of county) {
   const p = f.properties;
-  if (p.ub == null || !p.s || status(f.id) === "O") continue;
+  // Complete homes only: some county records carry no bedrooms or a stub area.
+  if (p.ub == null || !p.s || p.s < 400 || !p.b || status(f.id) === "O") continue;
   const r = f.geometry.coordinates[0], k = r.length - 1;
   const x = r.slice(0, k).reduce((a, q) => a + q[0], 0) / k, y = r.slice(0, k).reduce((a, q) => a + q[1], 0) / k;
   if (x >= zone[0] && x <= zone[2] && y >= zone[1] && y <= zone[3]) continue; // Pedro's lots there
