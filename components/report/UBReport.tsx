@@ -336,6 +336,9 @@ export function UBReport({ l, onComps }: { l: Listing; onComps: () => void }) {
     // White, full width like the Comps result (review feedback), rather than the design's tan 748 px column.
     <div className="ubr" style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", background: "rgb(255,255,255)" }}>
       <style>{css}</style>
+      {/* Review: no drop shadows on this page; cards get a thin light grey outline instead
+          (dialogs keep their lift, --breezy-shadow-lg). */}
+      <style>{`.ubr.ubr{--breezy-shadow-xs:0 0 0 1px rgb(234,230,227);--breezy-shadow-sm:0 0 0 1px rgb(234,230,227);--breezy-shadow-md:0 0 0 1px rgb(234,230,227)}`}</style>
       <div ref={scroller} className="no-scrollbar" style={{ flex: 1, minWidth: 0, overflowY: "auto", overscrollBehavior: "contain" }}>
         {/* Narrower, centred column (review: the line length made the eye travel too far). */}
         <div onClick={onClick} ref={body} style={{ maxWidth: 1080, margin: "0 auto", padding: "40px 112px 96px" }} />

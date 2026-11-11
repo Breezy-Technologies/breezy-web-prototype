@@ -4,7 +4,8 @@
 // a teardrop marker in the signal's colour with its icon, sitting on a frosted
 // glass pill that says what the signal is ("14% price drop", "Withdrawn 4 days
 // ago", "190 DOM", "74% Underbuilt", "$1.5m ROI", "$1.5m price estimate").
-// Selected or hovered: the marker turns black with a white icon.
+// Selected or hovered: the marker turns black with a white icon. The pill is white
+// with the price pins' shadow (11 Nov review), not the design's frosted glass.
 //
 // Markers are the design's own exports (public/pins/*.svg). Some include their
 // drop shadow (44 × 48 canvas round a 28 × 32 marker), so they're offset to line up.
@@ -24,6 +25,8 @@ const MARKER: Record<RadarKind, { src: string; shadow: boolean; icon: string }> 
   ub: { src: "/pins/ub.svg", shadow: true, icon: "target" },
 };
 
+/** The price pins' shadow (PricePins DROP), shared so the two pin styles match. */
+export const PIN_SHADOW = "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 4px 12px rgba(30,18,12,.16)";
 const roiCache = new Map<number, string>();
 /** The pill's words, from the listing's own signal. */
 export function radarLabel(l: Listing): string {
@@ -68,14 +71,13 @@ export function RadarPin({ l, kind, label, dark, pulse }: { l: Listing; kind: Ra
             style={mk.shadow ? { position: "absolute", left: -8, top: -4, width: 44, height: 48, maxWidth: "none" } : { position: "absolute", left: 0, top: 0, width: 28, height: 32 }} />
         )}
       </span>
-      {/* Frosted glass pill (design "Pill / Glass"): 20 px, 12 px bold, secondary ink. */}
-      <span style={{
+      {/* The label pill: white with the price pins' drop shadow (review: not the design's
+          frosted glass), 20 px, 12 px bold. No label (onboarding steps without labels): marker only. */}
+      {label && <span style={{
         marginTop: -2, height: 20, display: "flex", alignItems: "center", padding: "0 8px", borderRadius: 9999, whiteSpace: "nowrap",
-        background: "linear-gradient(90deg,rgba(253,252,252,.6),rgba(253,252,252,.6)),linear-gradient(90deg,rgba(253,252,252,.24),rgba(253,252,252,.24))",
-        backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-        boxShadow: "inset 0 40px 10px -40px #282828,inset 0 -40px 10px -40px #282828,inset 0 40px 30px -40px #e6e6e6,0 1px 1px rgba(18,18,18,.04),0 2px 2px rgba(18,18,18,.1)",
-        font: "700 12px/1.26 var(--font-sans)", letterSpacing: ".25px", color: dark ? "rgb(18,18,18)" : "rgb(73,67,65)",
-      }}>{label}</span>
+        background: "var(--paper)", boxShadow: PIN_SHADOW,
+        font: "700 12px/1.26 var(--font-sans)", letterSpacing: ".25px", color: "rgb(18,18,18)",
+      }}>{label}</span>}
     </span>
   );
 }
