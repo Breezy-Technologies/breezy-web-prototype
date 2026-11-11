@@ -3,9 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
 import { Listing, OPP, shortPrice } from "@/lib/fake";
-import { SignalDot } from "../PinPalette";
-import { UnreadDot } from "../Unread";
-import { pulseColor } from "@/lib/pinColors";
+import { RadarPin, radarLabel } from "./RadarPin";
 import { ANCHOR_STYLE, useAnchors } from "../map/anchors";
 
 const DROP = "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 4px 12px rgba(30,18,12,.16)";
@@ -60,9 +58,11 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
     const boxes: number[][] = [];
     return order.map(l => {
       const p0 = map.project([l.lng, l.lat]), p = { x: cx0 + (p0.x - cx0) * k, y: cy0 + (p0.y - cy0) * k };
-      const lab = shortPrice(l.price);
-      const w = lab.length * 9 + 30 + (signal?.has(l.id) ? 24 : 0);
-      const b = [p.x - w / 2 - 2, p.y - 19, p.x + w / 2 + 2, p.y + 19];
+      // Market radar pins say their signal ("14% price drop"), with the marker above the pill.
+      const sig = !!signal?.has(l.id);
+      const lab = sig ? radarLabel(l) : shortPrice(l.price);
+      const w = sig ? lab.length * 6.6 + 20 : lab.length * 9 + 30;
+      const b = sig ? [p.x - w / 2 - 2, p.y - 42, p.x + w / 2 + 2, p.y + 12] : [p.x - w / 2 - 2, p.y - 19, p.x + w / 2 + 2, p.y + 19];
       const hit = boxes.some(q => !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
       const blank = hit && z < 16.5;
       if (!blank) boxes.push(b);
@@ -89,36 +89,21 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
             }}
             onMouseLeave={() => { clearTimeout(openT.current); closeT.current = setTimeout(() => onHover(null), 180); }}
             style={{
-              position: "absolute", left: 0, top: 0, transform: "translate(-50%,-50%)", pointerEvents: "auto", cursor: "pointer",
+              // a radar pin's pill sits on the point, its marker above
+              position: "absolute", left: 0, top: 0, transform: sig ? "translate(-50%,calc(-100% + 10px))" : "translate(-50%,-50%)", pointerEvents: "auto", cursor: "pointer",
             }}
           >
-            <span
+            {sig ? <RadarPin l={l} kind={l.opp} label={lab} dark={dark} pulse={!sn} /> : <span
               style={{
                 display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", borderRadius: 9999, boxShadow: DROP,
                 transition: "background .18s, width .18s, height .18s",
-                ...(isBlank ? { width: 34, height: 20 } : { height: 34, padding: sig ? "0 12px 0 6px" : "0 12px" }),
+                ...(isBlank ? { width: 34, height: 20 } : { height: 34, padding: "0 12px" }),
                 background: dark ? "var(--ink)" : sn ? "linear-gradient(rgba(18,18,18,.08),rgba(18,18,18,.08)),var(--paper)" : "var(--paper)",
               }}
             >
-              {sig && (
-                <span style={{ position: "relative", display: "flex" }}>
-                  {/* Pulse in the signal's colour, reaching well past the pill (review: make it
-                      more prominent): a soft disc and a ring, behind the pill (z -1), staggered
-                      per pin. Seen or selected pins stay still. */}
-                  {!dark && !sn && <>
-                    <span style={{ position: "absolute", left: "50%", top: "50%", width: 22, height: 22, margin: -11, zIndex: -1, borderRadius: 9999, background: pulseColor(l.opp, 0.42), animation: `sigPulse 2.2s cubic-bezier(.2,.6,.3,1) ${(l.id % 7) * 0.3}s infinite`, pointerEvents: "none" }} />
-                    <span style={{ position: "absolute", left: "50%", top: "50%", width: 22, height: 22, margin: -11, zIndex: -1, borderRadius: 9999, boxShadow: `0 0 0 2px ${pulseColor(l.opp, 0.7)}`, animation: `sigRing 2.2s cubic-bezier(.2,.6,.3,1) ${(l.id % 7) * 0.3 + 0.5}s infinite`, pointerEvents: "none" }} />
-                  </>}
-                  <span style={{ position: "relative", display: "flex" }}>
-                    <SignalDot l={l} type={l.opp} size={22} icon={12} selected={dark} ring="rgb(253,252,252)" ringW={dark ? 1.5 : 0} />
-                    {/* Unread (decided): a red dot until the property is opened. */}
-                    {!sn && <UnreadDot ring="rgb(253,252,252)" style={{ position: "absolute", right: -3, top: -3 }} />}
-                  </span>
-                </span>
-              )}
               {!isBlank && !sig && l.opp === "drop" && <i className="ph-bold ph-arrow-down" style={{ fontSize: 13, color: dark ? "var(--paper)" : "rgb(192,98,84)" }} />}
               {!isBlank && <span style={{ font: "700 14px/1.26 var(--font-sans)", color: dark ? "var(--paper)" : "var(--ink)", animation: "fadeIn .22s ease both" }}>{lab}</span>}
-            </span>
+            </span>}
           </div>
           </div>
         );
