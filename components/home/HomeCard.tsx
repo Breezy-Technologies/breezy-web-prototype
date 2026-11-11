@@ -9,7 +9,9 @@ import { useEffect, useRef, useState } from "react";
 import { Listing, OppType, fullPrice } from "@/lib/fake";
 import { CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
 import { PickedFooter } from "./Saved";
-import { ForYouFeed, SeenView } from "./ForYouFeed";
+import { ForYouFeed } from "./ForYouFeed";
+import { ColsToggle } from "./LeftPanel";
+import { NewTag, UnreadDot } from "../Unread";
 import { userLocationLabel } from "@/lib/places";
 
 export type Tab = "For you" | "Searches" | "Properties";
@@ -33,7 +35,7 @@ function Tabs({ tab, onPick, bellS, bellP }: { tab: Tab; onPick: (t: Tab) => voi
         const on = tab === t;
         return (
           <button key={t} onClick={() => onPick(t)} style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", border: "none", borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", font: "400 15px/20px var(--font-sans)", transition: "background .16s,color .16s", background: on ? INK : "rgba(18,18,18,.06)", color: on ? "rgb(249,249,249)" : INK }}>
-            {((t === "Searches" && bellS) || (t === "Properties" && bellP)) && <span title="New" style={{ flex: "none", width: 8, height: 8, borderRadius: 9999, background: "rgb(214,53,41)" }} />}<span>{t}</span>
+            {((t === "Searches" && bellS) || (t === "Properties" && bellP)) && <UnreadDot ring={on ? INK : undefined} />}<span>{t}</span>
           </button>
         );
       })}
@@ -77,7 +79,7 @@ function SearchRow({ x, hover, full, onEnter, onLeave, onOpen, onDel }: { x: Sav
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <span style={{ minWidth: 0, font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ppl ? forTxt(cl) : "No clients added"}</span>
           {x.newN
-            ? <span style={{ flex: "none", height: 20, padding: "0 8px", borderRadius: 9999, whiteSpace: "nowrap", font: "700 11px/20px var(--font-sans)", background: "rgb(249,60,45)", color: "rgb(253,252,252)" }}>{x.newN} new</span>
+            ? <NewTag n={x.newN} />
             : <span style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, height: 20, padding: "0 8px 0 7px", borderRadius: 9999, whiteSpace: "nowrap", font: "400 11px/20px var(--font-sans)", background: "rgba(49,140,96,.1)", color: "rgb(36,104,72)" }}>
                 <span style={{ position: "relative", flex: "none", width: 6, height: 6 }}>
                   <span style={{ position: "absolute", inset: 0, borderRadius: 9999, background: "rgb(49,160,104)", animation: "activePing 1.8s ease-out infinite" }} />
@@ -108,7 +110,7 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 4, font: "400 12px/1.26 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)", whiteSpace: "nowrap", overflow: "hidden" }}>
-            {!x.viewed && <span style={{ flex: "none", width: 8, height: 8, borderRadius: "50%", background: "rgb(249,60,45)" }} />}{x.status}
+            {!x.viewed && <UnreadDot />}{x.status}
           </span>
           <span style={{ flex: "none", font: "400 12px/1.26 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)" }}>{x.when}</span>
         </div>
@@ -124,9 +126,11 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
   );
 }
 
-export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals, onSeenView }: {
+export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals, cols = 1, maxCols = 1, onCols }: {
   name: string; area?: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void; onOpenSaved?: () => void;
-  onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void; onSeenView?: (v: SeenView) => void;
+  onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void;
+  // Multi-column feed: shares the Results 1 / 2 / 3 setting (11 Nov review).
+  cols?: number; maxCols?: number; onCols?: (n: number) => void;
   onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
   const sv = useSaved();
@@ -176,7 +180,7 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
   );
   const propList = (rows: PropItem[], live: boolean) => rows.map(x => <PropRow key={x.key} x={x} hover={live && hover === x.key} onEnter={enter(x.key)} onLeave={leave(x.key)} onOpen={() => openProp(x)} onDel={() => askDel(x.key, x.l.addr)} />);
   // V5 "For you" feed: filter by opportunity signal, larger cards with the signal badge.
-  const forYouList = <ForYouFeed items={forYou} seen={seen} onOpen={onOpen} onHover={onHover} onSignals={onSignals} onView={onSeenView} area={(area || "").split(",")[0]} />;
+  const forYouList = <ForYouFeed items={forYou} seen={seen} onOpen={onOpen} onHover={onHover} onSignals={onSignals} area={(area || "").split(",")[0]} cols={cols} />;
   const hello = (
     <>
       <span style={{ font: "300 26px/1.26 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>Hello {name.split(" ")[0]}</span>
@@ -192,7 +196,10 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
       {!full ? (
         <div ref={cardRef} style={{ ...card, flex: 1, minHeight: 0, animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) both" }}>
           <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 16, padding: 20 }}>
-            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>{hello}</div>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>{hello}</div>
+              {tab === "For you" && maxCols > 1 && onCols && <ColsToggle value={cols} max={maxCols} onPick={onCols} />}
+            </div>
             <div className="no-scrollbar" style={{ display: "flex", gap: 8, overflowX: "auto" }}><Tabs tab={tab} onPick={setTab} bellS={bellS} bellP={bellP} /></div>
           </div>
           <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: tab === "For you" ? "0 16px 16px" : "0 24px" }}>

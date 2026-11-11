@@ -19,7 +19,7 @@ Both routes share **one Mapbox GL map** that lives in the root layout (`componen
 
 | Layer | Source | Status |
 |---|---|---|
-| Base map | **Breezy light / dark** (default): Mapbox Standard, Pedro's `dev-breezy/cmgfg4m3e007y01re4uq6bz83` (`NEXT_PUBLIC_MAPBOX_BREEZY_STYLE`) with runtime presets in `lib/map/breezyTheme.ts` (spec: `docs/map-theme.md`). Also `streets-v12` ("Streets", the old base) and `satellite-streets-v12`, all on the dev-breezy **production public token** | Live. Keep the token to prototypes. Our layers go in Standard's `middle` slot with emissive strength 1. Breezy dark: `monochrome` + `night`; land colour isn't configurable, so it needs the Studio style. `lib/map/theme.ts` (old Breezy palette) only applies to `light-v11`. |
+| Base map | **Breezy light / dark** (default): Mapbox Standard, Pedro's `dev-breezy/cmgfg4m3e007y01re4uq6bz83` (`NEXT_PUBLIC_MAPBOX_BREEZY_STYLE`) with runtime presets in `lib/map/breezyTheme.ts` (spec: `docs/map-theme.md`). Also `streets-v12` ("Streets", the old base) and `satellite-streets-v12`, all on the dev-breezy **production public token** | Live. **The current Breezy light theme is approved (William, 11 Nov).** Keep the token to prototypes. Our layers go in Standard's `middle` slot with emissive strength 1. Breezy dark: `monochrome` + `night`; land colour isn't configurable, so it needs the Studio style. `lib/map/theme.ts` (old Breezy palette) only applies to `light-v11`. |
 | Parcels | Regrid vector tiles, source layer `parcels`, `promoteId: ll_uuid`, fields `owner, address, parcelnumb, path…` | Live on a **trial token: Dallas County only, expires 4 Dec 2026**, ~10k tiles. LA comes back empty, so demo around 32.7767, -96.7970. Tiles carry no lot size or specs, so those stay fake. Without the token, `lib/map/layers.ts` generates demo parcels. |
 | Area outlines | US Census TIGERweb through `app/api/boundary/route.ts` (city, ZIP, county, state) | Live. Outer rings come back **clockwise** and enclave holes **anticlockwise** (`lib/geo.ts`). The inner-glow edge depends on that: a positive `line-offset` means inside. `pointInRings` is even-odd, so holes count as outside. |
 | Search | Mapbox Geocoding v6 (`searchPlaces` / `searchPlacesStrict` in `lib/places.ts`) | Live. The hand-drawn gazetteer (Beverly Hills, Silver Lake, Dallas…) is the offline fallback. |
@@ -56,14 +56,16 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 **Home card** (`HomeCard.tsx`), always full height, with three tabs:
 - **For you:** the V5 feed (`ForYouFeed.tsx`), with a signal filter dropdown and `SignalDot` badges.
   - **Read state (decided 10 Nov):** an item is **seen when it's opened** (clicked); hover doesn't count. Each opportunity is dated by when Breezy found it (fake, 0–3 days ago) and the feed is grouped under bold date dividers ("Today · November 11", "Yesterday · …"); a divider has a red dot and "n new" while anything under it is unread. Unread cards carry a red **"New"** label (the bell read as an alert someone set up); opened cards show a quiet "Seen" tick.
-  - **All / Unseen / Seen** control under the signal filter (counts on each). "Seen" lists what you've opened and shows no special pins. When nothing is unread: "You're all caught up" (with "Show seen (n)" in the Unseen view).
+  - **All ⇄ Unread** (11 Nov review, like Apple Mail's filter): one button, right-aligned on the signal filter's row, that flips between the two states; it carries the red dot while anything is unread. No result count on For you. A card opened while filtering by Unread stays listed until the filter is switched. When nothing is unread: "You're all caught up" (with "Show all" in the Unread view).
+  - The feed follows the same 1 / 2 / 3 column setting as Results (toggle top-right of the Home card, For you only); each day's cards form a grid.
   - **Special pins** (yellow signal circles) appear on the map **only while For you is the visible tab**. They follow the feed's signal filter.
   - A pin reverts to a plain white price pill once its detail has been opened ("seen"). Until then it pulses (a disc and a ring in its colour, reaching well past the pill, staggered) and carries a red unread dot.
   - The "+" on a card picks the property. Picked properties show in the `PickedFooter`, and their thumbnails open the Saved sheet.
 - Under "Hello <name>": the user's location. **The prototype defaults to LA:** "you are here" is always Silver Lake, Los Angeles (`DEMO_LOCATION` in `lib/places.ts`; `USE_BROWSER_LOCATION` brings real geolocation back), for the greeting, "Current location" and My location. A saved session area outside LA isn't restored.
 - Searches and Properties show their **whole list** (no "View all"); hover shows the delete button.
 - For you cards: the photo is a carousel (up to 5 photos, dots) that swipes with a mouse drag or touch; a drag never opens the card.
-- **Searches:** saved searches, each with an "n new" badge (red) until the search is **clicked** (hover doesn't count), then Active (pulsing green); and alerts.
+- **Unread treatment (unified 11 Nov, `components/Unread.tsx`):** one red (rgb 214,53,41), two marks. `UnreadDot` (8 px) flags a place holding something unread: tabs, date dividers, saved-property rows, map pins, the Unread toggle. `NewTag` (red pill) says "New" on an unread item (feed and Results cards) or "n new" for a count (saved searches, date dividers). Everything clears on **open (click)**, never hover; Results cards use the same seen set as the feed.
+- **Searches:** saved searches, each with an "n new" `NewTag` until the search is **clicked** (hover doesn't count), then Active (pulsing green); and alerts.
 - **Properties:** saved properties. Unviewed ones carry a red dot; opening one marks it viewed. Properties you save yourself start viewed.
 - The Searches / Properties tabs show a red unread dot (no bell) only while something is unseen (a search with new matches, a property with its red dot). Price-drop pins use a down arrow, not a bell.
 
@@ -77,7 +79,8 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 **Results** (`LeftPanel.tsx`)
 - The filter bar scrolls horizontally with round arrows; the row is clipped under each arrow's centre, so chips slide under the arrows (no cut edge, no fade band).
 - Filters (`Filters.tsx`, `lib/filters.ts`) default to relaxed: any status, any type. The "All filters" badge counts every active filter.
-- Sort menu, and a 1 / 2 / 3 column toggle (`ColsToggle`). Widening the column pans the map so the same spot stays centred.
+- Results cards carry the "New" `NewTag` while new and not yet opened; the status chip always shows the status.
+- Sort menu, and a 1 / 2 / 3 column toggle (`ColsToggle`, shared with the For you feed). Widening the column pans the map so the same spot stays centred.
 - Footer:
   - **Save search** (primary).
   - When the **Recently sold** filter is on, **Create comps** becomes primary and Save search turns into a grey secondary.
@@ -199,13 +202,12 @@ Muted in the 10 Nov review (the first set read too garish): same hues, lower sat
 - Draw-area tool: placement still undecided. The "Search this area" zone diagram is coming from William's Figma.
 - Make saved reports easier to reach, as on mobile.
 - Welcome-panel polish: rounder corners, no bottom padding between list items, skeleton loading piece by piece.
-- "New match" badge should clear on first interaction.
 - Read state on Searches / market alerts: same pattern as the feed (dated, "New", red dot until opened) still to apply there.
 - **Heat palette:** pick one with Ann and Jimsy and remove the switcher. Underbuilt band cut points are placeholders until JD's service defines them.
 - Pedro's smooth heat surface (canvas image + water clip) is not ported yet.
 - Pins: inside the lot zone, every search shows real lots (`lotListing`, fixed rank); elsewhere named places still generate their own listings and only "Search this area" uses the fixed grid.
 - Regrid: ask for LA County coverage before the trial ends (4 Dec 2026).
-- **Breezy map theme:** duplicate Pedro's style in Studio as Breezy Light / Dark with the values in `docs/map-theme.md` (plus dark land #221d1b), then confirm with Ann and Jeff. Needs Mapbox access.
+- **Breezy map theme:** the current light theme is approved. Optional later: duplicate Pedro's style in Studio as Breezy Light / Dark with the values in `docs/map-theme.md` (plus dark land #221d1b) so it no longer depends on his style. Needs Mapbox access.
 - Dark map only: the app UI and the lifted parcel slab are still light.
 - Onboarding and activation designs were due 7 Nov to unblock the China team. The full engineering handoff is end of November.
 

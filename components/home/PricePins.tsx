@@ -4,6 +4,7 @@ import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
 import { Listing, OPP, shortPrice } from "@/lib/fake";
 import { SignalDot } from "../PinPalette";
+import { UnreadDot } from "../Unread";
 import { pulseColor } from "@/lib/pinColors";
 import { ANCHOR_STYLE, useAnchors } from "../map/anchors";
 
@@ -100,7 +101,7 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
                   <span style={{ position: "relative", display: "flex" }}>
                     <SignalDot l={l} type={l.opp} size={22} icon={12} selected={dark} ring="rgb(253,252,252)" ringW={dark ? 1.5 : 0} />
                     {/* Unread (decided): a red dot until the property is opened. */}
-                    {!sn && <span style={{ position: "absolute", right: -3, top: -3, width: 9, height: 9, borderRadius: 9999, background: "rgb(214,53,41)", boxShadow: "0 0 0 1.5px rgb(253,252,252)" }} />}
+                    {!sn && <UnreadDot ring="rgb(253,252,252)" style={{ position: "absolute", right: -3, top: -3 }} />}
                   </span>
                 </span>
               )}

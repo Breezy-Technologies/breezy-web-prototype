@@ -4,11 +4,12 @@ import { SORT_OPTS, SortKey } from "@/lib/filters";
 import { css } from "@/lib/css";
 import { SavedProp, useSaved } from "@/components/SavedState";
 import { ManageSearchButton, PickedFooter, SaveToggle } from "./Saved";
+import { NewTag } from "../Unread";
 
 const card: React.CSSProperties = { display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 24, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgb(245,240,238),0 14px 36px rgba(40,26,20,.1)", pointerEvents: "auto", animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) both" };
 
-// `fresh` controls the "New match" badge; it clears once the card has been
-// interacted with (sprint item). The "+" saves the home (`r.save`); saved homes
+// `fresh`: the unread "New" tag (components/Unread.tsx). It clears once the
+// property has been opened (clicked), as everywhere else; hover doesn't count. The "+" saves the home (`r.save`); saved homes
 // show a green check and land in the Home panel's Properties tab.
 // `dense`: the multi-column results layout uses a slightly shorter photo and smaller type.
 export function ListingCard({ l, onOpen, onHover, fresh = l.isNew, dense }: { l: Listing; onOpen: () => void; onHover: (on: boolean) => void; fresh?: boolean; dense?: boolean }) {
@@ -17,8 +18,9 @@ export function ListingCard({ l, onOpen, onHover, fresh = l.isNew, dense }: { l:
     <div onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} style={{ display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }}>
       <div style={{ position: "relative", height: dense ? 180 : 210, borderRadius: dense ? 18 : 20, background: `rgb(241,231,228) url(${l.photos[0]}) center/cover no-repeat` }}>
         <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 13px/28px var(--font-sans)" }}>
-          {fresh && <span style={{ width: 7, height: 7, borderRadius: 9999, background: "rgb(226,57,50)" }} />}{fresh ? "New match" : l.status}
+          {l.status}
         </span>
+        {fresh && <NewTag style={{ position: "absolute", right: 56, top: 16 }} />}
         <SaveToggle saved={sv.isSaved(l)} onToggle={() => sv.toggleProp(l)} />
         <span style={{ position: "absolute", left: 12, bottom: 12, display: "flex", alignItems: "center", gap: 6, height: 26, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.72)", font: "700 12px/26px var(--font-sans)", color: "var(--paper)" }}>
           <i className={`ph-bold ph-${OPP[l.opp].ic}`} />{l.oppWhy.split(" · ")[0]}
@@ -37,8 +39,8 @@ export function ListingCard({ l, onOpen, onHover, fresh = l.isNew, dense }: { l:
 // `onShowNearest`, `onFilterReset`) are ported from the canvas results column.
 // Footer: "Save search" / "Manage search" (`onFooterSearch`), or, once homes are
 // picked with "+", the picked footer (`hasPicked`). The pencil is `onManageSearch`.
-export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, sortOpen, onSortToggle, onShowNearest, onResetFilters, active, onFooterSearch, onManage, picked = [], onOpenSaved, onSharePicked, unsupported, onTryArea, cols, maxCols = 1, onCols, onCreateComps }: {
-  title: string; meta: string; listings: Listing[]; onOpen: (id: number) => void; onHover: (id: number | null) => void; compact?: boolean;
+export function ResultsPanel({ title, meta, listings, seen, onOpen, onHover, compact, sortOpen, onSortToggle, onShowNearest, onResetFilters, active, onFooterSearch, onManage, picked = [], onOpenSaved, onSharePicked, unsupported, onTryArea, cols, maxCols = 1, onCols, onCreateComps }: {
+  title: string; meta: string; listings: Listing[]; seen?: Set<number>; onOpen: (id: number) => void; onHover: (id: number | null) => void; compact?: boolean;
   sortOpen?: boolean; onSortToggle?: () => void; onShowNearest?: () => void; onResetFilters?: () => void;
   active?: boolean; onFooterSearch?: () => void; onManage?: () => void; picked?: SavedProp[]; onOpenSaved?: () => void; onSharePicked?: () => void;
   unsupported?: string | null; onTryArea?: () => void; // `isUnsupported` / `unsupArea` / `onTryArea`
@@ -64,9 +66,9 @@ export function ResultsPanel({ title, meta, listings, onOpen, onHover, compact, 
       <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: "4px 16px 16px" }}>
         {multi && listings.length > 0
           ? <div style={{ flex: "none", display: "grid", gridTemplateColumns: `repeat(${n},minmax(0,1fr))`, gap: "20px 16px" }}>
-              {listings.map(l => <ListingCard key={l.id} l={l} dense onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />)}
+              {listings.map(l => <ListingCard key={l.id} l={l} fresh={l.isNew && !seen?.has(l.id)} dense onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />)}
             </div>
-          : listings.map(l => <ListingCard key={l.id} l={l} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />)}
+          : listings.map(l => <ListingCard key={l.id} l={l} fresh={l.isNew && !seen?.has(l.id)} onOpen={() => onOpen(l.id)} onHover={on => onHover(on ? l.id : null)} />)}
         {unsupported && (
           <div style={css("flex:1 0 auto;margin:auto 0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:32px;padding:24px 24px 48px;text-align:center;animation:fadeIn .25s ease both")}>
             <img src="/ui/pin-3d.png" alt="" style={css("display:block;width:66px;height:auto;margin-bottom:8px")} />
@@ -115,7 +117,7 @@ const colIcon = (k: number) => (
     {Array.from({ length: k }, (_, i) => { const g = 1.5, w = (14 - g * (k - 1)) / k; return <rect key={i} x={1 + i * (w + g)} y={2.5} width={w} height={11} rx={1.6} />; })}
   </svg>
 );
-function ColsToggle({ value, max, onPick }: { value: number; max: number; onPick: (n: number) => void }) {
+export function ColsToggle({ value, max, onPick }: { value: number; max: number; onPick: (n: number) => void }) {
   return (
     <div role="radiogroup" aria-label="Columns" style={css("flex:none;display:flex;gap:2px;height:32px;box-sizing:border-box;padding:2px;margin-right:8px;border-radius:9999px;background:rgba(13,12,12,.05)")}>
       {[1, 2, 3].filter(k => k <= max).map(k => {

@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useMapCtx } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
 import { SideNav, NAV_W, DevAction } from "@/components/home/SideNav";
-import type { SeenView } from "@/components/home/ForYouFeed";
 import { SearchBar, previewSearchState } from "@/components/home/SearchBar";
 import { ResultsPanel, SortMenu } from "@/components/home/LeftPanel";
 import { AllFiltersPanel, FilterBar, FilterDropdown, useFilterState } from "@/components/home/Filters";
@@ -52,7 +51,8 @@ export default function HomeWeb() {
   useEffect(() => { try { const v = Number(localStorage.getItem(COLS_KEY)); if (v === 2 || v === 3) setColsPref(v); } catch {} }, []);
   const pickCols = (n: number) => { setColsPref(n); try { localStorage.setItem(COLS_KEY, String(n)); } catch {} };
   const maxCols = colsFit(winW);
-  const cols = view === "results" ? Math.min(colsPref, maxCols) : 1;
+  // One 1 / 2 / 3 setting for Results and the For you feed (11 Nov review).
+  const cols = Math.min(colsPref, maxCols);
   const COL = COL_W[cols];
   const [selId, setSelId] = useState<number | null>(null);
   const [parcel, setParcel] = useState<ParcelHit | null>(null);
@@ -67,9 +67,6 @@ export default function HomeWeb() {
   const [seen, setSeen] = useState<Set<number>>(new Set());
   const keepT = useRef<any>(null);
   const { toast, show: showToast } = useToast();
-  // Hovering or opening a listing counts as the first interaction that clears its "New match" badge.
-  const [badgeSeen, setBadgeSeen] = useState<Set<number>>(new Set());
-  const hoverListing = (id: number | null) => { setHoverId(id); if (id != null) setBadgeSeen(s => s.has(id) ? s : new Set(s).add(id)); };
   const navW = navX ? NAV_W.expanded : NAV_W.collapsed;
   // Filters: the bar, dropdowns and "All filters" panel filter what the pins and results show.
   const fs = useFilterState();
@@ -133,18 +130,15 @@ export default function HomeWeb() {
   // detail has been opened. Picked signals also limit which pins are on the map.
   const [homeTab, setHomeTab] = useState<string>("For you");
   const [fySignals, setFySignals] = useState<OppType[]>([]);
-  // The feed's All / Unseen / Seen view: "Seen" shows no special pins (they're for what's unread).
-  const [fyView, setFyView] = useState<SeenView>("all");
   const fyOn = view === "home" && homeTab === "For you";
   const sigFilter = fyOn && fySignals.length > 0;
-  const signalIds = useMemo(() => fyOn ? new Set(fyView === "seen" ? [] : forYou.filter(l => (!sigFilter || fySignals.includes(l.opp)) && !seen.has(l.id)).map(l => l.id)) : undefined, [fyOn, fyView, sigFilter, fySignals, forYou, seen]);
+  const signalIds = useMemo(() => fyOn ? new Set(forYou.filter(l => (!sigFilter || fySignals.includes(l.opp)) && !seen.has(l.id)).map(l => l.id)) : undefined, [fyOn, sigFilter, fySignals, forYou, seen]);
   const pinListings = useMemo(() => unsupOn ? [] : sigFilter ? shown.filter(l => fySignals.includes(l.opp)) : shown, [unsupOn, sigFilter, fySignals, shown]);
 
   const openListing = (id: number) => {
     if (id !== selId) alerts.close();
     setParcel(null); setSoloL(null); setSelId(id); setHoverId(null); setSearching(false);
     setSeen(s => new Set(s).add(id));
-    setBadgeSeen(s => new Set(s).add(id));
     const l = listings.find(x => x.id === id);
     if (l) frameSel(l);
   };
@@ -330,9 +324,9 @@ export default function HomeWeb() {
               active={detailOpen ? null : active} onManage={() => openSheet(active)} onClearActive={clearActive} />
           </div>
           {searching ? null : view === "home"
-            ? <HomeCard name={user.name} area={place.label} forYou={forYou} seen={badgeSeen} onOpen={openListing} onHover={hoverListing} toast={showToast}
+            ? <HomeCard name={user.name} area={place.label} forYou={forYou} seen={seen} onOpen={openListing} onHover={setHoverId} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
-                picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} onSeenView={setFyView}
+                picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} cols={cols} maxCols={maxCols} onCols={pickCols}
                 onOpenSaved={() => { setSavedOut(false); setSavedOpen(true); }} />
             : (
               // The results column steps back (scale + dim) while a sheet sits on top of it.
@@ -340,7 +334,7 @@ export default function HomeWeb() {
                 {/* `resultsTitle` / `resultsMeta` for an active saved search */}
                 <ResultsPanel title={active ? (active.newN ? "New matches" : active.name) : "Results"}
                   meta={active && active.newN ? `${active.newN} since you last visited` : unsupOn ? "" : `${shown.length} ${shown.length === 1 ? "home" : "homes"} · ${active ? active.params[3] || place.label : areaMeta}`}
-                  listings={unsupOn ? [] : results} onOpen={openListing} onHover={setHoverId}
+                  listings={unsupOn ? [] : results} seen={seen} onOpen={openListing} onHover={setHoverId}
                   unsupported={unsupOn ? unsup!.label.split(",")[0] : null} onTryArea={() => setSearching(true)}
                   sortOpen={sortOpen} onSortToggle={() => { setSortOpen(o => !o); fs.setDd(null); }}
                   onShowNearest={() => { fs.reset(); showToast("Showing nearest properties"); }} onResetFilters={fs.reset}
