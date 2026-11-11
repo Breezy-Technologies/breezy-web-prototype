@@ -2,7 +2,11 @@
 // values, all generated deterministically from a place so every search feels
 // populated. Swap these functions for real API calls later.
 import { BBox, LngLat, Ring, field, hashStr, pointInRings, rng } from "./geo";
-import { LOTS, LOT_ZONE, Lot, PIN_LOTS, boxesMeet, inBox, inLotZone, lotId, lotRng } from "./silverlake";
+import { HEAT_AREA, LOTS, LOT_ZONE, Lot, PIN_LOTS, boxesMeet, fromHeatCenter, inBox, inLotZone, lotId, lotRng } from "./silverlake";
+import SL_HOMES from "./data/sl-homes.json";
+import { metersPerDegLat, metersPerDegLng } from "./geo";
+/** The heat circle's box, for a quick overlap test. */
+const HEAT_BOX: BBox = (() => { const [x, y] = HEAT_AREA.center, dx = HEAT_AREA.radius / metersPerDegLng(y), dy = HEAT_AREA.radius / metersPerDegLat; return [x - dx, y - dy, x + dx, y + dy]; })();
 
 export type OppType = "ub" | "drop" | "exp" | "roi" | "wd" | "stale";
 
@@ -94,6 +98,8 @@ export function lotListing(l: Lot, i: number): Listing {
    area and an assumed FAR; ROI, price, owner and photos are made up, as for the lots. */
 export type CountyProps = { a?: string; z?: string; t?: string; lf?: number; s?: number; b?: number; ba?: number; y?: number; ub?: number; roi?: number };
 const countyCache = new Map<number, Listing>();
+/** A county home's demo market status, stable per parcel (scripts/build-sl-homes.mjs uses the same rule). */
+export const countyStatus = (id: number): Lot["st"] => { const v = hashStr("market:" + id) % 100; return v < 9 ? "L" : v < 15 ? "S" : "O"; };
 export function countyListing(id: number, p: CountyProps, c: LngLat, ring: [number, number][]): Listing {
   const hit = countyCache.get(id);
   if (hit) return hit;
@@ -102,7 +108,7 @@ export function countyListing(id: number, p: CountyProps, c: LngLat, ring: [numb
   const lot: Lot = {
     apn: "LA" + id, addr: p.a || "Parcel", zip: p.z || "", hood: "", zone: p.t === "Com" ? "C2" : (p.b || 0) > 4 ? "R3" : "R1",
     c, ring, lot: p.lf || 0, beds: p.b || 0, baths: p.ba || 0, sqft, year: p.y || 0,
-    price: sqft ? sqft * ppsf : Math.max(450000, (p.lf || 5000) * 150), ppsf, st: "O", roi: p.roi ?? 0, ub: p.ub ?? 0,
+    price: sqft ? sqft * ppsf : Math.max(450000, (p.lf || 5000) * 150), ppsf, st: p.s && p.ub != null ? countyStatus(id) : "O", roi: p.roi ?? 0, ub: p.ub ?? 0,
   };
   const out = lotToListing(lot, 3e9 + id);
   countyCache.set(id, out);
@@ -171,6 +177,18 @@ export function listingAt(key: string, p: LngLat, cityLabel = ""): Listing | und
 // Each lot has a fixed rank, so any search over the same streets shows the same homes.
 const lotRank = (apn: string) => rng(hashStr("rank:" + apn))();
 const RANKED_PIN_LOTS = [...PIN_LOTS].sort((a, b) => lotRank(a.l.apn) - lotRank(b.l.apn));
+/* Every real home that can be pinned, in one fixed rank: Pedro's listed / sold lots,
+   and the county homes elsewhere in the heat circle with a listed / sold demo status
+   (lib/data/sl-homes.json). Inside the circle every search pins these, so pins sit
+   on the real parcels the heat map colours. */
+type HomeRow = [number, number, number, string, string, string, number, number, number, number, number, number, number];
+const COUNTY_HOMES = (SL_HOMES as unknown as HomeRow[]).map(r => ({ c: [r[1], r[2]] as LngLat, rank: rng(hashStr("rank:LA" + r[0]))(), row: r }));
+const homeListing = (r: HomeRow) => countyListing(r[0], { a: r[3], z: r[4], t: r[5], lf: r[6], s: r[7], b: r[8], ba: r[9], y: r[10], ub: r[11], roi: r[12] }, [r[1], r[2]], []);
+type PoolItem = { c: LngLat; rank: number; listing: () => Listing };
+const PIN_POOL: PoolItem[] = [
+  ...RANKED_PIN_LOTS.map(({ l, i }) => ({ c: l.c, rank: lotRank(l.apn), listing: () => lotListing(l, i) })),
+  ...COUNTY_HOMES.map(h => ({ c: h.c, rank: h.rank, listing: () => homeListing(h.row) })),
+].sort((a, b) => a.rank - b.rank);
 
 export function makeListings(key: string, center: LngLat, bbox: BBox | undefined, rings: Ring[] | null, n = 28, cityLabel = "", dense = true): Listing[] {
   const R = rng(hashStr(key));
@@ -180,8 +198,8 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
   // Inside the lot zone, homes are Pedro's real lots (listed or recently sold);
   // the zone is dense, so it gets more of them. Fake listings fill in outside it.
   const win: BBox = [Math.max(w, center[0] - span / 2), Math.max(s, center[1] - spanY / 2), Math.min(e, center[0] + span / 2), Math.min(nn, center[1] + spanY / 2)];
-  const real = boxesMeet(win, LOT_ZONE)
-    ? RANKED_PIN_LOTS.filter(({ l }) => inBox(l.c, win) && (!rings || !rings.length || pointInRings(l.c, rings))).slice(0, dense ? Math.max(n, 48) : n).map(x => lotListing(x.l, x.i))
+  const real = boxesMeet(win, HEAT_BOX)
+    ? PIN_POOL.filter(h => inBox(h.c, win) && (!rings || !rings.length || pointInRings(h.c, rings))).slice(0, dense ? Math.max(n, 48) : n).map(h => h.listing())
     : [];
   if (real.length >= n) return real;
   n -= real.length;
@@ -195,7 +213,7 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
     const lng = center[0] + (R() - 0.5) * span, lat = center[1] + (R() - 0.5) * spanY;
     if (lng < w || lng > e || lat < s || lat > nn) continue;
     if (rings && rings.length && !pointInRings([lng, lat], rings)) continue;
-    if (inLotZone([lng, lat])) continue; // real lots only in there
+    if (fromHeatCenter([lng, lat]) <= HEAT_AREA.radius) continue; // real homes only in the heat circle
     const i = out.length;
     const price = Math.round((level * (0.45 + R() * 1.3)) / 5e3) * 5e3;
     const opp = OPP_TYPES[Math.floor(R() * OPP_TYPES.length)];

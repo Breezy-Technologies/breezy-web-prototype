@@ -26,6 +26,7 @@ import { Listing, OppType, listingAt } from "@/lib/fake";
 import { SortKey, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, pointInRings, ringBBox } from "@/lib/geo";
+import { HEAT_AREA, fromHeatCenter } from "@/lib/silverlake";
 
 const GAP = 12;
 // Results column width per layout (1 / 2 / 3 columns of cards); Home and 1 column stay 388.
@@ -111,6 +112,14 @@ export default function HomeWeb() {
     if (place.kind === "area") return;
     fit(GAP + COL + GAP);
   }, [map, ready, place.id, rings]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The heat map and real parcels cover a 3 km circle round Silver Lake (lib/silverlake.ts).
+  // A search that lands outside it says so, rather than the heat silently going away.
+  const heatNote = useRef("");
+  useEffect(() => {
+    if (!ready || place.id === heatNote.current) return;
+    heatNote.current = place.id;
+    if (fromHeatCenter(place.center) > HEAT_AREA.radius + 1500) showToast("The heat map covers Silver Lake, Echo Park and around for now");
+  }, [ready, place.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Widening / narrowing the results column keeps the same spot in the middle of the
   // visible map (programmatic pan, so it never raises "Search this area").
   const prevCol = useRef(COL);
