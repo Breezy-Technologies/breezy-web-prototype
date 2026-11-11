@@ -85,6 +85,30 @@ const lotListingCache = new Map<number, Listing>();
 export function lotListing(l: Lot, i: number): Listing {
   const hit = lotListingCache.get(i);
   if (hit) return hit;
+  const out = lotToListing(l, lotId(i));
+  lotListingCache.set(i, out);
+  return out;
+}
+/* County parcels round the lots (public/data/sl-parcels.json, scripts/fetch-la-parcels.mjs):
+   outline, address, use and house figures are LA County's; Underbuilt from the lot
+   area and an assumed FAR; ROI, price, owner and photos are made up, as for the lots. */
+export type CountyProps = { a?: string; z?: string; t?: string; lf?: number; s?: number; b?: number; ba?: number; y?: number; ub?: number; roi?: number };
+const countyCache = new Map<number, Listing>();
+export function countyListing(id: number, p: CountyProps, c: LngLat, ring: [number, number][]): Listing {
+  const hit = countyCache.get(id);
+  if (hit) return hit;
+  const R = rng(hashStr("county:" + id));
+  const sqft = p.s || 0, ppsf = Math.round(820 + R() * 360);
+  const lot: Lot = {
+    apn: "LA" + id, addr: p.a || "Parcel", zip: p.z || "", hood: "", zone: p.t === "Com" ? "C2" : (p.b || 0) > 4 ? "R3" : "R1",
+    c, ring, lot: p.lf || 0, beds: p.b || 0, baths: p.ba || 0, sqft, year: p.y || 0,
+    price: sqft ? sqft * ppsf : Math.max(450000, (p.lf || 5000) * 150), ppsf, st: "O", roi: p.roi ?? 0, ub: p.ub ?? 0,
+  };
+  const out = lotToListing(lot, 3e9 + id);
+  countyCache.set(id, out);
+  return out;
+}
+function lotToListing(l: Lot, id: number): Listing {
   const R = lotRng(l);
   const left = l.ub > 0 && l.ub < 100 ? Math.round((l.sqft / (1 - l.ub / 100) - l.sqft) / 10) * 10 : 0;
   const opp: OppType = l.roi >= 30 ? "roi" : l.ub >= 55 && R() < 0.7 ? "ub" : (["drop", "exp", "wd", "stale"] as OppType[])[Math.floor(R() * 4)];
@@ -96,7 +120,7 @@ export function lotListing(l: Lot, i: number): Listing {
   const qeV = l.price * (0.94 + R() * 0.14);
   const p0 = Math.floor(R() * PHOTOS.length);
   const out: Listing = {
-    id: lotId(i), apn: l.apn,
+    id, apn: l.apn,
     lng: l.c[0], lat: l.c[1],
     addr: l.addr, city: "Los Angeles",
     price: Math.round(l.price / 5e3) * 5e3,
@@ -122,7 +146,6 @@ export function lotListing(l: Lot, i: number): Listing {
     feats: PFEATS.filter(() => R() < 0.35),
     noQe: false,
   };
-  lotListingCache.set(i, out);
   return out;
 }
 /** The real lot at a point (its outline contains it, else the nearest centre within ~60 m). */

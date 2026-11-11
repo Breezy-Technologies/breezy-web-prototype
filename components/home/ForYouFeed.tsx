@@ -80,7 +80,6 @@ function FeedCard({ l, seen, dense, onOpen, onHover }: { l: Listing; seen: boole
         <span style={{ display: "flex", alignItems: "baseline", gap: 4, whiteSpace: "nowrap" }}>
           <span style={{ font: "700 14px/21px var(--font-sans)", letterSpacing: ".25px", color: INK }}>{fullPrice(l.price)}</span>
           <span style={{ font: "400 12px/16px var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)" }}>/ ${Math.round(l.price / l.sqft).toLocaleString()} per ft² · {l.dom} DOM</span>
-          {seen && <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, font: "400 12px/16px var(--font-sans)", color: "rgb(129,117,111)" }}><i className="ph-bold ph-check" style={{ fontSize: 12 }} />Seen</span>}
         </span>
       </div>
     </div>
@@ -176,11 +175,12 @@ export function ForYouFeed({ items, seen, onOpen, onHover, onSignals, area = "",
           ))}
           {k > 2 && <button onClick={() => setMenu(true)} style={{ display: "flex", alignItems: "center", height: 30, padding: "0 10px", border: "none", borderRadius: 9999, background: "rgb(255,246,214)", boxShadow: "inset 0 0 0 1px rgba(18,18,18,.14)", font: "400 13px/16px var(--font-sans)", color: INK, cursor: "pointer" }}>+{k - 2} more</button>}
           <span style={{ flex: 1 }} />
-          {/* All ⇄ Unread: one button with two states, like Apple Mail's filter (11 Nov review). No result count here. */}
-          <button onClick={() => pickView(unreadOn ? "all" : "unread")} aria-pressed={unreadOn} title={unreadOn ? "Showing unread · show all" : "Show unread only"}
-            style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px 0 10px", border: "none", borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", font: "700 13px/16px var(--font-sans)", transition: "background .16s,color .16s", ...(unreadOn ? { background: INK, color: "rgb(253,252,252)" } : { background: "rgba(18,18,18,.06)", color: INK }) }}>
-            {unseenN > 0 ? <UnreadDot ring={unreadOn ? INK : undefined} /> : <i className="ph-bold ph-check" style={{ fontSize: 12 }} />}
-            {unreadOn ? "Unread" : "All"}
+          {/* Unread filter: one toggle, like Slack's "Unread messages" (11 Nov review): an
+              outlined button that fills when on. No red dot, no result count. */}
+          <button onClick={() => pickView(unreadOn ? "all" : "unread")} aria-pressed={unreadOn} title={unreadOn ? "Show all" : "Show unread only"} className={unreadOn ? undefined : "fy-unread"}
+            style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px 0 10px", border: "none", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap", font: "700 13px/16px var(--font-sans)", transition: "background .16s,color .16s,box-shadow .16s",
+              ...(unreadOn ? { background: "rgb(246,236,232)", color: "rgb(147,89,75)", boxShadow: "inset 0 0 0 1px rgba(147,89,75,.45)" } : { background: "none", color: INK, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.18)" }) }}>
+            <i className="ph-bold ph-notification" style={{ fontSize: 16 }} />Unread
           </button>
         </div>
         {menu && (

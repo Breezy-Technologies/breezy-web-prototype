@@ -169,6 +169,28 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     if (map && map.getSource("bz-area")) setArea(map, r);
   }, [map]);
 
+  // Pins, the hover card and the lifted parcel live in #bz-overlay, above the canvas,
+  // so a wheel over them never reached Mapbox (team feedback: zoom didn't work with
+  // the pointer on a pin). Hand the wheel on to the canvas, where scroll zoom listens.
+  useEffect(() => {
+    const ov = document.getElementById("bz-overlay");
+    if (!map || !ov) return;
+    const wheel = (e: WheelEvent) => {
+      // Let anything inside the overlay that really scrolls keep its wheel.
+      for (let n = e.target as HTMLElement | null; n && n !== ov; n = n.parentElement) {
+        const oy = getComputedStyle(n).overflowY;
+        if ((oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight) return;
+      }
+      e.preventDefault();
+      map.getCanvas().dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+        deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey,
+      }));
+    };
+    ov.addEventListener("wheel", wheel, { passive: false });
+    return () => ov.removeEventListener("wheel", wheel);
+  }, [map]);
+
   const value = useMemo(() => ({ map, ready, mode, setMode, heat, setHeat, setAreaRings, inset, setInset, parcels, offline }),
     [map, ready, mode, setMode, heat, setHeat, setAreaRings, inset, parcels, offline]);
   return (

@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { MapOverlay } from "../map/Overlay";
-import { useMapCtx, useMapTick } from "../map/MapProvider";
-import { Listing, lotListing, makeListings } from "@/lib/fake";
+import { useMapCtx } from "../map/MapProvider";
+import { CountyProps, Listing, countyListing, lotListing, makeListings } from "@/lib/fake";
 import { LOTS } from "@/lib/silverlake";
 import { HEAT_PALETTES, heatColorOf, parcelPct, useHeatPrefs } from "@/lib/heat";
 import { config, hasRegrid, isLiveMap } from "@/lib/config";
@@ -14,7 +14,27 @@ export type ParcelHit = { key: string; ring: [number, number][]; cx: number; cy:
 // heat map on the slab keeps the parcel's heat colour; otherwise it's neutral.
 export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: boolean; onOpen: (p: ParcelHit) => void; selected: ParcelHit | null }) {
   const { map, heat, mode } = useMapCtx();
-  const tick = useMapTick();
+  // Drawn once per camera rest, in pixels relative to the parcel's centre; while the
+  // camera moves, the wrapper is translated / scaled / rotated on the map's `move`
+  // event, in the frame the map draws (team feedback: the selected parcel slid
+  // around while the map eased to it, because it was redrawn a frame late).
+  const [, setRest] = useState(0);
+  const frame = useRef<{ ll: [number, number]; z0: number; b0: number } | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!map) return;
+    const move = () => {
+      const f = frame.current, w = wrapRef.current;
+      if (!f || !w) return;
+      const p = map.project(f.ll), s = Math.pow(2, map.getZoom() - f.z0), r = -(map.getBearing() - f.b0);
+      w.style.transform = `translate3d(${p.x}px,${p.y}px,0) rotate(${r}deg) scale(${s})`;
+      if (cardRef.current) cardRef.current.style.visibility = "hidden";
+    };
+    const rest = () => { if (cardRef.current) cardRef.current.style.visibility = ""; setRest(n => n + 1); };
+    map.on("move", move); map.on("moveend", rest);
+    return () => { map.off("move", move); map.off("moveend", rest); };
+  }, [map]);
   const palettes = useHeatPrefs();
   const [hit, setHit] = useState<ParcelHit | null>(null);
   const keyRef = useRef("");
@@ -23,12 +43,13 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   useEffect(() => {
     if (!map) return;
     const move = (e: any) => {
-      const layers = ["bz-lots-fill", "bz-par-fill"].filter(id => map.getLayer(id));
+      const layers = ["bz-lots-fill", "bz-la-fill", "bz-par-fill"].filter(id => map.getLayer(id));
       if (map.getZoom() < 15.4 || !layers.length) { if (keyRef.current) { keyRef.current = ""; setHit(null); } return; }
       const f = map.queryRenderedFeatures(e.point, { layers })[0];
       if (!f || f.geometry.type !== "Polygon") { if (keyRef.current) { keyRef.current = ""; setHit(null); } return; }
       const props: any = f.properties || {};
-      const key = typeof props.lot === "number" ? "lot:" + props.lot : String(f.id ?? props.ll_uuid ?? props.pid ?? props.parcelnumb ?? JSON.stringify(f.geometry.coordinates[0][0]));
+      const county = f.layer?.id === "bz-la-fill";
+      const key = typeof props.lot === "number" ? "lot:" + props.lot : county ? "la:" + f.id : String(f.id ?? props.ll_uuid ?? props.pid ?? props.parcelnumb ?? JSON.stringify(f.geometry.coordinates[0][0]));
       if (key === keyRef.current) return;
       keyRef.current = key;
       const ring = (f.geometry.coordinates[0] as [number, number][]);
@@ -36,6 +57,7 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
       const addr = props.address || props.headline || props.saddress || "";
       // Pedro's lots carry their index; Regrid / demo parcels get a generated home.
       const l = typeof props.lot === "number" ? lotListing(LOTS[props.lot], props.lot)
+        : county ? countyListing(Number(f.id), props as CountyProps, [cx, cy], ring)
         : { ...makeListings("parcel:" + key, [cx, cy], [cx - 1e-5, cy - 1e-5, cx + 1e-5, cy + 1e-5], null, 1, "")[0] };
       if (addr && !l.apn) l.addr = String(addr);
       if (props.owner) l.owner = { ...l.owner, name: String(props.owner), ini: String(props.owner).split(" ").filter((w: string) => /^[A-Z]/.test(w)).slice(0, 2).map((w: string) => w[0]).join("") };
@@ -53,9 +75,12 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
 
   const show = hit || selected;
   if (!map || !show || map.getZoom() < 15.4) return null;
-  void tick;
   const el = map.getContainer(), W = el.clientWidth, H = el.clientHeight;
-  const q = show.ring.map(ll => map.project(ll));
+  const anchorLL: [number, number] = [show.cx, show.cy];
+  frame.current = { ll: anchorLL, z0: map.getZoom(), b0: map.getBearing() };
+  const p0 = map.project(anchorLL);
+  // Local pixels, relative to the anchor.
+  const q = show.ring.map(ll => { const v = map.project(ll); return { x: v.x - p0.x, y: v.y - p0.y }; });
   const pts = q.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(" ");
   const sat = mode === "satellite";
   // Same value the parcel is painted with: a real lot's own figure, its feature state (Regrid), else the field at its centre.
@@ -80,7 +105,8 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   if (sat && isLiveMap()) {
     const lngs = show.ring.map(p => p[0]), lats = show.ring.map(p => p[1]);
     const bw = Math.min(...lngs), be = Math.max(...lngs), bs = Math.min(...lats), bn = Math.max(...lats);
-    const nw = map.project([bw, bn]), se = map.project([be, bs]);
+    const nw0 = map.project([bw, bn]), se0 = map.project([be, bs]);
+    const nw = { x: nw0.x - p0.x, y: nw0.y - p0.y }, se = { x: se0.x - p0.x, y: se0.y - p0.y };
     const w = se.x - nw.x, h = se.y - nw.y;
     if (w > 2 && h > 2) {
       let url = satUrls.current.get(show.key);
@@ -93,16 +119,18 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
     }
   }
   const edgeC = sat ? "rgb(255,209,41)" : "rgba(17,16,16,.75)";
-  const hole = `M0,0H${W}V${H}H0Z M${q.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(" L")}Z`;
+  const hole = `M-6000,-6000H6000V6000H-6000Z M${q.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(" L")}Z`;
   const top = Math.min(...q.map(v => v.y)), bot = Math.max(...q.map(v => v.y)), cx = q.reduce((a, v) => a + v.x, 0) / q.length;
   const num = (show.addr.match(/^\d+/) || [""])[0];
   const fs = Math.max(10, Math.min(14, 8 + (map.getZoom() - 15.4) * 3));
   const ccy = q.reduce((a, v) => a + v.y, 0) / q.length;
   const showCard = hit && !suppressCard && !selected;
-  const CH = 150, below = top - CH < 124 && bot + 16 + CH < H - 12;
+  // The card is placed in screen pixels (it doesn't scale with the map).
+  const CH = 150, below = p0.y + top - CH < 124 && p0.y + bot + 16 + CH < H - 12;
   return (
     <MapOverlay>
-      <svg width={W} height={H} style={{ position: "absolute", inset: 0, zIndex: 45, pointerEvents: "none" }} key={show.key}>
+      <div ref={wrapRef} style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, zIndex: 45, pointerEvents: "none", willChange: "transform", transformOrigin: "0 0", transform: `translate3d(${p0.x}px,${p0.y}px,0)` }}>
+      <svg width={1} height={1} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }} key={show.key}>
         <defs><filter id="bzLiftBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" /></filter></defs>
         {/* Light fade around the lifted parcel so the rest of the map, neighbouring parcels and labels stay readable (review feedback).
             The alpha lives in the fill colour: the fadeIn animation ends at CSS opacity 1, which would override an opacity attribute. */}
@@ -124,8 +152,9 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
         {/* The parcel's real outline on the ground stays visible above the lifted slab (review feedback). */}
         <polygon points={pts} fill="none" stroke={sat ? "rgba(255,209,41,.9)" : "rgba(18,18,18,.6)"} strokeWidth={1.2} strokeDasharray="4 3" strokeLinejoin="round" style={{ animation: "fadeIn .3s ease both" }} />
       </svg>
+      </div>
       {showCard && (
-        <div style={{ position: "absolute", left: Math.max(146, Math.min(W - 146, cx)), top: below ? bot + 16 : Math.max(124 + CH, top - 12), transform: `translate(-50%,${below ? "0" : "-100%"})`, width: 268, display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 18, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.2),0 0 0 .5px rgba(13,12,12,.08)", zIndex: 60, pointerEvents: "none", animation: "hvPop .2s cubic-bezier(.2,.8,.2,1) both" }}>
+        <div ref={cardRef} style={{ position: "absolute", left: Math.max(146, Math.min(W - 146, p0.x + cx)), top: below ? p0.y + bot + 16 : Math.max(124 + CH, p0.y + top - 12), transform: `translate(-50%,${below ? "0" : "-100%"})`, width: 268, display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 18, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.2),0 0 0 .5px rgba(13,12,12,.08)", zIndex: 60, pointerEvents: "none", animation: "hvPop .2s cubic-bezier(.2,.8,.2,1) both" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
             <span style={{ font: "700 14px/19px var(--font-sans)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hit!.addr}</span>
             <span style={{ flex: "none", font: "400 11px/16px var(--font-sans)", color: "rgb(98,90,89)" }}>{hasRegrid() ? "Parcel" : "Off market"}</span>

@@ -41,14 +41,25 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
     return () => { map.off("moveend", on); map.off("resize", on); };
   }, [map]);
 
+  // Team: "map flickering". Re-running the collapse at every rest made ~1 pin in 5
+  // pop between full and blank on each small zoom step (a trackpad zoom rests many
+  // times). The layout now holds until the zoom has moved half a level from the one
+  // it was made at; overlaps are measured as if at that zoom (positions scaled
+  // about the centre), so pins only regroup on real zoom changes.
+  const layoutZ = useRef<number | null>(null);
   const placed = useMemo(() => {
     if (!map) return [];
-    const z = map.getZoom();
-    const pr = (l: Listing) => (l.opp === "drop" ? 2 : 0) + (l.isNew ? 1 : 0);
+    const zNow = map.getZoom();
+    if (layoutZ.current == null || Math.abs(zNow - layoutZ.current) >= 0.5) layoutZ.current = zNow;
+    const z = layoutZ.current, k = Math.pow(2, z - zNow);
+    const ctr = map.getContainer(), cx0 = ctr.clientWidth / 2, cy0 = ctr.clientHeight / 2;
+    // Feed items first (team: pins should match the feed): a For you card's pin always
+    // draws in full with its signal, never folded into a blank pill under a neighbour.
+    const pr = (l: Listing) => (signal?.has(l.id) ? 4 : 0) + (l.opp === "drop" ? 2 : 0) + (l.isNew ? 1 : 0);
     const order = listings.slice().sort((a, b) => pr(b) - pr(a) || a.id - b.id);
     const boxes: number[][] = [];
     return order.map(l => {
-      const p = map.project([l.lng, l.lat]);
+      const p0 = map.project([l.lng, l.lat]), p = { x: cx0 + (p0.x - cx0) * k, y: cy0 + (p0.y - cy0) * k };
       const lab = shortPrice(l.price);
       const w = lab.length * 9 + 30 + (signal?.has(l.id) ? 24 : 0);
       const b = [p.x - w / 2 - 2, p.y - 19, p.x + w / 2 + 2, p.y + 19];
@@ -84,7 +95,7 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
             <span
               style={{
                 display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", borderRadius: 9999, boxShadow: DROP,
-                transition: "background .18s, width .18s",
+                transition: "background .18s, width .18s, height .18s",
                 ...(isBlank ? { width: 34, height: 20 } : { height: 34, padding: sig ? "0 12px 0 6px" : "0 12px" }),
                 background: dark ? "var(--ink)" : sn ? "linear-gradient(rgba(18,18,18,.08),rgba(18,18,18,.08)),var(--paper)" : "var(--paper)",
               }}
@@ -106,7 +117,7 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
                 </span>
               )}
               {!isBlank && !sig && l.opp === "drop" && <i className="ph-bold ph-arrow-down" style={{ fontSize: 13, color: dark ? "var(--paper)" : "rgb(192,98,84)" }} />}
-              {!isBlank && <span style={{ font: "700 14px/1.26 var(--font-sans)", color: dark ? "var(--paper)" : "var(--ink)" }}>{lab}</span>}
+              {!isBlank && <span style={{ font: "700 14px/1.26 var(--font-sans)", color: dark ? "var(--paper)" : "var(--ink)", animation: "fadeIn .22s ease both" }}>{lab}</span>}
             </span>
           </div>
           </div>

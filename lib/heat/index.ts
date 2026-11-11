@@ -17,21 +17,25 @@ import type { Bands, Colors } from "./scale";
 
 export { readable, gaugeReading } from "./scale";
 
+import SL_HEAT from "../data/sl-heat.json";
 export type HeatLayer = "roi" | "ub";
 
 /* The data scale: ROI uses the report model's bands (scale.ts); Underbuilt is
    the share of the lot's allowed floor area left unbuilt, %, placeholder cut
    points until JD's heat-map service defines them. Values are spread along
    these, whatever palette draws them. */
+// Underbuilt cut points are the lots' own quantiles (lib/data/sl-heat.json, from
+// scripts/fetch-la-parcels.mjs), so each colour holds a similar share of lots
+// (team: the Underbuilt heat wasn't varied). Still placeholders for JD's service.
 export const HEAT_BANDS: Record<HeatLayer, Bands> = {
   roi: BANDS,
-  ub: [10, 20, 35, 50, 65, 80],
+  ub: SL_HEAT.ubBands7,
 };
 /* Reduced palettes (design point: fewer distinct colours) draw 5 bands.
    ROI: doesn't pencil · marginal · modest · good · strong. */
 const BANDS_5: Record<HeatLayer, Bands> = {
   roi: [0, 10, 20, 35],
-  ub: [15, 35, 55, 75],
+  ub: SL_HEAT.ubBands5,
 };
 /** The cut points a palette of `n` colours draws with. */
 export const bandsFor = (kind: HeatLayer, n: number): Bands => (n === 5 ? BANDS_5[kind] : HEAT_BANDS[kind]);

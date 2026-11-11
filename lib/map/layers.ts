@@ -1,10 +1,11 @@
 import type { Map as MbMap, GeoJSONSource } from "mapbox-gl";
 import { config, hasRegrid } from "../config";
 import { Ring, metersPerDegLat, metersPerDegLng, rng, hashStr } from "../geo";
-import { cellToBoundary, cellToLatLng, latLngToCell, polygonToCells } from "h3-js";
+import { cellToBoundary, cellToLatLng, polygonToCells } from "h3-js";
 import { isStandardStyle } from "./breezyTheme";
 import { heatAlpha, heatColors, heatPct, heatStep, parcelPct } from "../heat";
-import { LOTS, heatAreaLatLng, inLotZone } from "../silverlake";
+import { LOTS, HEAT_AREA, fromHeatCenter, heatAreaLatLng } from "../silverlake";
+import SL_HEAT from "../data/sl-heat.json";
 
 export type HeatKind = "roi" | "ub" | "none";
 
@@ -55,6 +56,15 @@ export function ensureLayers(m: MbMap) {
     // Lot outlines, Pedro's style: thin warm grey, fading in with the fills.
     add({ id: "bz-par-line", type: "line", source: "bz-par", ...sl, minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } });
   }
+  if (!m.getSource("bz-la")) {
+    // Every other parcel in the heat circle: LA County's assessor parcels
+    // (scripts/fetch-la-parcels.mjs), so parcels cover the whole heat surface,
+    // not only Pedro's blocks. Loaded on demand; parks, streets and other
+    // unvalued parcels carry no `ub` / `roi` and draw as outlines only.
+    m.addSource("bz-la", { type: "geojson", data: "/data/sl-parcels.json", tolerance: 0.2 });
+    add({ id: "bz-la-fill", type: "fill", source: "bz-la", minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } });
+    add({ id: "bz-la-line", type: "line", source: "bz-la", minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } });
+  }
   if (!m.getSource("bz-lots")) {
     // Pedro's real Silver Lake / Echo Park lots: static, coloured by their own
     // ROI / Underbuilt (properties `roi`, `ub`), same ramps as the parcels.
@@ -92,7 +102,7 @@ export function applyHeatColors(m: MbMap, kind: HeatKind) {
   m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
   m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
   if (m.getLayer("bz-par-fill")) m.setPaintProperty("bz-par-fill", "fill-opacity", parcelOpacity(A));
-  if (m.getLayer("bz-lots-fill")) m.setPaintProperty("bz-lots-fill", "fill-opacity", parcelOpacity(A));
+  for (const id of ["bz-lots-fill", "bz-la-fill"]) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", parcelOpacity(A));
   if (kind === "none") return;
   const colors = heatColors(kind);
   const step = heatStep(kind, colors);
@@ -100,6 +110,7 @@ export function applyHeatColors(m: MbMap, kind: HeatKind) {
   const own = heatStep(kind, colors, ["get", kind]);
   for (const id of ["bz-hex-fill", "bz-hex-line", "bz-hex-sub-fill", "bz-hex-sub-line"]) m.setPaintProperty(id, id.endsWith("fill") ? "fill-color" : "line-color", own);
   if (m.getLayer("bz-lots-fill")) m.setPaintProperty("bz-lots-fill", "fill-color", own);
+  if (m.getLayer("bz-la-fill")) m.setPaintProperty("bz-la-fill", "fill-color", ["case", ["has", kind], own, "rgba(0,0,0,0)"]);
   if (!m.getLayer("bz-par-fill")) return;
   // Regrid parcels get their value as feature state (stampParcels); until a
   // parcel is stamped it stays clear rather than flashing the lowest band.
@@ -120,7 +131,7 @@ function setAlpha(m: MbMap, kind: HeatKind, f: number) {
   const A = heatAlpha(kind) * f;
   m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
   m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
-  for (const id of ["bz-par-fill", "bz-lots-fill"]) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", parcelOpacity(A));
+  for (const id of ["bz-par-fill", "bz-lots-fill", "bz-la-fill"]) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", parcelOpacity(A));
 }
 function animate(ms: number, f: (t: number) => void, done: () => void) {
   const t0 = performance.now();
@@ -190,26 +201,20 @@ export function stampParcels(m: MbMap, kind: HeatKind) {
 // changes after load; the layer switch only repaints.
 // A cell with more than 3 of Pedro's lots in it averages them (his derive.ts);
 // other cells read the fake field at their centre.
-const MIN_REAL = 3;
 const hexDataCache = new Map<number, GeoJSON.FeatureCollection>();
 function hexData(res: number): GeoJSON.FeatureCollection {
   const hit = hexDataCache.get(res);
   if (hit) return hit;
-  const real = new Map<string, { roi: number; ub: number; n: number }>();
-  for (const l of LOTS) {
-    const c = latLngToCell(l.c[1], l.c[0], res);
-    const a = real.get(c) || { roi: 0, ub: 0, n: 0 };
-    a.roi += l.roi; a.ub += l.ub; a.n++;
-    real.set(c, a);
-  }
+  // Real cells: the average of every lot / county parcel inside, spread by rank over
+  // the lots' range (lib/data/sl-heat.json). Elsewhere (none at res 8 today) the fake field.
+  const real = SL_HEAT.hex as Record<string, number[]>;
   const features: GeoJSON.Feature[] = polygonToCells([heatAreaLatLng()], res).map(h => {
     const [lat, lng] = cellToLatLng(h);
     const ring = cellToBoundary(h, true);
     ring.push(ring[0]);
-    const r = real.get(h);
-    const ok = !!r && r.n > MIN_REAL;
-    const roi = ok ? Math.round((r!.roi / r!.n) * 10) / 10 : heatPct("roi", lng, lat);
-    const ub = ok ? Math.round((r!.ub / r!.n) * 10) / 10 : heatPct("ub", lng, lat);
+    const r = res === 8 ? real[h] : undefined;
+    const roi = r ? r[0] : heatPct("roi", lng, lat);
+    const ub = r ? r[1] : heatPct("ub", lng, lat);
     return { type: "Feature", properties: { h3: h, roi, ub, x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } };
   });
   const fc = { type: "FeatureCollection", features } as GeoJSON.FeatureCollection;
@@ -247,7 +252,7 @@ export function fakeParcelsFor(m: MbMap, heat: HeatKind): FakeParcel[] {
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
     const key = i + ":" + j;
     if (!parcelCache.has(key)) parcelCache.set(key, makeCell(i * cell, j * cell, cell, hashStr(key)));
-    all.push(...parcelCache.get(key)!.filter(p => !inLotZone([p.cx, p.cy]))); // Pedro's lots cover that zone
+    all.push(...parcelCache.get(key)!.filter(p => fromHeatCenter([p.cx, p.cy]) > HEAT_AREA.radius)); // real parcels cover the heat circle
   }
   src.setData({
     type: "FeatureCollection",

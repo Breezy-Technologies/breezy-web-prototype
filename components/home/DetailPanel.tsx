@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Listing, fullPrice, listingDetail, shortPrice } from "@/lib/fake";
 import { F_TYPES } from "@/lib/filters";
 import { css } from "@/lib/css";
+import { hashStr } from "@/lib/geo";
 import { BellButton } from "./Saved";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
@@ -291,7 +292,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                   {reveal === "play" && <span aria-hidden style={{ position: "absolute", left: 54, right: 0, top: -4, bottom: -4, borderRadius: 12, overflow: "hidden", pointerEvents: "none" }}>
                     <span style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg,rgba(174,106,91,0) 0%,rgba(174,106,91,.10) 35%,rgba(186,160,251,.12) 55%,rgba(186,160,251,0) 80%)", animation: "revealSheen 1.5s cubic-bezier(.3,.7,.3,1) both" }} />
                   </span>}
-                  <CopyLine text={l.owner.phone} reveal={reveal} delay={0} /><CopyLine text={l.owner.email} reveal={reveal} delay={160} /><CopyLine text={l.owner.mail} muted reveal={reveal} delay={320} />
+                  <CopyLine text={l.owner.phone} reveal={reveal} delay={0} verified={isVerified(l.owner.phone, 0.7)} /><CopyLine text={l.owner.email} reveal={reveal} delay={160} verified={isVerified(l.owner.email, 0.55)} /><CopyLine text={l.owner.mail} muted reveal={reveal} delay={320} verified={isVerified(l.owner.mail, 0.8)} />
                   <CreditLine text={`1 credit used · ${credits} left`} used />
                 </div>
               : <div style={css("padding-left:70px;display:flex;flex-direction:column;gap:6px")}>
@@ -538,9 +539,20 @@ function CreditLine({ text, used }: { text: string; used?: boolean }) {
   );
 }
 
+// Each contact line says whether it's verified (review comment, 11 Nov). Fake and
+// stable per value until the owner data service returns real verification.
+const isVerified = (v: string, share: number) => (hashStr("verified:" + v) % 100) < share * 100;
+function VerifyTag({ ok }: { ok: boolean }) {
+  return (
+    <span title={ok ? "Verified: confirmed against a recent source" : "Unverified: not yet confirmed"} style={{ flex: "none", display: "flex", alignItems: "center", gap: 4, font: "400 12px/16px var(--font-sans)", color: ok ? "rgb(46,122,84)" : "rgb(129,117,111)" }}>
+      <i className={`ph-${ok ? "fill" : "bold"} ph-${ok ? "seal-check" : "seal-question"}`} style={{ fontSize: 14 }} />{ok ? "Verified" : "Unverified"}
+    </span>
+  );
+}
+
 // While revealing, the text is painted by a gradient (ink, a clay → violet edge,
 // then transparent) that slides across it, so each line is written in left to right.
-function CopyLine({ text, muted, reveal = "done", delay = 0 }: { text: string; muted?: boolean; reveal?: "wait" | "play" | "done"; delay?: number }) {
+function CopyLine({ text, muted, reveal = "done", delay = 0, verified }: { text: string; muted?: boolean; reveal?: "wait" | "play" | "done"; delay?: number; verified?: boolean }) {
   const [done, setDone] = useState(false);
   const copy = () => {
     // writeText is async and rejects when the page isn't focused; swallow that.
@@ -555,6 +567,7 @@ function CopyLine({ text, muted, reveal = "done", delay = 0 }: { text: string; m
         backgroundImage: `linear-gradient(100deg,${muted ? "rgb(98,90,89)" : "rgb(18,18,18)"} 0%,${muted ? "rgb(98,90,89)" : "rgb(18,18,18)"} 30%,rgb(174,106,91) 36%,rgb(186,160,251) 41%,rgba(186,160,251,0) 47%)`,
         animation: `revealText 1s cubic-bezier(.4,.1,.3,1) ${delay}ms both`,
       } : {}) }}>{text}</span>
+      {verified != null && reveal !== "wait" && <span style={{ flex: "none", animation: reveal === "play" ? `fadeIn .4s ease ${delay + 700}ms both` : undefined }}><VerifyTag ok={verified} /></span>}
       <i className={`ph-bold ph-${done ? "check" : "copy"} copy-ic`} style={{ flex: "none", fontSize: 15, color: done ? "rgb(49,140,96)" : "var(--fg-2)", opacity: done ? 1 : undefined }} />
     </button>
   );
