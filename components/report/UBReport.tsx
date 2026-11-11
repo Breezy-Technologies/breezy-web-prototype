@@ -20,13 +20,16 @@
 // Underbuilt %, the ft² left to build, buildable area, ADU size, the options'
 // figures) comes from lib/roi/property.ts `siteOf`, the same site facts the
 // Upside tab prices, so the two tabs agree with each other and with the map's
-// Underbuilt %. Setbacks become LA R1's (20 / 5 / 15 ft). The rest of the rule
-// framework (coverage x 2.5 stories, heights, uses, § references) stays the sample's, renamed to the
-// City of Los Angeles; a note at the top says so. Swap for the Underbuilt
-// service's report when it exists.
+// Underbuilt %. The rules are Los Angeles's for the lot's zone (lib/zoning/la.ts):
+// LAMC sections and summaries, uses (the cards are rebuilt per zone), height by
+// height district, yards, density, parking and California's ADU / JADU / SB 9
+// rules. A note at the top says they are summaries to confirm on ZIMAS. Swap for
+// the Underbuilt service's report when it covers Los Angeles.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Listing } from "@/lib/fake";
 import { siteOf } from "@/lib/roi";
+import type { Site } from "@/lib/roi";
+import { LAMC_URL, LaZone, ZIMAS_URL, laPairs, laZone } from "@/lib/zoning/la";
 
 type Report = {
   bg: string; toc: { id: string; label: string }[];
@@ -46,17 +49,20 @@ const pctS = (n: number) => (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/,
 const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Sample text → this property's, as [sample, ours] pairs (numbers matched whole). */
-function replacements(l: Listing): [string, string][] {
+function replacements(l: Listing, z: LaZone): [string, string][] {
   const S = siteOf(l);
   const L = S.lot, W = S.lotW, D = S.lotD, Ex = S.Ex, Smax = Math.round(S.Smax);
   const fpMax = Math.round(Smax / 2.5), fp = Math.min(S.footprint, fpMax);
   const imperv = Math.round(L * 0.35);
-  // Setbacks: the City of LA's R1 defaults (front 20, sides 5, rear 15 ft), not the sample's 35 / 15 / 30.
-  const { F, Sd, Rr } = SETBACK;
+  // Yards: the lot's zone's (lib/zoning/la.ts), not the sample's 35 / 15 / 30.
+  const { F, Sd, Rr } = z.yards;
   const bw = Math.max(W - 2 * Sd, 0), bd = Math.max(D - F - Rr, 0), buildable = bw * bd;
-  const adu = Math.round(Math.min(800, Ex * 0.3));
+  // State law guarantees an 800 ft² ADU whatever the floor-area and coverage limits.
+  const adu = 800;
   const used = Smax > 0 ? Math.round((100 * Ex) / Smax) : 0;
   return [
+    // Los Angeles rules first: whole sentences win over the renames below
+    ["in the township code", "in the LA Municipal Code"], ...laPairs(S, z),
     // names: the most specific first
     ["418 Wren Hollow Lane", S.addr], ["WREN HOLLOW LANE", S.street.toUpperCase()], ["Wren Hollow Lane", S.street],
     ["Wren Hollow Estates", `${S.hood} Tract`], ["Wren Hollow", S.street],
@@ -83,21 +89,108 @@ function replacements(l: Listing): [string, string][] {
   ];
 }
 
-const SETBACK = { F: 20, Sd: 5, Rr: 15 };
 /* A bare "35 ft" / "30 ft" / "15 ft" is the front / rear / side setback (setbacks table,
-   garage rows, the options drawing) unless its row is about height. */
-const BARE: Record<string, string> = { "35 ft": `${SETBACK.F} ft`, "30 ft": `${SETBACK.Rr} ft`, "15 ft": `${SETBACK.Sd} ft` };
-function bareSetback(n: Node): string | null {
+   garage rows, the options drawing), or the height limit when its row is about height. */
+function bareSetback(n: Node, z: LaZone): string | null {
   const v = (n.nodeValue || "").trim();
-  if (!BARE[v]) return null;
+  const bare: Record<string, string> = { "35 ft": `${z.yards.F} ft`, "30 ft": `${z.yards.Rr} ft`, "15 ft": `${z.yards.Sd} ft` };
+  if (!bare[v]) return null;
   let a = n.parentElement;
   for (let i = 0; i < 3 && a?.parentElement; i++) a = a.parentElement;
-  return /height|tall|stor(y|ies)|roof/i.test(a?.textContent || "") ? null : (n.nodeValue || "").replace(v, BARE[v]);
+  if (/height|tall|stor(y|ies)|roof/i.test(a?.textContent || "")) {
+    if (v === "15 ft") return null;
+    const h = v === "30 ft" ? z.flat : z.height;
+    return (n.nodeValue || "").replace(v, h ? `${h} ft` : "No limit");
+  }
+  return (n.nodeValue || "").replace(v, bare[v]);
+}
+
+/* Rule rows (label cell, then value cell): the value for Los Angeles, keyed by the label. */
+function rowValues(S: Site, z: LaZone): Map<string, string> {
+  const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
+  const homes = z.cls === "R1" ? "1 home, plus an ADU and a junior ADU" : `${z.homes} home${z.homes === 1 ? "" : "s"}`;
+  return new Map<string, string>([
+    ["Max height", z.height ? `${z.height} ft${z.flat !== z.height ? ` (${z.flat} ft flat roof)` : ""}` : "No limit (Height District 1)"],
+    ["Max stories", z.stories], ["Max lot coverage", "Not capped; floor area and yards govern"],
+    ["Height exceptions", "Chimneys and roof equipment, within set allowances"],
+    ["Min lot area", "5,000 ft²"], ["Min lot width", "50 ft"],
+    ["Min lot area per home", z.perHome ? `${fmt(z.perHome)} ft²` : "Not used (one home per lot)"],
+    ["FAR (code)", z.cls === "R1" ? "0.45 (residential floor area)" : "3 × buildable area"],
+    ["Classification", z.cls === "R1" ? "Single-family (SFR)" : z.cls === "C" ? "Commercial, homes allowed" : z.cls === "PF" ? "Public facilities" : "Multifamily"],
+    ["Planned development or specific plan", "Check ZIMAS"], ["Legal description", `See the LA County Assessor record (APN ${S.apn})`],
+    ["Homes allowed", homes], ["Controlling rule", `${z.densityRule} (${z.densityCite})`], ["Existing vs allowed", `1 of ${Math.max(1, z.homes)}`],
+    ["ADUs count toward density", "No (state law)"], ["Density method", z.perHome ? "Lot area per home" : "One home per lot"],
+    ["Max units by density", String(z.homes)], ["Max units by lot area per home", String(z.homes)],
+    ["Lot split eligible", z.cls === "R1" ? "Possibly, under SB 9 (the owner must live there 3 years)" : "No"],
+    ["Prevailing front setback", z.cls === "R1" ? "Can apply: the average of the block's homes" : "Not used"],
+    ["Attached ADU", "Permitted by right (state law)"], ["Detached ADU", "Permitted by right (state law)"],
+    ["ADUs allowed per lot", z.cls === "R1" ? "1 ADU + 1 junior ADU" : "At least 2 detached, plus conversions"],
+    ["Max ADU size", "1,200 ft² detached; attached up to 50% of the house"],
+    ["Owner occupancy", "Not for an ADU; yes for a junior ADU"], ["ADU parking", "None within ½ mile of transit; else up to 1"],
+    ["Min rental term", "More than 30 days"], ["Detached ADU distance from side and back property lines", "4 ft minimum"],
+    ["Shed distance from side and back property lines", "See §12.22 C.20"], ["Accessory building height (sheds, studios)", "See §12.22 C.20"],
+    ["Pool distance from side and back property lines", "See §12.22 C.20"],
+    ["Attic and lofts", "Counts as floor area where the ceiling is over 7 ft"], ["Dormers", "No separate rule"],
+    ["Basement as floor area", "Not counted when its ceiling is 3 ft or less above grade"], ["Basement as a story", "See §12.03 (story)"],
+    ["Historic district", "Check ZIMAS (HPOZ)"], ["Overlays", "Check ZIMAS"], ["Min landscaped front yard", "See §12.40"],
+    ["Utility easement", "Check the title report"], ["Required trees", "Not set for one home"],
+  ]);
+}
+function rowValue(n: Node, vals: Map<string, string>): string | null {
+  let a = n.parentElement;
+  for (let i = 0; i < 4 && a; i++, a = a.parentElement) {
+    const prev = a.previousElementSibling;
+    if (prev) { const v = vals.get((prev.textContent || "").trim()); return v ?? null; }
+  }
+  return null;
+}
+
+/* The uses cards (Permitted / Conditional / Not allowed), rebuilt for the zone from the
+   sample's own group and row markup. Each row's § opens the matching summary when one exists. */
+function rebuildUses(root: DocumentFragment, z: LaZone) {
+  const head = [...root.querySelectorAll("p")].find(p => p.textContent?.trim() === "Allowed uses");
+  const grid = head?.parentElement?.nextElementSibling;
+  if (!grid) return;
+  const modalOf = new Map<string, string>();
+  root.querySelectorAll<HTMLElement>("button[data-ubm]").forEach(b => { const t = b.textContent?.trim(); if (t && !modalOf.has(t)) modalOf.set(t, b.dataset.ubm!); });
+  const cards = [...grid.children] as HTMLElement[];
+  const groupT = cards[0]?.children[1]?.cloneNode(true) as HTMLElement | undefined;
+  const rowT = groupT?.children[1]?.cloneNode(true) as HTMLElement | undefined;
+  if (!groupT || !rowT) return;
+  const badge = rowT.querySelector("span span")?.cloneNode(true) as HTMLElement | undefined;
+  const lists = [z.uses.permitted, z.uses.conditional, z.uses.notAllowed];
+  cards.slice(0, 3).forEach((card, ci) => {
+    const accent = card.children[1] as HTMLElement | undefined;
+    const g0 = accent?.cloneNode(true) as HTMLElement | undefined;
+    const r0 = g0?.children[1]?.cloneNode(true) as HTMLElement | undefined;
+    while (card.children.length > 1) card.lastElementChild!.remove();
+    for (const [h, rows] of lists[ci]) {
+      const g = (g0 || groupT).cloneNode(true) as HTMLElement;
+      while (g.children.length > 1) g.lastElementChild!.remove();
+      // The Not allowed card's sample group has no small heading; its rows stand alone.
+      if (ci === 2) g.firstElementChild!.remove(); else g.firstElementChild!.textContent = h;
+      for (const [label, cite, mine] of rows) {
+        const r = (r0 || rowT).cloneNode(true) as HTMLElement;
+        const lab = r.firstElementChild as HTMLElement, btn = r.querySelector("button") as HTMLElement | null;
+        lab.textContent = label;
+        if (mine && badge) lab.appendChild(badge.cloneNode(true));
+        if (btn) {
+          btn.textContent = cite;
+          btn.title = `Read ${cite} in the LA Municipal Code`;
+          const m = modalOf.get(cite);
+          if (m) btn.dataset.ubm = m; else { delete btn.dataset.ubm; btn.style.cursor = "default"; }
+        }
+        g.appendChild(r);
+      }
+      card.appendChild(g);
+    }
+  });
 }
 
 /** Rewrites the text (and title / aria-label) of a recorded fragment in one pass, so nothing is replaced twice. */
 function personalizer(l: Listing) {
-  const pairs = replacements(l), map = new Map(pairs);
+  const S = siteOf(l), z = laZone(S), vals = rowValues(S, z);
+  const pairs = replacements(l, z), map = new Map(pairs);
   const re = new RegExp(pairs.map(([k]) => /^[\d.,%/ ]+$/.test(k) ? `(?<![\\d.,])${esc(k)}(?![\\d]|[.,]\\d)` : esc(k)).join("|"), "g");
   const fix = (t: string) => t.replace(re, m => map.get(m) ?? m);
   const ub = siteOf(l).ub;
@@ -107,12 +200,15 @@ function personalizer(l: Listing) {
     const walk = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
     for (let n = walk.nextNode(); n; n = walk.nextNode()) {
       if (n.nodeType === 3) {
-        if (n.nodeValue && /\S/.test(n.nodeValue) && !/^(STYLE|SCRIPT)$/.test(n.parentElement?.tagName || "")) n.nodeValue = bareSetback(n) ?? fix(n.nodeValue);
+        if (n.nodeValue && /\S/.test(n.nodeValue) && !/^(STYLE|SCRIPT)$/.test(n.parentElement?.tagName || "")) n.nodeValue = rowValue(n, vals) ?? bareSetback(n, z) ?? fix(n.nodeValue);
         continue;
       }
       const el = n as Element;
       for (const a of ["title", "aria-label"]) { const v = el.getAttribute(a); if (v) el.setAttribute(a, fix(v)); }
     }
+    rebuildUses(tpl.content, z);
+    // "Open the LA Municipal Code" links go to the code itself.
+    tpl.content.querySelectorAll("a").forEach(a => { if (a.textContent?.trim() === "Open the LA Municipal Code") { a.setAttribute("href", LAMC_URL); a.setAttribute("target", "_blank"); a.setAttribute("rel", "noopener"); } });
     return tpl.innerHTML;
   };
 }
@@ -120,7 +216,8 @@ function personalizer(l: Listing) {
 function personalize(r: Report, l: Listing): Report {
   const f = personalizer(l);
   const each = (o: Record<string, string>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, f(v)]));
-  const note = `<p style="margin:0 0 -48px;padding:12px 16px;border-radius:12px;background:rgb(245,243,243);font:400 13px/18px var(--font-sans);color:rgb(98,90,89)">Lot, house and build figures are this property\u2019s. Setbacks are LA R1 defaults; the other zoning rules (heights, uses, code sections) are sample data until the Underbuilt service covers this city.</p>`;
+  const z = laZone(siteOf(l));
+  const note = `<p style="margin:0 0 -48px;padding:12px 16px;border-radius:12px;background:rgb(245,243,243);font:400 13px/18px var(--font-sans);color:rgb(98,90,89)">Lot, house and build figures are this property\u2019s (LA County assessor). The rules are summaries of the LA Municipal Code and California ADU law for ${z.code} (${z.name}); overlays such as hillside, historic (HPOZ) or specific plans can change them. Check the parcel on <a href="${ZIMAS_URL}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">ZIMAS</a> before relying on them.</p>`;
   return { ...r, main: f(r.main).replace(/(<main\b[^>]*>)/, `$1${note}`), rows: each(r.rows), options: each(r.options), modals: each(r.modals), glossary: f(r.glossary) };
 }
 

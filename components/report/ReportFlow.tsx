@@ -17,6 +17,7 @@ import { Listing, shortPrice } from "@/lib/fake";
 import { css } from "@/lib/css";
 import { CompsResult, CompsReview } from "../home/CompsFlow";
 import { UBReport } from "./UBReport";
+import { compsFor } from "@/lib/comps";
 import { UpsideReport } from "./upside/UpsideReport";
 import { upsideOf } from "@/lib/roi";
 
@@ -117,7 +118,8 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   const rows = steps.concat(["Opening your report"]);
   const ri = done ? rows.length - 1 : Math.min(step, n - 1);
   const upGross = useMemo(() => (kind === "roi" ? upsideOf(l).sc.rec.gross : 0), [l, kind]);
-  const doneTitle = { comps: "5 sold and 1 active\nproperties found", ub: "Your report is ready", roi: `This property could\nbe worth ${shortPrice(upGross)}` }[kind];
+  const cps = compsFor(l);
+  const doneTitle = { comps: `${cps.sold.length} sold and ${cps.active.length} active\nproperties found`, ub: "Your report is ready", roi: `This property could\nbe worth ${shortPrice(upGross)}` }[kind];
   const loading = phase === "run" || phase === "done";
 
   return (

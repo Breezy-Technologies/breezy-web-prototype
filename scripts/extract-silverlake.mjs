@@ -47,6 +47,8 @@ const out = lots
       lot: l.lot, beds: l.beds, baths: l.baths, sqft: l.built, year: l.year,
       price: l.vnow, ppsf: l.ppsf,
       st: l.listed ? "L" : l.sold ? "S" : "O",
+      sm: l.sold ? l.soldmo : undefined, // sold this many months ago
+      by: l.byright, bo: l.bonus, nb: l.nbhd, cp: l.comps, // by-right, bonus ft², largest nearby comp ft², comps count
       roi: Math.round(targetOf(l, apn)),
       ub: l.byright > 0 ? Math.round(Math.max(0, 1 - l.built / l.byright) * 100) : 0,
     };

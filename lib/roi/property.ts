@@ -16,6 +16,7 @@
 import type { Listing } from "@/lib/fake";
 import { hashStr, rng } from "@/lib/geo";
 import { lotOfId, type Lot } from "@/lib/silverlake";
+import { compsFor, largestNearby } from "@/lib/comps";
 import { DEFAULTS } from "./defaults";
 import { ledger, dealScenarios } from "./ledger";
 import type { Params, Scenarios } from "./types";
@@ -74,9 +75,11 @@ export function siteOf(l: Listing): Site {
     zone: real?.zone || ZONE_OF[l.ptype] || "R1-1", zip: real?.zip || "",
     apn: real?.apn || l.apn || String(l.id),
     lot, ...d, Ex, Smax, ub: Math.round(100 * Math.max(0, 1 - Ex / Smax)),
-    Sbonus: Math.round(Smax * (1.6 + R() * 0.5)),
-    Snbhd: Math.round(Math.max(Ex * 1.05, Smax * (0.8 + R() * 0.45)) / 10) * 10,
-    stories, footprint, year: real?.year || l.built || 1950, vacant, comps: 5,
+    // Pedro's own bonus and largest-nearby figures for his lots; elsewhere the largest home
+    // within half a mile on a similar lot (his lots), else a seeded estimate.
+    Sbonus: real?.bo ?? Math.round(Smax * (1.6 + R() * 0.5)),
+    Snbhd: Math.max(Ex, real?.nb ?? largestNearby(l) ?? Math.round(Math.max(Ex * 1.05, Smax * (0.8 + R() * 0.45)) / 10) * 10),
+    stories, footprint, year: real?.year || l.built || 1950, vacant, comps: compsFor(l).sold.length,
   };
   siteCache.set(key, out);
   return out;

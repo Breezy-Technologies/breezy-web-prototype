@@ -17,6 +17,8 @@ export type Lot = {
   price: number; ppsf: number;
   st: "L" | "S" | "O"; // listed, sold, off market
   roi: number; ub: number; // %
+  /** Pedro's figures: sold months ago, by-right / bonus ft², largest nearby comp ft², comps count. */
+  sm?: number; by?: number; bo?: number; nb?: number; cp?: number;
 };
 
 export const LOTS = data as unknown as Lot[];

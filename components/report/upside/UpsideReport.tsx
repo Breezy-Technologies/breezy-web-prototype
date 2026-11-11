@@ -153,7 +153,7 @@ export function UpsideReport({ l, onComps }: { l: Listing; onComps: () => void }
           <div className="rp-wrap rp-cards">
             <BuildSize key={site.vacant ? "v" : "h"} p={p} sc={sc} a={a} comps={site.comps} />
             <Ledger p={p} rec={rec} a={a} onAdjust={adjust} />
-            <Neighborhood p={p} onComps={onComps} />
+            <Neighborhood p={p} l={l} onComps={onComps} />
           </div>
         </section>
 

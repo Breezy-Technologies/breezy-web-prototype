@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Listing, fullPrice, shortPrice } from "@/lib/fake";
 import { css } from "@/lib/css";
+import { type Comp, compsFor } from "@/lib/comps";
 
 
 // Comps pieces used by the report sheet (components/report/ReportFlow.tsx):
@@ -39,32 +40,33 @@ export function CompsReview({ l, onClose, onConfirm }: { l: Listing; onClose: ()
 }
 
 export function CompsResult({ l }: { l: Listing }) {
-  // Matches the loading stage's "5 sold and 1 active properties found". A vacant
-  // parcel (no house, sqft 0) is comped against lots: lot size, no beds.
-  const lotFt = Math.round(l.lotAc * 43560);
-  const spec = (i: number) => l.sqft > 0
-    ? `${l.beds > 0 ? `${l.beds} bd · ` : ""}${Math.round(l.sqft * (0.9 + i * 0.04)).toLocaleString("en-US")} ft²`
-    : `Lot · ${Math.round((lotFt || 6000) * (0.9 + i * 0.04)).toLocaleString("en-US")} ft²`;
+  // Real comps (lib/comps.ts): Pedro's lots sold in the last 12 months or listed now,
+  // nearest and most alike first; the loading title counts the same list. A vacant
+  // parcel (no house, sqft 0) is comped on lot size.
+  const { sold, active } = compsFor(l);
+  const list = [...sold, ...active];
+  const vacant = !(l.sqft > 0);
+  const psf = sold.length ? [...sold].sort((a, b) => a.ppsf - b.ppsf)[sold.length >> 1].ppsf : 0;
+  const spec = (c: Comp) => vacant ? `Lot · ${c.lot.toLocaleString("en-US")} ft²` : `${c.beds} bd · ${c.baths} ba · ${c.sqft.toLocaleString("en-US")} ft²`;
   return (
     <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "24px 48px 48px", animation: "flowRise .6s cubic-bezier(.2,.8,.2,1) both" }}>
       <span style={{ font: "700 13px/16px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--fg-3)" }}>AI comps · {l.addr}</span>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 16, margin: "8px 0 24px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 16px", margin: "8px 0 24px" }}>
         <span style={{ font: "300 56px/1.1 var(--font-sans)", letterSpacing: "-1.5px" }}>{fullPrice(l.qe.value * 1.01)}</span>
-        <span style={{ font: "400 16px/22px var(--font-sans)", color: "var(--fg-2)" }}>estimated value · range {shortPrice(l.qe.lo)}–{shortPrice(l.qe.hi)}</span>
+        <span style={{ font: "400 16px/22px var(--font-sans)", color: "var(--fg-2)" }}>estimated value · range {shortPrice(l.qe.lo)}–{shortPrice(l.qe.hi)}{psf ? ` · ${sold.length} sold comps at a median $${psf.toLocaleString("en-US")}/ft²` : ""}</span>
       </div>
+      {list.length === 0 && <span style={{ font: "400 15px/22px var(--font-sans)", color: "var(--fg-2)" }}>No sales or listings close enough to compare yet.</span>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 20 }}>
-        {[0, 1, 2, 3, 4, 5].map(i => {
-          const p = l.price * (0.88 + ((i * 37) % 23) / 100), sc = 92 - i * 6;
-          return (
-            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ height: 160, borderRadius: 18, background: `url(${l.photos[(i + 1) % l.photos.length]}) center/cover` }} />
-              <span style={{ font: "700 15px/20px var(--font-sans)" }}>{["Sold", "Sold", "Sold", "Active", "Sold", "Sold"][i]} · {fullPrice(p)}</span>
-              <span style={{ font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{(0.1 + i * 0.07).toFixed(1)} mi away · {spec(i)}</span>
-              <span style={{ height: 6, borderRadius: 9999, background: "rgba(13,12,12,.08)" }}><span style={{ display: "block", height: 6, width: sc + "%", borderRadius: 9999, background: sc >= 70 ? "rgb(96,201,172)" : "rgb(221,171,71)" }} /></span>
-              <span style={{ font: "400 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>{sc}% comparable</span>
-            </div>
-          );
-        })}
+        {list.map(c => (
+          <div key={c.i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ height: 160, borderRadius: 18, background: `rgb(241,231,228) url(${c.photo}) center/cover` }} />
+            <span style={{ font: "700 15px/20px var(--font-sans)" }}>{c.st === "S" ? `Sold${c.sm ? ` ${c.sm} mo ago` : ""}` : "Active"} · {fullPrice(Math.round(c.price / 1000) * 1000)}</span>
+            <span style={{ font: "400 14px/19px var(--font-sans)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.addr}</span>
+            <span style={{ font: "400 13px/18px var(--font-sans)", color: "var(--fg-2)" }}>{c.mi < 0.1 ? "<0.1" : c.mi.toFixed(1)} mi away · {spec(c)} · ${c.ppsf.toLocaleString("en-US")}/ft²</span>
+            <span style={{ height: 6, marginTop: 2, borderRadius: 9999, background: "rgba(13,12,12,.08)" }}><span style={{ display: "block", height: 6, width: c.score + "%", borderRadius: 9999, background: c.score >= 70 ? "rgb(96,201,172)" : "rgb(221,171,71)" }} /></span>
+            <span style={{ font: "400 12px/16px var(--font-sans)", color: "var(--fg-3)" }}>{c.score}% comparable</span>
+          </div>
+        ))}
       </div>
     </div>
   );
