@@ -26,7 +26,6 @@ import { Listing, OppType, listingAt } from "@/lib/fake";
 import { SortKey, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, pointInRings, ringBBox } from "@/lib/geo";
-import { HEAT_AREA, fromHeatCenter } from "@/lib/silverlake";
 
 const GAP = 12;
 // Results column width per layout (1 / 2 / 3 columns of cards); Home and 1 column stay 388.
@@ -112,14 +111,6 @@ export default function HomeWeb() {
     if (place.kind === "area") return;
     fit(GAP + COL + GAP);
   }, [map, ready, place.id, rings]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The heat map and real parcels cover a 3 km circle round Silver Lake (lib/silverlake.ts).
-  // A search that lands outside it says so, rather than the heat silently going away.
-  const heatNote = useRef("");
-  useEffect(() => {
-    if (!ready || place.id === heatNote.current) return;
-    heatNote.current = place.id;
-    if (fromHeatCenter(place.center) > HEAT_AREA.radius + 1500) showToast("The heat map covers Silver Lake, Echo Park and around for now");
-  }, [ready, place.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Widening / narrowing the results column keeps the same spot in the middle of the
   // visible map (programmatic pan, so it never raises "Search this area").
   const prevCol = useRef(COL);
@@ -157,19 +148,26 @@ export default function HomeWeb() {
     frameLot(map, { ring, at: at || [l!.lng, l!.lat], lotAc: l?.lotAc, left: GAP + COL + GAP + 420, top: BAR_BOTTOM });
   };
   const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); };
+  // Set by the side nav's "New buyer search": the next area search ends on the Save search sheet.
+  const buyerRef = useRef(false);
+  const [buyer, setBuyerS] = useState(false);
+  const setBuyer = (on: boolean) => { buyerRef.current = on; setBuyerS(on); };
+  const afterBuyerSearch = (was: boolean) => { if (was) setTimeout(() => openSheet(), 450); };
   const goPlace = async (p: Place) => { setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
   // `_commitAreas`: results for the field's area(s); leaves the active saved search.
   // Each chip resolves to a Place (live geocoding / gazetteer; "Current location" via
   // geolocation), then they go to `chooseAreas` together (outlines + listings for all).
   const commitAreas = async (list: Area[]) => {
+    let wasBuyer = buyerRef.current; setBuyer(false);
     sv.setActive(null); closeDetail(); setSearching(false); setView("results"); setUnsup(null); setAreaPill(false);
     const ps = await Promise.all(list.map(a => resolveArea(a, place.center)));
     const ok = ps.filter((p): p is Place => !!p);
     const missed = list.filter((_, k) => !ps[k]);
     if (!ok.length) { setUnsup({ label: list[list.length - 1].label, placed: false }); return; }
     if (missed.length) showToast("No results for " + missed.map(a => a.label.split(",")[0]).join(", "), "info");
-    if (!ok.some(isCovered)) setUnsup({ label: ok[ok.length - 1].label, placed: true });
+    if (!ok.some(isCovered)) { wasBuyer = false; setUnsup({ label: ok[ok.length - 1].label, placed: true }); }
     await chooseAreas(ok);
+    afterBuyerSearch(wasBuyer);
   };
   // An address suggestion opens that property on its own (`_openSolo`). Outside
   // coverage there's no property data: neutral "No property found" toast (sprint item).
@@ -321,6 +319,8 @@ export default function HomeWeb() {
         dev={devActions}
         onPick={k => {
         if (k === "Map") { closeDetail(); setView("home"); setSearching(false); if (rp.open) rp.close(); }
+        // New buyer search: open location search; once an area is picked, offer Save search.
+        if (k === "Buyer search") { if (rp.open) rp.close(); setBuyer(true); sv.setActive(null); closeDetail(); setSearching(true); }
         // Reports (side-nav footer) opens the saved reports sheet over the left column.
         if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
       }} />
@@ -329,7 +329,8 @@ export default function HomeWeb() {
           <div style={{ pointerEvents: "auto" }}>
             {/* Entering the search step (`onSearchFocus`) closes dropdowns and the detail panel, as the canvas step change does. */}
             <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : areaSq(fieldAreas.map(a => a.label))} near={place.center}
-              areas={fieldAreas} searching={searching} onSearching={on => { setSearching(on); if (on) { fs.setDd(null); setSortOpen(false); closeDetail(); } }}
+              areas={fieldAreas} searching={searching} prompt={buyer ? "Where is your buyer looking?" : undefined}
+              onSearching={on => { setSearching(on); if (!on) setTimeout(() => { buyerRef.current = false; setBuyerS(false); }, 0); if (on) { fs.setDd(null); setSortOpen(false); closeDetail(); } }}
               onCommit={commitAreas} onPickAddress={pickAddress} onClearAll={clearSearch}
               onClear={() => { if (detailOpen) closeDetail(); else { setView("home"); setUnsup(null); } }}
               active={detailOpen ? null : active} onManage={() => openSheet(active)} onClearActive={clearActive} />

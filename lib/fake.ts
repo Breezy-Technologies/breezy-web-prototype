@@ -5,6 +5,7 @@ import { BBox, LngLat, Ring, field, hashStr, pointInRings, rng } from "./geo";
 import { HEAT_AREA, LOTS, LOT_ZONE, Lot, PIN_LOTS, boxesMeet, fromHeatCenter, inBox, inLotZone, lotId, lotRng } from "./silverlake";
 import SL_HOMES from "./data/sl-homes.json";
 import { metersPerDegLat, metersPerDegLng } from "./geo";
+import { photosFor } from "./photos";
 /** The heat circle's box, for a quick overlap test. */
 const HEAT_BOX: BBox = (() => { const [x, y] = HEAT_AREA.center, dx = HEAT_AREA.radius / metersPerDegLng(y), dy = HEAT_AREA.radius / metersPerDegLat; return [x - dx, y - dy, x + dx, y + dy]; })();
 
@@ -59,7 +60,6 @@ const PFEATS = ["Pool", "ADU potential", "City view", "Garage", "Landscaped gard
 
 const STREETS = ["N Alpine Dr", "N Rexford Dr", "Carmelita Ave", "N Elm Dr", "S Maple Dr", "Lomitas Ave", "S Oakhurst Dr", "N Beverly Dr", "S Wetherly Dr", "Elevado Ave", "S Almont Dr", "N Doheny Dr", "Clifton Way", "Gregory Way", "Whittier Dr", "Lake View Ave", "Micheltorena St", "Descanso Dr", "Griffith Park Blvd", "Sunset Dr", "Redcliff St", "Effie St", "Maltman Ave", "Hyperion Ave"];
 const OWNERS: [string, string][] = [["Harbor Lane Holdings LLC", "Investor · LLC · owner since 2019"], ["Dana Whitfield", "Owner-occupant · since 2008"], ["Romelu Bayo", "Owner-occupant · since 2014"], ["Linden Family Trust", "Trust · since 2001"], ["Marisol Ortega", "Absentee owner · since 2016"], ["Kestrel Capital LP", "Investor · LP · since 2021"], ["Peter & Amy Chao", "Owner-occupants · since 1998"], ["Nadia Farouk", "Owner-occupant · since 2011"]];
-const PHOTOS = ["prop-a", "prop-b", "prop-c", "prop-d", "prop-e", "prop-f", "prop-g", "prop-h", "hero-property"].map(p => `/photos/${p}.jpg`);
 const STATUS: Listing["status"][] = ["Active", "Active", "Active", "Pending", "Off market", "Sold"];
 
 export function shortPrice(v: number): string {
@@ -124,7 +124,7 @@ function lotToListing(l: Lot, id: number): Listing {
   const ow = OWNERS[Math.floor(R() * OWNERS.length)];
   const first = ow[0].split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
   const qeV = l.price * (0.94 + R() * 0.14);
-  const p0 = Math.floor(R() * PHOTOS.length);
+  R(); // was the photo offset: keeps the rest of the lot's seeded values unchanged
   const out: Listing = {
     id, apn: l.apn,
     lng: l.c[0], lat: l.c[1],
@@ -135,7 +135,7 @@ function lotToListing(l: Lot, id: number): Listing {
     built: l.year,
     status: l.st === "S" ? "Sold" : l.st === "O" ? "Off market" : R() < 0.15 ? "Pending" : "Active",
     opp, oppWhy: why,
-    photos: Array.from({ length: 6 }, (_, k) => PHOTOS[(p0 + k) % PHOTOS.length]),
+    photos: photosFor(l.apn, { price: l.price, lng: l.c[0], lat: l.c[1], vacant: !l.sqft }),
     owner: {
       name: ow[0], sub: ow[1],
       ini: ow[0].split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join(""),
@@ -190,7 +190,13 @@ const PIN_POOL: PoolItem[] = [
   ...COUNTY_HOMES.map(h => ({ c: h.c, rank: h.rank, listing: () => homeListing(h.row) })),
 ].sort((a, b) => a.rank - b.rank);
 
+/* Beverly Hills and around (Bel Air, West Hollywood, Beverlywood): the demo's second
+   area, so its market is denser (12 Nov review: more pins round Beverly Hills). */
+const BH_BOX: BBox = [-118.47, 34.035, -118.35, 34.125];
+export const pinDensity = (c: LngLat) => (inBox(c, BH_BOX) ? 2.5 : 1);
+
 export function makeListings(key: string, center: LngLat, bbox: BBox | undefined, rings: Ring[] | null, n = 28, cityLabel = "", dense = true): Listing[] {
+  if (n > 1) n = Math.round(n * pinDensity(center));
   const R = rng(hashStr(key));
   const [w, s, e, nn] = bbox || [center[0] - 0.03, center[1] - 0.022, center[0] + 0.03, center[1] + 0.022];
   // keep listings within a reasonable window around the centre for big areas
@@ -220,7 +226,7 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
     const ow = OWNERS[Math.floor(R() * OWNERS.length)];
     const first = ow[0].split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
     const qeV = price * (0.94 + R() * 0.14);
-    const p0 = Math.floor(R() * PHOTOS.length);
+    R(); // was the photo offset: keeps every later seeded value unchanged
     out.push({
       id: i,
       lng, lat,
@@ -235,7 +241,7 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
       status: STATUS[Math.floor(R() * STATUS.length)],
       opp,
       oppWhy: OPP[opp].why[Math.floor(R() * OPP[opp].why.length)],
-      photos: Array.from({ length: 6 }, (_, k) => PHOTOS[(p0 + k) % PHOTOS.length]),
+      photos: photosFor(`${key}:${i}`, { price, lng, lat }),
       owner: {
         name: ow[0], sub: ow[1],
         ini: ow[0].split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join(""),
@@ -287,6 +293,7 @@ export function areaListings(prev: Listing[], bbox: BBox, n: number): Listing[] 
   // new homes: as before, a zoomed-out box only gets them in a window round its centre
   let [w, s, e, nn] = bbox;
   const cx = (w + e) / 2, cy = (s + nn) / 2, hx = Math.min(0.03, (e - w) / 2), hy = Math.min(0.0225, (nn - s) / 2);
+  n = Math.round(n * pinDensity([cx, cy]));
   [w, s, e, nn] = [cx - hx, cy - hy, cx + hx, cy + hy];
   const inBox = (l: Listing) => l.lng >= w && l.lng <= e && l.lat >= s && l.lat <= nn;
   const have = new Set(kept.map(l => l.id));
@@ -299,9 +306,13 @@ export function areaListings(prev: Listing[], bbox: BBox, n: number): Listing[] 
 }
 
 // Heat value 0..1 for the ROI / Underbuilt layers at a coordinate.
+/* Three scales, so the US-wide demo heat reads like real data at every zoom:
+   regions (~250 km), metros (~25 km) and streets (~4 km, the old field). Hexes at
+   every resolution and the demo parcels read the same function, so they agree. */
 export function heatValue(kind: "roi" | "ub", lng: number, lat: number) {
   const k = kind === "roi" ? 31 : 77;
-  return Math.max(0, Math.min(0.999, field(k, lng * 90, lat * 110)));
+  const v = 0.5 + (field(k, lng * 90, lat * 110) - 0.5) * 0.75 + (field(k + 5, lng * 14, lat * 17) - 0.5) * 0.55 + (field(k + 9, lng * 1.5, lat * 1.8) - 0.5) * 0.6;
+  return Math.max(0, Math.min(0.999, v));
 }
 
 // Colours for these values live in lib/heat (one scale for hexes, parcels and pins).

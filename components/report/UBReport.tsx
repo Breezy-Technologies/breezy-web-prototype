@@ -25,7 +25,8 @@
 // height district, yards, density, parking and California's ADU / JADU / SB 9
 // rules. A note at the top says they are summaries to confirm on ZIMAS. Swap for
 // the Underbuilt service's report when it covers Los Angeles.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useAiWrite } from "./aiWrite";
 import type { Listing } from "@/lib/fake";
 import { siteOf } from "@/lib/roi";
 import type { Site } from "@/lib/roi";
@@ -239,7 +240,7 @@ function personalize(r: Report, l: Listing): Report {
 
 const isClose = (el: Element) => /close|dismiss/i.test(el.getAttribute("aria-label") || "") || /^(×|✕|Close)$/.test((el.textContent || "").trim());
 
-export function UBReport({ l, onComps }: { l: Listing; onComps: () => void }) {
+export function UBReport({ l, onComps, write }: { l: Listing; onComps: () => void; write?: boolean }) {
   const [raw, setRaw] = useState<[Report, string] | null>(null);
   const data = useMemo<[Report, string] | null>(() => (raw ? [personalize(raw[0], l), raw[1]] : null), [raw, l]);
   const [layer, setLayer] = useState<string | null>(null); // modal / glossary html on top
@@ -252,8 +253,9 @@ export function UBReport({ l, onComps }: { l: Listing; onComps: () => void }) {
 
   useEffect(() => { let on = true; load().then(d => { if (on) setRaw(d); }); return () => { on = false; }; }, []);
 
-  // Mount the recorded column once; interactions mutate it in place.
-  useEffect(() => {
+  // Mount the recorded column once; interactions mutate it in place. (A layout effect, so
+  // the AI-writing reveal below measures the column before the first paint.)
+  useLayoutEffect(() => {
     if (!data || !body.current) return;
     const [r] = data;
     body.current.innerHTML = r.main;
@@ -262,6 +264,8 @@ export function UBReport({ l, onComps }: { l: Listing; onComps: () => void }) {
     rowOther.current = { ...r.rows };
     setActive(r.toc[0]?.id || "");
   }, [data]);
+  // First open: written in front of the user, no loading screen (12 Nov review).
+  useAiWrite(scroller, body, !!write, data);
 
   // Scroll-spy for the dots rail.
   useEffect(() => {
@@ -336,7 +340,7 @@ export function UBReport({ l, onComps }: { l: Listing; onComps: () => void }) {
 
   if (!data) return (
     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "rgb(255,255,255)" }}>
-      <span style={{ width: 28, height: 28, borderRadius: 9999, border: "3px solid rgba(18,18,18,.12)", borderTopColor: "rgb(174,106,91)", animation: "spin 1s linear infinite" }} />
+      {!write && <span style={{ width: 28, height: 28, borderRadius: 9999, border: "3px solid rgba(18,18,18,.12)", borderTopColor: "rgb(174,106,91)", animation: "spin 1s linear infinite" }} />}
     </div>
   );
   const [r, css] = data;
@@ -347,9 +351,10 @@ export function UBReport({ l, onComps }: { l: Listing; onComps: () => void }) {
       {/* Review: no drop shadows on this page; cards get a thin light grey outline instead
           (dialogs keep their lift, --breezy-shadow-lg). */}
       <style>{`.ubr.ubr{--breezy-shadow-xs:0 0 0 1px rgb(234,230,227);--breezy-shadow-sm:0 0 0 1px rgb(234,230,227);--breezy-shadow-md:0 0 0 1px rgb(234,230,227)}`}</style>
+      {/* The Upside analysis's margins (12 Nov review): 1280 px column, 80 px sides (Upside's --wrap-pad steps), 80 px above. */}
+      <style>{`.ubr{--wrap-pad:80px}@media (max-width:1399px){.ubr{--wrap-pad:clamp(48px,calc(48px + (100vw - 1200px) * .16),80px)}}@media (max-width:1199px){.ubr{--wrap-pad:64px}}@media (max-width:1023px){.ubr{--wrap-pad:32px}}`}</style>
       <div ref={scroller} className="no-scrollbar" style={{ flex: 1, minWidth: 0, overflowY: "auto", overscrollBehavior: "contain" }}>
-        {/* Narrower, centred column (review: the line length made the eye travel too far). */}
-        <div onClick={onClick} ref={body} style={{ maxWidth: 1080, margin: "0 auto", padding: "40px 112px 96px" }} />
+        <div onClick={onClick} ref={body} style={{ maxWidth: 1280, margin: "0 auto", padding: "80px var(--wrap-pad) 96px" }} />
       </div>
       {/* The dots rail (version D's .d-dots): a dash per section; hover shows every title. */}
       <nav className="d-dots" aria-label="Report sections" style={{ position: "absolute" }}>

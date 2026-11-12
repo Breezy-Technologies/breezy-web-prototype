@@ -6,6 +6,7 @@ import { isStandardStyle } from "./breezyTheme";
 import { heatAlpha, heatColors, heatPct, heatStep, parcelPct } from "../heat";
 import { LOTS, HEAT_AREA, fromHeatCenter, heatAreaLatLng } from "../silverlake";
 import SL_HEAT from "../data/sl-heat.json";
+import { US_FILLS, addUsLayers } from "./usHeat";
 
 export type HeatKind = "roi" | "ub" | "none";
 
@@ -41,6 +42,8 @@ export function ensureLayers(m: MbMap) {
       add({ id: src + "-line", type: "line", source: src, minzoom: min, maxzoom: max, paint: { "line-color": "rgba(0,0,0,0)", "line-width": 1, "line-opacity": 0 } });
     }
   }
+  // The rest of the US: demo hexes, one H3 resolution per zoom band (usHeat.ts).
+  addUsLayers(add, m);
   if (!m.getSource("bz-par")) {
     resetParcelStamps();
     if (hasRegrid()) {
@@ -101,6 +104,7 @@ export function applyHeatColors(m: MbMap, kind: HeatKind) {
   const A = kind === "none" ? 0 : heatAlpha(kind) * fadeA;
   m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
   m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
+  for (const id of US_FILLS) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", subOpacity(A));
   if (m.getLayer("bz-par-fill")) m.setPaintProperty("bz-par-fill", "fill-opacity", parcelOpacity(A));
   for (const id of ["bz-lots-fill", "bz-la-fill"]) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", parcelOpacity(A));
   if (kind === "none") return;
@@ -109,6 +113,7 @@ export function applyHeatColors(m: MbMap, kind: HeatKind) {
   // Hexes and lots carry both values, so switching layer is a repaint only.
   const own = heatStep(kind, colors, ["get", kind]);
   for (const id of ["bz-hex-fill", "bz-hex-line", "bz-hex-sub-fill", "bz-hex-sub-line"]) m.setPaintProperty(id, id.endsWith("fill") ? "fill-color" : "line-color", own);
+  for (const id of US_FILLS) if (m.getLayer(id)) m.setPaintProperty(id, "fill-color", own);
   if (m.getLayer("bz-lots-fill")) m.setPaintProperty("bz-lots-fill", "fill-color", own);
   if (m.getLayer("bz-la-fill")) m.setPaintProperty("bz-la-fill", "fill-color", ["case", ["has", kind], own, "rgba(0,0,0,0)"]);
   if (!m.getLayer("bz-par-fill")) return;
@@ -131,6 +136,7 @@ function setAlpha(m: MbMap, kind: HeatKind, f: number) {
   const A = heatAlpha(kind) * f;
   m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
   m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
+  for (const id of US_FILLS) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", subOpacity(A));
   for (const id of ["bz-par-fill", "bz-lots-fill", "bz-la-fill"]) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", parcelOpacity(A));
 }
 function animate(ms: number, f: (t: number) => void, done: () => void) {
@@ -192,6 +198,7 @@ export function stampParcels(m: MbMap, kind: HeatKind) {
 }
 
 // ---- Heat hexes: fixed H3 cells over the demo circle, built once ----
+// (The rest of the US has demo hexes too, since 12 Nov: lib/map/usHeat.ts.)
 // Review: hexes kept redrawing and changing size (they were rebuilt for the
 // viewport after every pan, at a coarser resolution when zoomed out), and fake
 // heat across all of LA broke the behaviour. Now, as in Pedro's build, the
@@ -234,7 +241,7 @@ function lotData(): GeoJSON.FeatureCollection {
 export function syncHeat(m: MbMap, kind: HeatKind) {
   if (!m.getSource("bz-hex") || !m.getSource("bz-hex-sub")) return;
   applyHeatColors(m, kind);
-  for (const id of ["bz-hex-fill", "bz-hex-line", "bz-hex-sub-fill", "bz-hex-sub-line"]) m.setLayoutProperty(id, "visibility", kind === "none" ? "none" : "visible");
+  for (const id of ["bz-hex-fill", "bz-hex-line", "bz-hex-sub-fill", "bz-hex-sub-line", ...US_FILLS]) if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", kind === "none" ? "none" : "visible");
 }
 
 // ---- Demo parcels when Regrid isn't configured ----
@@ -294,6 +301,7 @@ export function heatWave(m: MbMap, c: [number, number], R: number, band: number)
   const d = ["sqrt", ["+", ["^", ["*", ["-", ["get", "x"], c[0]], kx], 2], ["^", ["*", ["-", ["get", "y"], c[1]], ky], 2]]];
   const on = "bz-hex-sub", off = "bz-hex"; // one grid at every zoom
   m.setPaintProperty(on + "-fill", "fill-opacity", ["case", ["<", d, R - band], 0.92 * A, ["<", d, R], Math.min(1, 0.92 * A + 0.3), 0] as any);
+  for (const id of US_FILLS) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", ["case", ["<", d, R - band], 0.92 * A, ["<", d, R], Math.min(1, 0.92 * A + 0.3), 0] as any);
   m.setPaintProperty(on + "-line", "line-opacity", ["case", ["<", d, R - band], 0, ["<", d, R], 0.9, 0] as any);
   m.setPaintProperty(off + "-fill", "fill-opacity", 0);
 }

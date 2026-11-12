@@ -10,6 +10,7 @@ import { applyBreezyTheme } from "@/lib/map/theme";
 import { applyBreezyBasemap, breezyTransformRequest } from "@/lib/map/breezyTheme";
 import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors, stampParcels, fadeHeatTo } from "@/lib/map/layers";
 import { HEAT_PALETTE_EVENT, setHeatDarkBase } from "@/lib/heat";
+import { updateUsHeat } from "@/lib/map/usHeat";
 import { Ring } from "@/lib/geo";
 
 type Inset = { left: number; top: number; radius: number };
@@ -81,6 +82,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       syncHeat(m, heatRef.current);
       setParcels(fakeParcelsFor(m, heatRef.current));
       stampParcels(m, heatRef.current);
+      updateUsHeat(m);
       setReady(true);
       setTick(t => t + 1);
     };
@@ -103,6 +105,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       raf.current = requestAnimationFrame(() => setTick(x => x + 1));
     });
     m.on("moveend", () => {
+      updateUsHeat(m);
       syncHeat(m, heatRef.current);
       setParcels(fakeParcelsFor(m, heatRef.current));
       stampParcels(m, heatRef.current);

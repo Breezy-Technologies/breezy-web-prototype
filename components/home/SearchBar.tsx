@@ -67,7 +67,8 @@ const icon = (city: boolean) => {
 };
 const keepFocus = (e: React.MouseEvent) => e.preventDefault();
 
-export function SearchBar({ value, areas, searching, onSearching, onCommit, onPickAddress, onClear, onClearAll, near, active, onManage, onClearActive }: {
+export function SearchBar({ prompt, value, areas, searching, onSearching, onCommit, onPickAddress, onClear, onClearAll, near, active, onManage, onClearActive }: {
+  prompt?: string; // placeholder override (side nav "New buyer search")
   value: string; // field text when not searching
   areas: Area[]; // committed areas (results), restored as chips when searching
   searching: boolean; onSearching: (on: boolean) => void;
@@ -222,7 +223,7 @@ export function SearchBar({ value, areas, searching, onSearching, onCommit, onPi
           ))}
           <input ref={input} value={searching ? sq : value}
             onChange={e => setSq(e.target.value)} onFocus={enter} onKeyDown={onKey}
-            placeholder={searching && addMode ? "Enter another area" : "Search by property, zip code or areas"}
+            placeholder={searching && addMode ? "Enter another area" : prompt || "Search by property, zip code or areas"}
             style={css("flex:1;min-width:140px;height:32px;margin:0 4px;padding:0;border:none;outline:none;background:none;font:400 15px/20px var(--font-sans);color:rgb(17,16,16)")} />
         </div>
         <div style={css("flex:none;display:flex;align-items:center;gap:10px")}>

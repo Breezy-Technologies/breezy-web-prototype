@@ -132,11 +132,12 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
       <div ref={wrapRef} style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, zIndex: 45, pointerEvents: "none", willChange: "transform", transformOrigin: "0 0", transform: `translate3d(${p0.x}px,${p0.y}px,0)` }}>
       <svg width={1} height={1} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }} key={show.key}>
         <defs><filter id="bzLiftBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" /></filter></defs>
-        {/* Light fade around the lifted parcel so the rest of the map, neighbouring parcels and labels stay readable (review feedback).
-            The alpha lives in the fill colour: the fadeIn animation ends at CSS opacity 1, which would override an opacity attribute. */}
-        {sat ? <path d={hole} fill="rgba(8,10,12,.2)" fillRule="evenodd" style={{ animation: "fadeIn .3s ease both" }} />
-          : <path d={hole} fill="rgba(253,251,248,.22)" fillRule="evenodd" style={{ animation: "fadeIn .3s ease both" }} />}
-        <polygon points={pts} fill={sat ? "rgba(0,0,0,.6)" : "rgba(58,42,38,.4)"} filter="url(#bzLiftBlur)" transform="translate(5 9)" style={{ animation: "fadeIn .3s ease both" }} />
+        {/* Light fade around the lifted parcel so the rest of the map stays readable (review feedback).
+            Only for a selected parcel, and without a fade: on hover it pulsed the whole map every time
+            the pointer crossed a road between parcels (12 Nov review: "remove the opacity change"). */}
+        {selected && !hit && (sat ? <path d={hole} fill="rgba(8,10,12,.2)" fillRule="evenodd" />
+          : <path d={hole} fill="rgba(253,251,248,.22)" fillRule="evenodd" />)}
+        <polygon points={pts} fill={sat ? "rgba(0,0,0,.6)" : "rgba(58,42,38,.4)"} filter="url(#bzLiftBlur)" transform="translate(5 9)" />
         {Array.from({ length: 9 }, (_, k) => <polygon key={k} points={pts} fill={sideC} stroke={sideC} strokeWidth={1} strokeLinejoin="round" style={{ ["--l" as any]: `${-(k + 1)}px`, animation: "liftUp .3s cubic-bezier(.2,.8,.2,1) both" }} />)}
         <g style={{ ["--l" as any]: "-10px", animation: "liftUp .3s cubic-bezier(.2,.8,.2,1) both" }}>
           <polygon points={pts} fill={topC} stroke={edgeC} strokeWidth={sat ? 2.5 : 1.6} strokeLinejoin="round" />
@@ -150,7 +151,7 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
           {num && <text x={cx} y={ccy} textAnchor="middle" dominantBaseline="central" fontFamily="Akkurat LL, sans-serif" fontWeight={700} fontSize={fs} fill="rgb(18,18,18)" stroke="rgba(255,255,255,.95)" strokeWidth={3} paintOrder="stroke">{num}</text>}
         </g>
         {/* The parcel's real outline on the ground stays visible above the lifted slab (review feedback). */}
-        <polygon points={pts} fill="none" stroke={sat ? "rgba(255,209,41,.9)" : "rgba(18,18,18,.6)"} strokeWidth={1.2} strokeDasharray="4 3" strokeLinejoin="round" style={{ animation: "fadeIn .3s ease both" }} />
+        <polygon points={pts} fill="none" stroke={sat ? "rgba(255,209,41,.9)" : "rgba(18,18,18,.6)"} strokeWidth={1.2} strokeDasharray="4 3" strokeLinejoin="round" />
       </svg>
       </div>
       {showCard && (

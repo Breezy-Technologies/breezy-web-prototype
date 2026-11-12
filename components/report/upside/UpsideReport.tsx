@@ -22,6 +22,7 @@ import { Ledger } from "./Ledger";
 import { Neighborhood } from "./Neighborhood";
 import { RoiGauge } from "./RoiGauge";
 import { readAssumptions, type DealUpdate } from "./assumptions";
+import { useAiWrite } from "../aiWrite";
 import "../upside.css";
 
 function Chip({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
@@ -44,13 +45,15 @@ function recommendation(rec: Scenarios["rec"], vacant: boolean) {
   return <>We recommend {job} and a {N(rec.added)} ft² addition, bringing the home to {N(rec.S)} ft².</>;
 }
 
-export function UpsideReport({ l, onComps }: { l: Listing; onComps: () => void }) {
+export function UpsideReport({ l, onComps, write }: { l: Listing; onComps: () => void; write?: boolean }) {
   const p = useMemo(() => paramsOf(l), [l]);
   const site = siteOf(l);
   const [a, setA] = useState<Assumptions>({});
   const [adjusting, setAdjusting] = useState(false);
   const [focus, setFocus] = useState<NumberKey | undefined>();
   const scroller = useRef<HTMLDivElement>(null);
+  // First open: written in front of the user, no loading screen (12 Nov review).
+  useAiWrite(scroller, scroller, !!write, true);
   const sc = useMemo(() => dealScenarios(p, a), [p, a]);
   const setDeal: DealUpdate = update => setA(prev => readAssumptions(update(prev)) ?? {});
   const adjust = (field?: NumberKey) => {

@@ -509,14 +509,12 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
         <button className="btn-soft" title="Share property" onClick={onShare} style={{ flex: "none", width: 48, padding: 0 }}>
           <span style={maskIco("/ui/share.svg", 18, "rgb(17,16,16)")} />
         </button>
-        {revealed ? <>
-          <button className="btn-dark" style={{ flex: 1, minWidth: 0, animation: "fadeIn .25s ease backwards" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>Call owner
-          </button>
-          <button className="btn-soft" title="Email owner" style={{ flex: "none", width: 48, padding: 0, animation: "fadeIn .25s ease backwards" }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(17,16,16)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
-          </button>
-        </> : (
+        {revealed ? (
+          // Email is the one CTA once the owner is unlocked (11 Nov comment: no Call on web).
+          <a className="btn-dark" href={`mailto:${l.owner.email}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", animation: "fadeIn .25s ease backwards" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>Email owner
+          </a>
+        ) : (
           <button className="btn-dark" style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap" }} onClick={contactOwner}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
             Contact owner

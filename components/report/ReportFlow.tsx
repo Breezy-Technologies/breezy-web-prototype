@@ -49,8 +49,13 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   onClose: () => void; onDone?: (k: FlowKind) => void; onShare?: () => void;
 }) {
   if (cached) got.add(gotKey(l, "comps"));
-  const start = (k: FlowKind): Phase => (got.has(gotKey(l, k)) ? "report" : k === "comps" ? "review" : "run");
+  // Max build and Profit potential open straight on the report, written in front of the
+  // user (useAiWrite) instead of the loading stage (12 Nov review). "run" is no longer used.
+  const start = (k: FlowKind): Phase => (got.has(gotKey(l, k)) ? "report" : k === "comps" ? "review" : "report");
+  const fresh = (k: FlowKind) => k !== "comps" && !got.has(gotKey(l, k));
+  const [write, setWrite] = useState(() => fresh(kind0));
   const [kind, setKind] = useState<FlowKind>(kind0);
+  useEffect(() => { if (write && kind !== "comps") { got.add(gotKey(l, kind)); onDone?.(kind); } }, [write, kind]); // eslint-disable-line react-hooks/exhaustive-deps
   const [phase, setPhase] = useState<Phase>(() => start(kind0));
   const [step, setStep] = useState(0);
   const [up, setUp] = useState(false); // the sheet is risen (drives the transition)
@@ -113,8 +118,9 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   const pick = (k: FlowKind) => {
     if (k === kind && phase === "report") return;
     prev.current = { kind, phase };
+    setWrite(fresh(k));
     setKind(k); gcLeft.current = AUTO_MS; setGcPaused(false);
-    setPhase(got.has(gotKey(l, k)) ? "report" : k === "comps" ? "review" : "run");
+    setPhase(start(k));
   };
 
   const th = THEME[kind], steps = STEPS[kind], n = steps.length;
@@ -220,8 +226,8 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
               </div>
             </div>
             {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
-            {kind === "ub" && <UBReport l={l} onComps={() => pick("comps")} />}
-            {kind === "roi" && <UpsideReport l={l} onComps={() => pick("comps")} />}
+            {kind === "ub" && <UBReport l={l} write={write} onComps={() => pick("comps")} />}
+            {kind === "roi" && <UpsideReport l={l} write={write} onComps={() => pick("comps")} />}
           </div>
         )}
       </div>

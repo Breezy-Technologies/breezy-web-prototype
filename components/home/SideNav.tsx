@@ -5,7 +5,7 @@ const MAIN: [string, string][] = [["Map", "/nav/map-iso.png"], ["Comps", "/nav/c
 const FOOT: [string, string, boolean?][] = [["Upgrade to team", "ph-users", true], ["Reports", "ph-file-text"], ["Settings", "ph-gear"]];
 
 // Optical size per icon (relative to the 28px box).
-const ICON_SCALE: Record<string, number> = { Map: 1.18, Comps: 1.1, Underbuilt: 0.86, "AI Notes": 0.86, Assistant: 0.9 };
+const ICON_SCALE: Record<string, number> = { "Buyer search": 0.82, Map: 1.18, Comps: 1.1, Underbuilt: 0.86, "AI Notes": 0.86, Assistant: 0.9 };
 
 export const NAV_W = { collapsed: 56, expanded: 239 };
 
@@ -16,7 +16,10 @@ export const NAV_W = { collapsed: 56, expanded: 239 };
    hairline and keep the dark pill. "classic" is the previous nav; the Dev menu
    switches between them (localStorage `bz-nav-style`). Not wired to flows yet. */
 type NavStyle = "actions" | "classic";
-const ACTIONS: [string, string, string][] = [["Comps", "Run comps", "/nav/comps-iso.png"], ["Underbuilt", "Find underbuilt", "/nav/radar.png"]];
+// "New buyer search" (12 Nov review): an explicit way into location search, since some
+// agents won't realise the search field is where a buyer search starts. It opens the
+// search step, then offers Save search once an area is picked.
+const ACTIONS: [string, string, string][] = [["Comps", "Run comps", "/nav/comps-iso.png"], ["Underbuilt", "Find underbuilt", "/nav/radar.png"], ["Buyer search", "New buyer search", "/ui/pin-3d.png"]];
 const PLACES = MAIN.filter(([k]) => !ACTIONS.some(a => a[0] === k));
 const NAV_STYLE_KEY = "bz-nav-style";
 function useNavStyle(): [NavStyle, (s: NavStyle) => void] {

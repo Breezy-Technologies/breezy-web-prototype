@@ -7,6 +7,7 @@
 // or a home elsewhere lands here.
 import { useEffect, useRef, useState } from "react";
 import { Listing, OppType, fullPrice } from "@/lib/fake";
+import { EXTERIORS } from "@/lib/photos";
 import { CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
 import { PickedFooter } from "./Saved";
 import { ForYouFeed } from "./ForYouFeed";
@@ -19,7 +20,7 @@ type Sort = "Default" | "Newest" | "Oldest";
 
 const PROP_STATUS = ["Increased 1% to $1M", "Price dropped 3%", "New photos added", "Back on market", "Open house Sat", "Price dropped 5%"];
 const PROP_WHEN = ["Today", "Today", "Yesterday", "Mon", "Last week", "Last week"];
-const THUMB = ["a", "b", "e", "c", "f", "h", "d", "g"].map(c => `/photos/prop-${c}.jpg`); // `_bhInfo[i].ph[0]`
+const THUMB = [0, 4, 9, 1, 13, 6, 16, 2].map(i => EXTERIORS[i]); // `_bhInfo[i].ph[0]`, from the listing photo set
 const RANK: Record<string, number> = { Today: 0, Yesterday: 1, Mon: 2, "Last week": 3 };
 
 const INK = "rgb(18,18,18)";
