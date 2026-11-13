@@ -21,6 +21,7 @@ import type { Map as MbMap, GeoJSONSource } from "mapbox-gl";
 import { cellToBoundary, cellToLatLng, polygonToCells } from "h3-js";
 import { heatPct } from "../heat";
 import { inLaBox } from "../heat/pedroField";
+import { loadUsLand, onUsLand as onLand, usLandReady } from "../usLand";
 
 export const US_TIERS = [
   { res: 4, min: 0, max: 6.9 },
@@ -39,31 +40,6 @@ export function usOpacity(res: number, A: number) {
   return zr(11.9, 0, 13, 0.92 * A, 15, 0.8 * A, 16, 0);
 }
 
-type State = { bb: [number, number, number, number]; ring: number[][] };
-let states: State[] | null = null, loading: Promise<void> | null = null;
-function loadStates() {
-  return loading ||= fetch("/data/us-states.json").then(r => r.json()).then((d: Record<string, number[][][]>) => {
-    states = Object.values(d).flat().map(ring => {
-      let w = 180, s = 90, e = -180, n = -90;
-      for (const [x, y] of ring) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
-      return { bb: [w, s, e, n], ring };
-    });
-  }).catch(() => { states = []; });
-}
-function onLand(x: number, y: number) {
-  for (const st of states!) {
-    const [w, s, e, n] = st.bb;
-    if (x < w || x > e || y < s || y > n) continue;
-    let inside = false;
-    const r = st.ring;
-    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
-      const [xi, yi] = r[i], [xj, yj] = r[j];
-      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    if (inside) return true;
-  }
-  return false;
-}
 // The 50 states' rough box (Alaska's Aleutians cross the antimeridian; they're left out).
 const US_BOX = [-170, 18, -66, 72];
 
@@ -87,7 +63,7 @@ export function addUsLayers(add: (layer: any) => void, m: MbMap) {
 /** List the cells for the current view (call during and after each move); a no-op when nothing is new. */
 export function updateUsHeat(m: MbMap) {
   if (!m.getSource(usSrc(8))) return;
-  if (!states) { loadStates().then(() => updateUsHeat(m)); return; }
+  if (!usLandReady()) { loadUsLand().then(() => updateUsHeat(m)); return; }
   const z = m.getZoom();
   const b = m.getBounds();
   if (!b) return;

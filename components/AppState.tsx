@@ -71,8 +71,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     // "Search this area" keeps the pins already in the box and tops up from the
     // fixed listing grid, so nothing on screen moves (lib/fake.ts areaListings).
     if (ps.length === 1 && ps[0].kind === "area" && ps[0].bbox) {
-      const [w, s, e, nn] = ps[0].bbox, sq = Math.min(1, ((e - w) * (nn - s)) / (0.06 * 0.045));
-      setListings(prev => areaListings(prev, ps[0].bbox!, Math.max(10, Math.round(32 * Math.sqrt(sq)))));
+      // Bigger views get more homes, up to ~90 (one per zone of a wide view, lib/fake.ts).
+      const [w, s, e, nn] = ps[0].bbox, sq = ((e - w) * (nn - s)) / (0.06 * 0.045);
+      setListings(prev => areaListings(prev, ps[0].bbox!, Math.min(90, Math.max(10, Math.round(32 * Math.sqrt(sq))))));
       return;
     }
     setListings(ps.flatMap((p, k) => listFor(p, rs[k]).map(l => (k ? { ...l, id: l.id + k * 1000 } : l))));
