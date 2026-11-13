@@ -115,7 +115,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
   - The parcel lifts off the map as a solid slab: drop shadow, stacked sides, an **opaque** top and the house number, with a dashed outline on the ground.
   - No opacity change on hover (12 Nov review: crossing a road between parcels pulsed the whole map): the light veil round the parcel shows only for a selected parcel, with no fade; the slab just lifts.
   - With the heat map on, the slab keeps its parcel's band colour (softened 60% toward paper, since the slab is opaque); with it off, it's neutral.
-  - The hover card sits **beside** the slab (right when there's room, else left), vertically centred on it, never over it (13 Nov, Jimsy: the card covered the parcel); only a parcel too wide for either side puts it above or below.
+  - The hover card **never covers the hovered parcel** (13 Nov, Jimsy / William): after each render it measures the drawn slab and its ground outline on screen and the card's real size, then sits 20 px beside the slab (right when it fits, else left), vertically centred; only a parcel too wide for both sides puts it above or below. Pedro's lots use their full outline from the data, not the tile-clipped rendered feature.
   - In satellite: the rest of the map dims, the slab top is the satellite image (Mapbox Static) with a yellow edge, and there are no colour washes.
 - **Selection framing** (`lib/map/frame.ts`): opening a property (pin, card, saved property, address) or clicking a parcel fits the **whole lot** into the free map space between the detail panel and the viewport edge, below the filter bar, centred, with an even 64 px margin. The frame keeps at least 70 m of ground across and stops at zoom 19 (review: the zoom was too tight), so the street and neighbours stay in view. A real lot uses its own outline. A parcel uses its outline; a listing fits a lot-sized square first, then settles on the parcel under it once drawn.
 - **Searched-area outline:** option 04, "inner glow edge". A thin clay line (rgb 147,89,75) plus a soft clay gradient inside the boundary; nothing outside. The glow widens with zoom while the line keeps a fixed width.
@@ -184,15 +184,15 @@ Every coloured opportunity circle (`SignalDot` in `components/PinPalette.tsx`: m
 
 | Family | Signals | Base |
 |---|---|---|
-| Red | Alert related: price drops | rgb(192,98,84) |
-| Yellow | Underbuilt | rgb(216,178,104) |
-| Green | ROI | rgb(94,144,106) |
-| Blue | Status related: withdrawn, expired, stale, foreclosure | rgb(100,138,176) |
-| Purple | Comps | rgb(138,118,160) |
+| Red | Alert related: price drops | #E08F88 → #C34137 |
+| Yellow | Underbuilt | #F9DBB4 → #AD740A |
+| Green | ROI | #99CBB1 → #469B70 |
+| Blue | Status related: withdrawn, expired, stale, foreclosure | #88BDDA → #2C88B5 |
+| Purple | Comps | #EDB5CF → #694C71 |
 
-Muted in the 10 Nov review (the first set read too garish): same hues, lower saturation, softer ring.
+**Matched to the mobile app (13 Nov, Figma "Onboarding redesign" 2CKvKeUl6XgruMBITGkHbt node 1455:96194):** each pin is a top-to-bottom gradient from the light tint to the base (values above), with a 24% ink edge and a white icon on every colour (Underbuilt included). The markers in `public/pins/` and `PIN_FAMILIES` carry the same stops.
 
-- Each circle is lit from the top (a lighter tint fading to the base) with a darker ring of its own shade. The icon is white, dark on yellow. **Selected is always black with a white icon.** White price pills never change; the price-drop bell uses the alert red.
+- Each circle is a vertical gradient (tint → base) with a 24% ink edge. The icon is always white. **Selected is always black with a white icon.** White price pills never change; the price-drop bell uses the alert red.
 - Onboarding pins (`components/onboarding/OppPins.tsx`) use the same market radar marker, 25% larger, with the label pill on steps that show labels; they pulse until selected.
 - The colour-route switcher is gone.
 

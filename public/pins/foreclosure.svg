@@ -13,8 +13,8 @@
 </g>
 <defs>
 <linearGradient id="paint0_linear_0_38" x1="14" y1="0" x2="14" y2="31.7939" gradientUnits="userSpaceOnUse">
-<stop stop-color="#39B1EC"/>
-<stop offset="1" stop-color="#185477"/>
+<stop stop-color="#88BDDA"/>
+<stop offset="1" stop-color="#2C88B5"/>
 </linearGradient>
 <path id="stroke0_0_38" d="M14 0C21.732 0 28 6.26801 28 14C28 18.8666 25.5166 23.1521 21.7482 25.6605C19.8981 26.892 18.0564 28.2386 16.9131 30.1445C15.5936 32.3436 12.4064 32.3436 11.0869 30.1445C10.3381 28.8962 9.5294 27.3493 8.20455 26.7461C3.36481 24.5425 0 19.6647 0 14C0 6.26806 6.26808 7.90788e-05 14 0Z"/>
 </defs>
