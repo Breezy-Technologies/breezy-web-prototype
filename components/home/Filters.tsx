@@ -274,7 +274,10 @@ const BAR_ICONS: Partial<Record<DdKey, string>> = { roi: "f-roi.svg", ub: "f-bui
 const NAMES: Partial<Record<DdKey, string>> = { roi: "ROI", ub: "Build potential", status: "Status & price", types: "Type" };
 const mask = (u: string) => "-webkit-mask:url('" + u + "') center/contain no-repeat;mask:url('" + u + "') center/contain no-repeat";
 
-export function FilterBar({ fs, left, hidden }: { fs: FilterState; left: number; hidden?: boolean }) {
+/** `right`: where the row stops (comps mode: before the comps panel). `lead`: chips placed
+ *  before the filters (comps mode: the radius). Left / right ease, so the bar slides along
+ *  with the detail panel when comps open. */
+export function FilterBar({ fs, left, right = 10, hidden, lead }: { fs: FilterState; left: number; right?: number; hidden?: boolean; lead?: React.ReactNode }) {
   const { f, dd, setDd, openPanel } = fs;
   const dims = fDims(f);
   const row = useRef<HTMLDivElement>(null);
@@ -284,7 +287,7 @@ export function FilterBar({ fs, left, hidden }: { fs: FilterState; left: number;
     const L = n.scrollLeft > 2, R = n.scrollLeft + n.clientWidth < n.scrollWidth - 2;
     setEdge(e => e.L === L && e.R === R ? e : { L, R });
   }, []);
-  useEffect(() => { const t = setTimeout(chk, 60); window.addEventListener("resize", chk); return () => { clearTimeout(t); window.removeEventListener("resize", chk); }; }, [chk, left, f]);
+  useEffect(() => { const t = setTimeout(chk, 60), t2 = setTimeout(chk, 700); window.addEventListener("resize", chk); return () => { clearTimeout(t); clearTimeout(t2); window.removeEventListener("resize", chk); }; }, [chk, left, right, f]);
 
   const openDD = (key: DdKey) => (e: React.MouseEvent<HTMLElement>) => {
     if (dd?.key === key) return setDd(null);
@@ -309,13 +312,14 @@ export function FilterBar({ fs, left, hidden }: { fs: FilterState; left: number;
     <>
       {/* The row is clipped under the centre of each scroll arrow (40 px wide, flush with the row's
           edge), so the chips slide under the arrows instead of showing a cut edge (review feedback). */}
-      <div ref={row} onScroll={chk} className="no-scrollbar" style={css("position:absolute;top:18px;right:10px;z-index:2;left:" + left + "px;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 18px;pointer-events:none;"
+      <div ref={row} onScroll={chk} className="no-scrollbar" style={css("position:absolute;top:18px;z-index:5;transition:left .6s cubic-bezier(.2,.8,.2,1),right .6s cubic-bezier(.2,.8,.2,1);right:" + right + "px;left:" + left + "px;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 18px;pointer-events:none;"
         + `clip-path:inset(0 ${edge.R ? 20 : 0}px 0 ${edge.L ? 20 : 0}px)`)}>
         <button onClick={openPanel} className="fb-pill" style={css("flex:none;display:flex;align-items:center;gap:8px;height:40px;box-sizing:border-box;padding:10px 16px;border:none;border-radius:9999px;cursor:pointer;white-space:nowrap;pointer-events:auto;background:rgb(249,249,249);box-shadow:inset 0 0 0 .5px rgba(13,12,12,.24);font:400 15px/20px var(--font-sans);color:rgb(17,16,16)")}>
           <span style={css("flex:none;width:16px;height:16px;background:currentColor;" + mask("/ui/f-sliders.svg"))} />
           <span>All filters</span>
           {badge > 0 && <span style={css("flex:none;min-width:20px;height:20px;padding:0 6px;border-radius:9999px;background:rgb(17,17,17);font:700 11px/20px var(--font-sans);color:rgb(249,249,249);text-align:center")}>{badge}</span>}
         </button>
+        {lead}
         {chips.map(c => {
           const open = dd?.key === c.key;
           return (
@@ -329,14 +333,14 @@ export function FilterBar({ fs, left, hidden }: { fs: FilterState; left: number;
         })}
       </div>
       {edge.L && (
-        <div style={css("position:absolute;top:20px;z-index:3;height:40px;display:flex;align-items:center;pointer-events:none;left:" + left + "px")}>
+        <div style={css("position:absolute;top:20px;z-index:6;height:40px;display:flex;align-items:center;pointer-events:none;left:" + left + "px")}>
           <button onClick={() => row.current?.scrollBy({ left: -260, behavior: "smooth" })} title="Scroll filters" className="fb-pill" style={arrow}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
           </button>
         </div>
       )}
       {edge.R && (
-        <div style={css("position:absolute;top:20px;right:10px;z-index:3;height:40px;display:flex;align-items:center;justify-content:flex-end;pointer-events:none")}>
+        <div style={css("position:absolute;top:20px;z-index:6;height:40px;display:flex;align-items:center;justify-content:flex-end;pointer-events:none;right:" + right + "px")}>
           <button onClick={() => row.current?.scrollBy({ left: 260, behavior: "smooth" })} title="Scroll filters" className="fb-pill" style={arrow}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
           </button>
@@ -350,11 +354,13 @@ export function FilterBar({ fs, left, hidden }: { fs: FilterState; left: number;
 
 const TITLES: Record<DdKey, string> = { roi: "ROI", ub: "Build potential", price: "Budget", status: "Status & price", drops: "Price drops", types: "Property type", beds: "Bedrooms", baths: "Bathrooms", size: "Home size, ft²", lot: "Lot size", styles: "Style", feats: "Features & amenities" };
 
-export function FilterDropdown({ fs, listings }: { fs: FilterState; listings: Listing[] }) {
+/** `count` / `noun`: what the CTA counts (comps mode: "Show 14 comps"). */
+export function FilterDropdown({ fs, listings, count, noun }: { fs: FilterState; listings: Listing[]; count?: (F: Filters) => number; noun?: [string, string] }) {
   const { f: F, setF, dd, setDd, stToast, toast } = fs;
   if (!dd) return null;
   const key = dd.key, dims = fDims(F);
-  const n = listings.filter(l => homeOk(l, F)).length;
+  const n = count ? count(F) : listings.filter(l => homeOk(l, F)).length;
+  const [one, many] = noun || ["home", "homes"];
   const close = () => setDd(null);
   const opts = (key === "ub"
     // Thresholds on the heat bands, so they match the real Silver Lake figures (ROI tops out near 55%).
@@ -364,8 +370,8 @@ export function FilterDropdown({ fs, listings }: { fs: FilterState; listings: Li
   const canClear = !!dims[key]?.on;
   return (
     <>
-      <div onClick={close} style={css("position:absolute;inset:0;z-index:7;pointer-events:auto")} />
-      <div style={css("position:absolute;left:" + dd.x + "px;top:" + dd.y + "px;z-index:8;width:" + ddW(key) + "px;max-height:calc(100% - " + (dd.y + 12) + "px);box-sizing:border-box;padding:16px;border-radius:16px;background:rgb(255,255,255);"
+      <div onClick={close} style={css("position:absolute;inset:0;z-index:85;pointer-events:auto")} />
+      <div style={css("position:absolute;left:" + dd.x + "px;top:" + dd.y + "px;z-index:86;width:" + ddW(key) + "px;max-height:calc(100% - " + (dd.y + 12) + "px);box-sizing:border-box;padding:16px;border-radius:16px;background:rgb(255,255,255);"
         + "box-shadow:inset 0 0 0 1px rgba(13,12,12,.08),0 18px 44px rgba(30,18,12,.18);display:flex;flex-direction:column;gap:16px;pointer-events:auto;animation:panelDrop .22s cubic-bezier(.2,.8,.2,1) both")}>
         <div style={css("display:flex;align-items:center;gap:8px")}>
           {ICON[key] && <Icon k={key} sw={1.4} />}
@@ -404,7 +410,7 @@ export function FilterDropdown({ fs, listings }: { fs: FilterState; listings: Li
         <div style={css("flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 -16px -16px;padding:12px 16px;box-shadow:inset 0 1px 0 rgba(13,12,12,.08)")}>
           <button onClick={() => { if (dims[key]) setF(dims[key].clear); }} className="fb-clear" style={css("flex:none;height:40px;padding:0 2px;border:none;background:none;font:700 14px/18px var(--font-sans);text-decoration:none;"
             + (canClear ? "color:rgb(17,16,16);cursor:pointer" : "color:rgb(170,164,160);cursor:default;pointer-events:none"))}>Clear</button>
-          <button onClick={close} className="fb-cta" style={css("flex:none;height:40px;padding:0 18px;border:none;border-radius:9999px;background:rgb(12,12,12);font:700 14px/18px var(--font-sans);color:rgb(252,250,248);cursor:pointer;white-space:nowrap")}>{"Show " + n + (n === 1 ? " home" : " homes")}</button>
+          <button onClick={close} className="fb-cta" style={css("flex:none;height:40px;padding:0 18px;border:none;border-radius:9999px;background:rgb(12,12,12);font:700 14px/18px var(--font-sans);color:rgb(252,250,248);cursor:pointer;white-space:nowrap")}>{"Show " + n + " " + (n === 1 ? one : many)}</button>
         </div>
       </div>
     </>
@@ -421,10 +427,10 @@ const Divider = () => <span style={css("flex:none;height:1px;background:rgba(18,
 const secHead = css("display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none");
 const secTitle = css("flex:1;font:700 14px/1.26 var(--font-sans);color:rgb(18,18,18)");
 
-export function AllFiltersPanel({ fs, top, listings, onApply }: { fs: FilterState; top: number; listings: Listing[]; onApply: () => void }) {
+export function AllFiltersPanel({ fs, top, listings, onApply, count, noun }: { fs: FilterState; top: number; listings: Listing[]; onApply: () => void; count?: (F: Filters) => number; noun?: string }) {
   const { f, fd, setD, panelOut, closePanel, applyPanel, reset, fCol, setFCol, stToast, toast } = fs;
   const D = fd || f;
-  const n = useMemo(() => listings.filter(l => homeOk(l, D)).length, [listings, D]);
+  const n = useMemo(() => (fd ? (count ? count(D) : listings.filter(l => homeOk(l, D)).length) : 0), [listings, D, fd]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!fd) return null;
   const col = fCol;
   const anyOpen = SEC_KEYS.some(k => !col[k]);
@@ -491,7 +497,7 @@ export function AllFiltersPanel({ fs, top, listings, onApply }: { fs: FilterStat
       {stToast && <InfoToast t={stToast} floating />}
       <div style={css("position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:16px;height:83px;box-sizing:border-box;padding:20px;background:rgb(255,255,255);box-shadow:inset 0 .5px 0 rgba(13,12,12,.16)")}>
         <button onClick={reset} className="fb-ghost" style={css("flex:none;height:43px;padding:0 12px;margin-left:-12px;border:none;border-radius:9999px;background:none;font:700 15px/20px var(--font-sans);color:rgb(18,18,18);cursor:pointer")}>Clear all</button>
-        <button onClick={() => { applyPanel(); onApply(); }} className="fb-dark" style={css("flex:none;height:43px;padding:0 20px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 15px/20px var(--font-sans);color:rgb(253,252,252);cursor:pointer")}>{"View " + n + " properties"}</button>
+        <button onClick={() => { applyPanel(); onApply(); }} className="fb-dark" style={css("flex:none;height:43px;padding:0 20px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 15px/20px var(--font-sans);color:rgb(253,252,252);cursor:pointer")}>{"View " + n + " " + (noun || "properties")}</button>
       </div>
     </div>
   );

@@ -14,23 +14,21 @@ import { fullPrice, shortPrice } from "@/lib/fake";
 import type { Comp } from "@/lib/comps";
 import { ACTIVE, Analytics, CompCard, GREEN, INK, MUTED, Modal, SOLD, Table } from "../report/CompsReport";
 import type { CompsSession } from "./useComps";
-import { ParamsButton, ParamsSheet, type ParamsUi } from "./CompParams";
 
 type View = "cards" | "table" | "analytics";
 const k = (n: number) => n.toLocaleString("en-US");
 
-export function CompsSide({ cs, width, cols, out, onClose, paramsUi, onEstimate }: { cs: CompsSession; width: number; cols: 1 | 2; out?: boolean; onClose: () => void; paramsUi: ParamsUi; onEstimate: () => void }) {
+/** `onAddSold`: the search filters leave sold homes out (status Active / Pending only);
+ *  turns Sold on in those same filters. `onClearFilters`: no comp matches the filters. */
+export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold, onClearFilters, filtered }: { cs: CompsSession; width: number; cols: 1 | 2; out?: boolean; onClose: () => void; onEstimate: () => void; onAddSold: () => void; onClearFilters: () => void; filtered: number }) {
   const [view, setView] = useState<View>("cards");
-  const [paramsOpen, setParamsOpen] = useState(false);
-  useEffect(() => { if (paramsUi !== "panel") setParamsOpen(false); }, [paramsUi]);
   const est = cs.mine ?? (cs.homePrice > 0 ? Math.round(cs.homePrice / 1000) * 1000 : 0);
   const [adding, setAdding] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<number, HTMLDivElement>());
   const [flash, setFlash] = useState<number | null>(null);
   const narrow = width < 480;
-  // With the Parameters button in the row (version B), Add comps keeps only its icon.
-  const addIcon = narrow || paramsUi === "panel";
+  const addIcon = narrow;
   const { sold, active, total, ready, loading, isReady, isOn, hideExcl } = cs;
 
   // A pin picked on the map: show its card (switching back to cards), centred, with a brief ring.
@@ -85,7 +83,6 @@ export function CompsSide({ cs, width, cols, out, onClose, paramsUi, onEstimate 
             ))}
           </div>
           <span style={{ flex: 1 }} />
-          {paramsUi === "panel" && <ParamsButton n={cs.changed.length} on={paramsOpen} narrow={narrow} onClick={() => setParamsOpen(o => !o)} />}
           <button onClick={() => cs.setHideExcl(!hideExcl)} aria-pressed={hideExcl} title={hideExcl ? "Show excluded comps" : "Hide excluded comps"} className={hideExcl ? undefined : "cs-act"}
             style={{ flex: "none", width: 40, height: 40, border: "none", borderRadius: 9999, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: hideExcl ? INK : "rgb(236,234,233)", color: hideExcl ? "rgb(253,252,252)" : INK }}>
             <i className={`ph-bold ph-${hideExcl ? "eye-closed" : "eye"}`} style={{ fontSize: 17 }} />
@@ -98,6 +95,13 @@ export function CompsSide({ cs, width, cols, out, onClose, paramsUi, onEstimate 
       </div>
 
       <div ref={scroller} style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 18, padding: "16px 14px 28px", scrollbarWidth: "thin" }}>
+        {(!cs.soldAllowed || filtered > 0) && (
+          <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px 10px 14px", borderRadius: 14, background: cs.soldAllowed ? "rgb(246,245,244)" : "rgb(252,243,236)", font: "400 13px/18px var(--font-sans)", color: INK }}>
+            <i className={`ph ph-${cs.soldAllowed ? "funnel-simple" : "warning-circle"}`} style={{ fontSize: 17, color: cs.soldAllowed ? MUTED : "rgb(176,98,52)" }} />
+            <span style={{ flex: 1 }}>{cs.soldAllowed ? <>Comps follow your search filters ({filtered} on).</> : <>Your filters leave out sold homes, so there's nothing to estimate from.</>}</span>
+            <button onClick={cs.soldAllowed ? onClearFilters : onAddSold} style={{ flex: "none", border: "none", background: "none", padding: 0, font: "700 13px/18px var(--font-sans)", color: INK, textDecoration: "underline", textUnderlineOffset: 3, cursor: "pointer", whiteSpace: "nowrap" }}>{cs.soldAllowed ? "Clear filters" : "Show sold"}</button>
+          </div>
+        )}
         {view === "analytics" && (
           <div className="cs-in" style={{ position: "relative", flex: "none", height: 500 }}>
             <Analytics embedded sold={cs.incSold} active={cs.incActive} />
@@ -109,9 +113,12 @@ export function CompsSide({ cs, width, cols, out, onClose, paramsUi, onEstimate 
           {!loading && total === 0 && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "48px 16px", textAlign: "center" }}>
               <span style={{ width: 140, height: 110, background: "url('/iso/empty-search.png') center/contain no-repeat" }} />
-              <span style={{ font: "400 20px/26px var(--font-sans)", color: INK }}>No comps match these parameters</span>
-              <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED, maxWidth: 300 }}>Widen the radius, the months sold or the size range to find more.</span>
-              <button className="btn-soft" onClick={() => cs.setParams({ ...cs.params, radius: Math.max(cs.params.radius, 1), months: 12, size: null, lot: null, beds: [null, null], baths: [null, null], yearFrom: null, status: { S: true, L: true } })} style={{ marginTop: 6, height: 40, padding: "0 16px", font: "700 14px/18px var(--font-sans)" }}>Reset to default</button>
+              <span style={{ font: "400 20px/26px var(--font-sans)", color: INK }}>No comps match your filters</span>
+              <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED, maxWidth: 300 }}>Loosen the filters above or widen the radius to find more.</span>
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                {filtered > 0 && <button className="btn-soft" onClick={onClearFilters} style={{ height: 40, padding: "0 16px", font: "700 14px/18px var(--font-sans)" }}>Clear filters</button>}
+                {cs.radius < 2 && <button className="btn-soft" onClick={() => cs.setRadius(2)} style={{ height: 40, padding: "0 16px", font: "700 14px/18px var(--font-sans)" }}>Widen to 2 miles</button>}
+              </div>
             </div>
           )}
           {([["S", sold, SOLD, "Sold"], ["L", active, ACTIVE, "Active"]] as [string, Comp[], string, string][]).map(([st, list, color, label]) => list.some(isReady) && (
@@ -151,7 +158,6 @@ export function CompsSide({ cs, width, cols, out, onClose, paramsUi, onEstimate 
           style={{ flex: "none", height: 48, padding: "0 22px", border: "none", borderRadius: 9999, background: INK, color: "rgb(253,252,252)", font: "700 15px/20px var(--font-sans)", cursor: "pointer", whiteSpace: "nowrap", opacity: loading && ready === 0 ? 0.4 : 1 }}>Set price estimate</button>
       </div>
 
-      {paramsOpen && cs.l && <ParamsSheet p={cs.params} l={cs.l} onClose={() => setParamsOpen(false)} onApply={p => { cs.setParams(p); setView("cards"); scroller.current?.scrollTo({ top: 0 }); }} />}
 
       {adding && (
         <Modal title="Add comps" onClose={() => setAdding(false)}>

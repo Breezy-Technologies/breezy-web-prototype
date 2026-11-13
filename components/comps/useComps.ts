@@ -10,11 +10,12 @@
 // mode) is kept per property for the session, so reopening comps finds it as it was.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Listing } from "@/lib/fake";
-import { type Comp, type CompParams, DEFAULT_PARAMS, compDetail, compPool, compsFor, paramsChanged } from "@/lib/comps";
+import { type Comp, DEFAULT_RADIUS, compDetail, compPool, compsFor, filtersAllowSold } from "@/lib/comps";
+import type { Filters } from "@/lib/filters";
 import { LOTS } from "@/lib/silverlake";
 import { avg, myEstimates } from "../report/CompsReport";
 
-type Sess = { added: Comp[]; excl: Set<number>; hideExcl: boolean; byLot: boolean; params: CompParams };
+type Sess = { added: Comp[]; excl: Set<number>; hideExcl: boolean; byLot: boolean; radius: number };
 const store = new Map<string, Sess>();
 const keyOf = (l: Listing) => `${l.id}|${l.addr}`;
 
@@ -27,17 +28,17 @@ export const compPrice = (c: Comp) => { const d = compDetail(c); return d.sold ?
 export type CompsSession = ReturnType<typeof useComps>;
 
 /** `l` null: no session (everything empty). `reveal`: the comps arrive one by one (first run). */
-export function useComps(l: Listing | null, reveal: boolean) {
+export function useComps(l: Listing | null, reveal: boolean, F?: Filters) {
   const key = l ? keyOf(l) : "";
   const [, bump] = useState(0);
-  const s: Sess = key ? (store.get(key) ?? (store.set(key, { added: [], excl: new Set(), hideExcl: false, byLot: false, params: DEFAULT_PARAMS }), store.get(key)!)) : { added: [], excl: new Set(), hideExcl: false, byLot: false, params: DEFAULT_PARAMS };
+  const s: Sess = key ? (store.get(key) ?? (store.set(key, { added: [], excl: new Set(), hideExcl: false, byLot: false, radius: DEFAULT_RADIUS }), store.get(key)!)) : { added: [], excl: new Set(), hideExcl: false, byLot: false, radius: DEFAULT_RADIUS };
   const set = (f: (s: Sess) => void) => { if (!key) return; f(s); bump(n => n + 1); };
 
-  // Search parameters (radius, sold within, status, size / lot ±, beds, baths, year):
-  // changing them runs the search again and the comps arrive again, one by one.
-  const pk = JSON.stringify(s.params);
-  const base = useMemo(() => (l ? compsFor(l, s.params) : { sold: [], active: [] }), [key, pk]); // eslint-disable-line react-hooks/exhaustive-deps
-  const pool = useMemo(() => (l ? compPool(l, s.params) : { sold: [], active: [] }), [key, pk]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The search's filters (the filter bar over the subject) and the radius: changing either
+  // runs the comps search again and the comps arrive again, one by one.
+  const pk = s.radius + "|" + JSON.stringify(F || null);
+  const base = useMemo(() => (l ? compsFor(l, s.radius, F) : { sold: [], active: [] }), [key, pk]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pool = useMemo(() => (l ? compPool(l, s.radius, F) : { sold: [], active: [] }), [key, pk]); // eslint-disable-line react-hooks/exhaustive-deps
   const sold = [...base.sold, ...s.added.filter(c => c.st === "S")];
   const active = [...base.active, ...s.added.filter(c => c.st === "L")];
   const all = [...sold, ...active];
@@ -88,7 +89,7 @@ export function useComps(l: Listing | null, reveal: boolean) {
     l, key, sold, active, all, total, ready, loading, isReady, isOn, toggle, add, candidates,
     hideExcl: s.hideExcl, setHideExcl: (v: boolean) => set(x => { x.hideExcl = v; }),
     byLot: s.byLot, setByLot: (v: boolean) => set(x => { x.byLot = v; }),
-    params: s.params, setParams: (p: CompParams) => set(x => { x.params = p; x.added = []; }), changed: paramsChanged(s.params),
+    radius: s.radius, setRadius: (r: number) => set(x => { x.radius = r; x.added = []; }), soldAllowed: filtersAllowSold(F),
     incSold, incActive, homePsf, lotPsf, vacant, lotFt, lotMode, homePrice, average,
     mine, setMine, hoverC, setHoverC, focusC, focus: (i: number) => setFocusC({ i, t: Date.now() }),
   };

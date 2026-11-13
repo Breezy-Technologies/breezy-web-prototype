@@ -21,15 +21,15 @@ import { frameLot } from "@/lib/map/frame";
 import { useComps, compLngLat } from "@/components/comps/useComps";
 import { CompsSide } from "@/components/comps/CompsSide";
 import { CompPins } from "@/components/comps/CompPins";
-import { CompRadius } from "@/components/comps/CompRadius";
+import { CompRadius, RadiusChip } from "@/components/comps/CompRadius";
 import { CompsExport } from "@/components/comps/CompsExport";
-import { ParamsBar, ParamsPill, ParamsVersionSwitch, useParamsUi } from "@/components/comps/CompParams";
+import { compsFor } from "@/lib/comps";
 import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
 import { AreaReport, ReportsSheet, useReports } from "@/components/home/Reports";
 import { Listing, OppType, listingAt } from "@/lib/fake";
-import { SortKey, homeOk, sortListings } from "@/lib/filters";
+import { Filters, SortKey, fDims, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, pointInRings, ringBBox } from "@/lib/geo";
 
@@ -230,15 +230,19 @@ export default function HomeWeb() {
   const [compsOn, setCompsOn] = useState(false);
   const [compsOut, setCompsOut] = useState(false);
   const [compsReveal, setCompsReveal] = useState(true);
-  const cm = useComps(compsOn && sel ? sel : null, compsReveal);
+  // Comps follow the search's own filters (fs.f): the filter bar slides left with the
+  // detail panel and stays above it, so editing a filter edits the comps too.
+  const cm = useComps(compsOn && sel ? sel : null, compsReveal, fs.f);
   const compsShift = compsOn && !compsOut;
-  // Exploration: where the comps search parameters live (A map bar / B panel / C on the map).
-  const [paramsUi, setParamsUi] = useParamsUi();
   // The export sheet ("Set price estimate").
   const [exportOn, setExportOn] = useState(false);
   const sideCols: 1 | 2 = winW >= 1360 ? 2 : 1;
   const SIDE_W = sideCols === 2 ? 580 : 360;
   const DETAIL_X = compsShift ? GAP : GAP + COL + GAP;
+  // Comps mode: the detail panel (now the subject) drops under the filter bar.
+  const DETAIL_TOP = compsShift ? BAR_BOTTOM : GAP;
+  const fCount = useMemo(() => { const d = fDims(fs.f); return (Object.keys(d) as (keyof typeof d)[]).filter(k => d[k].on && !(k === "price" && d.status.on)).length; }, [fs.f]);
+  const compCount = (F: Filters) => { if (!sel) return 0; const x = compsFor(sel, cm.radius, F); return x.sold.length + x.active.length; };
   const selKey = sel ? `${sel.id}|${sel.addr}` : "";
   // Another property (pin, parcel, saved home) leaves comps.
   useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); }, [selKey]);
@@ -246,14 +250,14 @@ export default function HomeWeb() {
   const frameComps = (l: Listing) => {
     if (!map) return;
     const pts = [[l.lng, l.lat], ...cm.all.map(compLngLat)];
-    // "On map" parameters: the whole radius circle stays in view, so its handle can be reached.
-    if (paramsUi === "map" || !cm.all.length) {
-      const dLat = cm.params.radius / 69.05, dLng = dLat / Math.cos(l.lat * Math.PI / 180);
+    // No comp yet (or none match): frame the radius circle instead.
+    if (!cm.all.length) {
+      const dLat = cm.radius / 69.05, dLng = dLat / Math.cos(l.lat * Math.PI / 180);
       pts.push([l.lng - dLng, l.lat - dLat], [l.lng + dLng, l.lat + dLat]);
     }
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], {
-      padding: { left: GAP + 420 + GAP + 40, right: SIDE_W + GAP * 2 + 40, top: paramsUi === "panel" ? 56 : 84, bottom: 64 }, maxZoom: 16.5, duration: 1100, essential: true,
+      padding: { left: GAP + 420 + GAP + 40, right: SIDE_W + GAP * 2 + 40, top: 84, bottom: 64 }, maxZoom: 16.5, duration: 1100, essential: true,
     });
   };
   const openCompsMode = () => {
@@ -263,8 +267,8 @@ export default function HomeWeb() {
   };
   // Frame once the session (and so its comps) exists.
   useEffect(() => { if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [compsOn, cm.key]); // eslint-disable-line react-hooks/exhaustive-deps
-  // New search parameters (or a different entry-point version): reframe once the new comps are known.
-  const pkey = JSON.stringify(cm.params) + paramsUi;
+  // New filters or radius: reframe once the new comps are known.
+  const pkey = cm.radius + JSON.stringify(fs.f);
   const firstP = useRef(pkey);
   useEffect(() => { if (firstP.current === pkey) return; firstP.current = pkey; if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [pkey]); // eslint-disable-line react-hooks/exhaustive-deps
   const closeComps = () => {
@@ -442,7 +446,7 @@ export default function HomeWeb() {
         </div>
         {detailOpen && (
           // The detail column steps back while the Alerts sheet sits on top of it (`dtT` / `dtF`).
-          <div style={{ position: "absolute", left: DETAIL_X, top: GAP, bottom: GAP, zIndex: 4, transformOrigin: "50% 0", transition: "left .6s cubic-bezier(.2,.8,.2,1),transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
+          <div style={{ position: "absolute", left: DETAIL_X, top: DETAIL_TOP, bottom: GAP, zIndex: 4, transformOrigin: "50% 0", transition: "left .6s cubic-bezier(.2,.8,.2,1),top .6s cubic-bezier(.2,.8,.2,1),transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
             <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openFlow(sel!, k)}
               alertN={alerts.count(sel)} onBell={() => alerts.open(sel!)} onShare={() => shareOne(sel!)} onToast={showToast} />
           </div>
@@ -450,14 +454,10 @@ export default function HomeWeb() {
         {detailOpen && alerts.panel(DETAIL_X)}
         {compsOn && sel && cm.key && (
           <div style={{ position: "absolute", right: GAP, top: GAP, bottom: GAP, zIndex: 4 }}>
-            <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} paramsUi={paramsUi} onEstimate={() => setExportOn(true)} />
+            <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} onEstimate={() => setExportOn(true)}
+              filtered={fCount} onClearFilters={fs.reset} onAddSold={() => fs.setF({ st: { "Recently sold": true }, tg: {} })} />
           </div>
         )}
-        {compsShift && sel && cm.key && <>
-          {paramsUi === "bar" && <ParamsBar p={cm.params} l={sel} left={GAP + 420 + GAP + 8} right={SIDE_W + GAP * 2} onApply={cm.setParams} />}
-          {paramsUi === "map" && <ParamsPill p={cm.params} l={sel} left={GAP + 420 + GAP} right={SIDE_W + GAP * 2} onApply={cm.setParams} />}
-          <ParamsVersionSwitch v={paramsUi} set={setParamsUi} left={GAP + 420 + GAP + 10} top={paramsUi === "panel" ? 18 : 76} />
-        </>}
         {pillOn && (
           // "Search this area": centred over the visible map, just under the filter bar.
           <div style={{ position: "absolute", left: detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + GAP, right: 0, top: BAR_BOTTOM, zIndex: 2, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
@@ -466,9 +466,12 @@ export default function HomeWeb() {
             </button>
           </div>
         )}
-        {!compsOn && <FilterBar fs={fs} left={detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} />}
-        <FilterDropdown fs={fs} listings={listings} />
-        <AllFiltersPanel fs={fs} top={view === "results" ? 88 : 76} listings={listings} onApply={() => { if (view === "home") { closeDetail(); setView("results"); } }} />
+        {/* In comps mode the bar slides left with the detail panel and sits above it, led by the comps radius. */}
+        <FilterBar fs={fs} left={compsShift ? GAP : detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} right={compsShift ? SIDE_W + GAP * 2 : 10}
+          lead={compsShift && cm.key ? <RadiusChip miles={cm.radius} onChange={cm.setRadius} /> : undefined} />
+        <FilterDropdown fs={fs} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? ["comp", "comps"] : undefined} />
+        <AllFiltersPanel fs={fs} top={compsShift ? DETAIL_TOP : view === "results" ? 88 : 76} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? "comps" : undefined}
+          onApply={() => { if (view === "home" && !compsShift) { closeDetail(); setView("results"); } }} />
         {sortOpen && view === "results" && <SortMenu value={sortBy} onPick={k => { setSortBy(k); setSortOpen(false); }} onClose={() => setSortOpen(false)} left={GAP + COL - 49} top={72} />}
         <div style={{ pointerEvents: "auto" }}><MapControls right={compsShift ? SIDE_W + GAP * 2 + 8 : 20} onLocate={() => fit(GAP + COL + GAP)} /></div>
         {offline && (
@@ -484,7 +487,7 @@ export default function HomeWeb() {
       </div>
 
       {compsOn && cm.key && <CompPins cs={cm} />}
-      {compsShift && sel && cm.key && <CompRadius at={[sel.lng, sel.lat]} miles={cm.params.radius} handle={paramsUi === "map"} onChange={mi => cm.setParams({ ...cm.params, radius: mi })} />}
+      {compsShift && sel && cm.key && <CompRadius at={[sel.lng, sel.lat]} miles={cm.radius} handle onChange={cm.setRadius} />}
       {exportOn && sel && cm.key && <CompsExport cs={cm} l={sel} navW={navW} user={user.name} onClose={() => setExportOn(false)} onToast={(t, tone) => showToast(t, tone)}
         onSaved={() => { if (!rp.has(sel)) rp.save(sel); }} />}
       <PricePins signal={signalIds} listings={compsOn ? [] : pinListings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
