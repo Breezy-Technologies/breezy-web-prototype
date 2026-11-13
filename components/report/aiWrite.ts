@@ -4,7 +4,7 @@
 // opens at once and is written in front of the user:
 //  - every component (a paragraph, a heading, a card, a chart…) starts as an AI
 //    gradient skeleton drawn on its own text lines and images, the real content hidden;
-//  - components above the fold resolve almost at once, top to bottom;
+//  - after a short loading beat, components above the fold resolve one by one, top to bottom;
 //  - the rest resolve as they scroll into view, each after a short "writing" beat;
 //  - resolving = the skeleton fades out while the content fades in and lifts 12 px.
 // It works on the rendered DOM, so the same hook serves the recorded Build guidelines
@@ -14,13 +14,16 @@ import { RefObject, useLayoutEffect } from "react";
 const LIFT = 12;
 const SMALL = 96;   // a block this short is one component
 const CARD = 520;   // a framed card up to this tall is one component
-const FIRST = 90, STEP_ABOVE = 55, ABOVE_MAX = 700; // above the fold: almost instant
-const DWELL = 420, STEP_BELOW = 110;                // below: a writing beat, then in
+// 13 Nov review ("a moment of delight"): a short loading beat with every skeleton
+// shimmering, then the pieces arrive one by one, slowly.
+const FIRST = 1100, STEP_ABOVE = 240, ABOVE_MAX = 4200; // above the fold: beat, then sequential
+const DWELL = 650, STEP_BELOW = 230, BATCH_MAX = 1600;  // below: a writing beat, then in
+const FADE = 900, LIFT_MS = 1000;                       // each piece's own fade / lift
 
 const STYLE_ID = "bz-aiwrite-css";
 const CSS = `
 .bzw-layer{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:3}
-.bzw-u{position:absolute;transition:opacity .4s ease}
+.bzw-u{position:absolute;transition:opacity .7s ease}
 .bzw-u>span{position:absolute;display:block;border-radius:9999px;
   background:linear-gradient(100deg,rgba(175,127,113,.16) 0%,rgba(150,112,150,.24) 35%,rgba(138,118,160,.16) 55%,rgba(175,127,113,.16) 100%) 0 0/240% 100%;
   animation:bzwShim 1.6s linear infinite,bzwIn .35s ease both}
@@ -141,16 +144,16 @@ export function useAiWrite(scroller: RefObject<HTMLElement | null>, root: RefObj
       if (u.done) return;
       u.done = true;
       u.skel.style.opacity = "0";
-      timers.push(setTimeout(() => u.skel.remove(), 450));
+      timers.push(setTimeout(() => u.skel.remove(), 750));
       if (u.el.isConnected) {
         if (instant) restore(u);
         else {
-          u.el.style.transition = "opacity .5s ease, transform .6s cubic-bezier(.2,.8,.2,1)";
+          u.el.style.transition = `opacity ${FADE}ms ease, transform ${LIFT_MS}ms cubic-bezier(.2,.8,.2,1)`;
           u.el.style.opacity = "1"; u.el.style.transform = "translateY(0)";
-          timers.push(setTimeout(() => restore(u), 700));
+          timers.push(setTimeout(() => restore(u), LIFT_MS + 100));
         }
       }
-      if (units.every(x => x.done)) timers.push(setTimeout(finish, 750));
+      if (units.every(x => x.done)) timers.push(setTimeout(finish, LIFT_MS + 150));
     };
     // Anything the user has already scrolled past (a jump via the dots rail) just appears.
     function onScroll() {
@@ -175,7 +178,7 @@ export function useAiWrite(scroller: RefObject<HTMLElement | null>, root: RefObj
       rt.style.opacity = opPrev;
       if (!units.length) return finish();
 
-      // Above the fold: almost instant, top to bottom.
+      // Above the fold: a loading beat, then one by one, top to bottom.
       const fold = sc.clientHeight;
       units.filter(u => u.dy < fold).sort((a, b) => a.dy - b.dy)
         .forEach((u, i) => timers.push(setTimeout(() => reveal(u), FIRST + Math.min(ABOVE_MAX, i * STEP_ABOVE))));
@@ -186,8 +189,8 @@ export function useAiWrite(scroller: RefObject<HTMLElement | null>, root: RefObj
         const now = performance.now();
         const batch = es.filter(e => e.isIntersecting).map(e => units.find(u => u.el === e.target)).filter((u): u is Unit => !!u && !u.done)
           .sort((a, b) => a.el.getBoundingClientRect().top - b.el.getBoundingClientRect().top);
-        // A big jump brings many in at once: the batch still lands within ~0.7 s.
-        const step = Math.min(STEP_BELOW, 700 / Math.max(1, batch.length));
+        // A big jump brings many in at once: the batch still lands within ~1.6 s.
+        const step = Math.min(STEP_BELOW, BATCH_MAX / Math.max(1, batch.length));
         batch.forEach(u => {
           io!.unobserve(u.el);
           queueAt = Math.max(queueAt, now + DWELL);

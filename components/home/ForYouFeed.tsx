@@ -12,7 +12,7 @@ import { hashStr } from "@/lib/geo";
 import { useSaved } from "@/components/SavedState";
 import { SaveToggle } from "./Saved";
 import { SignalDot } from "../PinPalette";
-import { NewTag, UnreadDot } from "../Unread";
+import { NewTag } from "../Unread";
 
 const INK = "rgb(18,18,18)";
 type Item = { c: OppType | null; lb: string; ic: string };
@@ -105,7 +105,6 @@ function dayLabel(d: number) {
 function DateDivider({ label, unread }: { label: string; unread: number }) {
   return (
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "10px 0 2px" }}>
-      {unread > 0 && <UnreadDot title={`${unread} unread`} />}
       <span style={{ flex: "none", font: "700 15px/20px var(--font-sans)", color: INK }}>{label}</span>
       {unread > 0 && <NewTag n={unread} />}
       <span style={{ flex: 1, height: 1.5, borderRadius: 1, background: "rgba(18,18,18,.12)" }} />
