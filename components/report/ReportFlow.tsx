@@ -37,7 +37,9 @@ const THEME: Record<FlowKind, { bar: string; glow: string; dot: string }> = {
   ub: { bar: "linear-gradient(180deg,rgba(234,215,210,.24) 0%,rgba(234,215,210,.44) 100%),linear-gradient(180deg,rgb(227,202,196) 0%,rgb(174,106,91) 100%)", glow: "rgb(227,202,196)", dot: "rgb(174,106,91)" },
   roi: { bar: "linear-gradient(89.442deg,rgb(13,87,57) 0.06%,rgb(70,155,112) 97.94%)", glow: "rgb(196,222,207)", dot: "rgb(70,155,112)" },
 };
-const TABS: [FlowKind, string, string][] = [["roi", "Upside analysis", "act-chart"], ["ub", "Build guidelines", "act-target"], ["comps", "Comps", "act-files"]];
+// No Comps tab (review, 13 Nov): comps live in the split view (comps interaction 2.0). A saved
+// comps report still opens here on its own, with these two tabs to move on.
+const TABS: [FlowKind, string, string][] = [["roi", "Upside analysis", "act-chart"], ["ub", "Build guidelines", "act-target"]];
 const EASE = "cubic-bezier(.2,.8,.2,1)";
 const STEP_MS = 700, AUTO_MS = 6700;
 
@@ -47,10 +49,12 @@ const gotKey = (l: Listing, k: FlowKind) => `${k}:${l.addr}|${l.lng.toFixed(5)},
 
 type Phase = "review" | "choose" | "run" | "done" | "report";
 
-export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onShare, onToast }: {
+export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onShare, onToast, onComps }: {
   l: Listing; kind: FlowKind; navW: number; cached?: boolean;
   onClose: () => void; onDone?: (k: FlowKind) => void; onShare?: () => void;
   onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void;
+  /** "See comps" in a report: drop the sheet and open the comps split view instead. */
+  onComps?: () => void;
 }) {
   if (cached) got.add(gotKey(l, "comps"));
   // Max build and Profit potential open straight on the report, written in front of the
@@ -152,6 +156,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
     const n = ent.left(feat) - 1;
     onToast?.(`${PRICING.names[feat]} · ${n} of ${PRICING.allowance[feat]} left this month`, "neutral");
   }, [phase, kind, acc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toComps = () => { if (onComps) { close(); onComps(); } else pick("comps"); };
   const unlock = () => {
     if (!feat) return;
     const was = ent.access(feat, pk);
@@ -253,8 +258,8 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
             </div>
             <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
               {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
-              {kind === "ub" && <UBReport l={l} write={write} onComps={() => pick("comps")} />}
-              {kind === "roi" && <UpsideReport l={l} write={write} onComps={() => pick("comps")} />}
+              {kind === "ub" && <UBReport l={l} write={write} onComps={toComps} />}
+              {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} />}
               {locked && <LockVeil key={kind} access={acc} feature={feat ?? "comps"} clear={ent.s.lockStyle === "blur" ? 0 : "42%"} onUnlock={unlock} onToast={onToast} />}
             </div>
           </div>

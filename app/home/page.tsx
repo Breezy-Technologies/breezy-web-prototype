@@ -521,7 +521,8 @@ export default function HomeWeb() {
         frameSel(p.listing, p.ring, [p.cx, p.cy]);
       }} />
       {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached} onClose={() => setFlow(null)}
-        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); }} onShare={() => shareOne(flow.l)} onToast={showToast} />}
+        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); }} onShare={() => shareOne(flow.l)} onToast={showToast}
+        onComps={sel && sel.id === flow.l.id ? openCompsMode : undefined} />}
       {areaComps && <AreaCompsPreview key={areaComps.title + areaComps.comps.length} {...areaComps} saved={rp.hasArea(areaComps)} onClose={() => setAreaComps(null)}
         onSave={() => { rp.saveArea(areaComps); showToast("Report saved to Reports"); }} />}
       {ss.modals}
