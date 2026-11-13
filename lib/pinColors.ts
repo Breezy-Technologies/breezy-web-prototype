@@ -5,8 +5,8 @@
 //   Green  = ROI
 //   Blue   = status related (withdrawn, expired, stale, foreclosure, …)
 //   Purple = Comps
-// Each circle is lit from the top (light → base) with a darker ring of its own
-// shade. Selected is always black with a white icon. White price pills never change.
+// Colours match the mobile app (Figma 1455:96194): a vertical gradient from a light tint
+// to the base, a 24% ink edge, a white icon. Selected is always black with a white icon. White price pills never change.
 import type { OppType } from "./fake";
 
 export type RGB = [number, number, number];
@@ -14,12 +14,13 @@ export type PinFamily = "alert" | "ub" | "roi" | "status" | "comps";
 type Shade = { light: RGB; base: RGB; ring: RGB; icon: string };
 
 export const PIN_FAMILIES: Record<PinFamily, Shade & { label: string }> = {
-  // Muted (review: the first set read too garish): same hues, lower saturation, a softer top light.
-  alert: { label: "Alerts", light: [214, 128, 112], base: [192, 98, 84], ring: [160, 80, 68], icon: "rgb(253,252,252)" },
-  ub: { label: "Underbuilt", light: [234, 204, 140], base: [216, 178, 104], ring: [180, 146, 82], icon: "rgb(18,18,18)" },
-  roi: { label: "ROI", light: [124, 168, 132], base: [94, 144, 106], ring: [74, 116, 84], icon: "rgb(253,252,252)" },
-  status: { label: "Status", light: [132, 164, 196], base: [100, 138, 176], ring: [80, 112, 144], icon: "rgb(253,252,252)" },
-  comps: { label: "Comps", light: [164, 146, 184], base: [138, 118, 160], ring: [112, 94, 132], icon: "rgb(253,252,252)" },
+  // Matched to the mobile app (13 Nov, Figma "Onboarding redesign" 1455:96194): each pin is a
+  // top-to-bottom gradient from a light tint to a deep base, with a white icon on every colour.
+  alert: { label: "Alerts", light: [224, 143, 136], base: [195, 65, 55], ring: [18, 18, 18], icon: "rgb(253,252,252)" },
+  ub: { label: "Underbuilt", light: [249, 219, 180], base: [173, 116, 10], ring: [18, 18, 18], icon: "rgb(253,252,252)" },
+  roi: { label: "ROI", light: [153, 203, 177], base: [70, 155, 112], ring: [18, 18, 18], icon: "rgb(253,252,252)" },
+  status: { label: "Status", light: [136, 189, 218], base: [44, 136, 181], ring: [18, 18, 18], icon: "rgb(253,252,252)" },
+  comps: { label: "Comps", light: [237, 181, 207], base: [105, 76, 113], ring: [18, 18, 18], icon: "rgb(253,252,252)" },
 };
 
 export const familyOf = (t: OppType): PinFamily =>
@@ -37,8 +38,9 @@ export function pinFill(type: OppType | PinFamily, selected = false, size = 22) 
     ring: `inset 0 0 0 ${ringW}px rgba(0,0,0,.55)`, icon: "rgb(253,252,252)", rgb: [18, 18, 18] as RGB,
   };
   return {
-    background: `radial-gradient(circle at 50% 28%, ${rgb(f.light)} 0%, ${rgb(f.base)} 68%)`,
-    ring: `inset 0 0 0 ${ringW}px ${rgb(f.ring, 0.6)}`,
+    // As the mobile markers: a vertical gradient, light at the top, with a 24% ink edge.
+    background: `linear-gradient(180deg, ${rgb(f.light)} 0%, ${rgb(f.base)} 100%)`,
+    ring: `inset 0 0 0 ${ringW}px ${rgb(f.ring, 0.24)}`,
     icon: f.icon, rgb: f.base,
   };
 }

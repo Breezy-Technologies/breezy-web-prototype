@@ -176,15 +176,15 @@ Every coloured opportunity circle (`SignalDot` in `components/PinPalette.tsx`: m
 
 | Family | Signals | Base |
 |---|---|---|
-| Red | Alert related: price drops | rgb(192,98,84) |
-| Yellow | Underbuilt | rgb(216,178,104) |
-| Green | ROI | rgb(94,144,106) |
-| Blue | Status related: withdrawn, expired, stale, foreclosure | rgb(100,138,176) |
-| Purple | Comps | rgb(138,118,160) |
+| Red | Alert related: price drops | #E08F88 → #C34137 |
+| Yellow | Underbuilt | #F9DBB4 → #AD740A |
+| Green | ROI | #99CBB1 → #469B70 |
+| Blue | Status related: withdrawn, expired, stale, foreclosure | #88BDDA → #2C88B5 |
+| Purple | Comps | #EDB5CF → #694C71 |
 
-Muted in the 10 Nov review (the first set read too garish): same hues, lower saturation, softer ring.
+**Matched to the mobile app (13 Nov, Figma "Onboarding redesign" 2CKvKeUl6XgruMBITGkHbt node 1455:96194):** each pin is a top-to-bottom gradient from the light tint to the base (values above), with a 24% ink edge and a white icon on every colour (Underbuilt included). The markers in `public/pins/` and `PIN_FAMILIES` carry the same stops.
 
-- Each circle is lit from the top (a lighter tint fading to the base) with a darker ring of its own shade. The icon is white, dark on yellow. **Selected is always black with a white icon.** White price pills never change; the price-drop bell uses the alert red.
+- Each circle is a vertical gradient (tint → base) with a 24% ink edge. The icon is always white. **Selected is always black with a white icon.** White price pills never change; the price-drop bell uses the alert red.
 - Onboarding pins (`components/onboarding/OppPins.tsx`) use the same market radar marker, 25% larger, with the label pill on steps that show labels; they pulse until selected.
 - The colour-route switcher is gone.
 
