@@ -71,8 +71,9 @@ export function valueAtPosition(pos: number, bands: Bands): number {
 }
 
 /** The fake field as a percentage at a coordinate. Swap for the real service here. */
-export function heatPct(kind: HeatLayer, lng: number, lat: number): number {
-  return Math.round(valueAtPosition(heatValue(kind, lng, lat), HEAT_BANDS[kind]) * 10) / 10;
+/** `cellKm`: the hex's size, so coarse hexes read a smoothed field (see heatValue). */
+export function heatPct(kind: HeatLayer, lng: number, lat: number, cellKm = 0): number {
+  return Math.round(valueAtPosition(heatValue(kind, lng, lat, cellKm), HEAT_BANDS[kind]) * 10) / 10;
 }
 
 /* Lots differ from their neighbours: each one moves off the area's value by

@@ -60,6 +60,9 @@ const SL_CELLS = new Set(Object.keys(SL_HEAT.hex as Record<string, unknown>));
 const seen = new Map<number, Set<string>>();          // every cell looked at, per res
 const feats = new Map<number, GeoJSON.Feature[]>();   // the land cells kept, per res
 const MAX_CELLS = 40000;
+// Approximate cell size per resolution: coarse cells read a smoothed field (no speckle).
+// Res 8 reads the full field, like the Silver Lake grid and the parcels it meets.
+const CELL_KM: Record<number, number> = { 4: 45, 5: 17, 7: 2.5, 8: 0 };
 
 function tierFor(z: number) { return US_TIERS.find(t => z < t.max) || US_TIERS[US_TIERS.length - 1]; }
 
@@ -100,7 +103,7 @@ export function updateUsHeat(m: MbMap) {
     if (res === 8 ? SL_CELLS.has(h) : fromHeatCenter([lng, lat]) < HEAT_AREA.radius) continue;
     const ring = cellToBoundary(h, true);
     ring.push(ring[0]);
-    list.push({ type: "Feature", properties: { h3: h, roi: heatPct("roi", lng, lat), ub: heatPct("ub", lng, lat), x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } });
+    list.push({ type: "Feature", properties: { h3: h, roi: heatPct("roi", lng, lat, CELL_KM[res]), ub: heatPct("ub", lng, lat, CELL_KM[res]), x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } });
     added++;
   }
   if (!added) return;
