@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { heatValue } from "../fake";
 import { BANDS, PALETTES as PEDRO, bandIndex, rampAt, scalePosition } from "./scale";
 import type { Bands, Colors } from "./scale";
+import { kmFromLaBox, roiAt } from "./pedroField";
 
 export { readable, gaugeReading } from "./scale";
 
@@ -70,9 +71,28 @@ export function valueAtPosition(pos: number, bands: Bands): number {
   return lo + (hi - lo) * f;
 }
 
+/* ROI follows Pedro's placeholder surface (./pedroField, 14 Nov: "the map data is still
+   not matching Pedro's"): his values inside his LA box, ours far from it, blended over
+   15 km so there's no seam. Coarse cells average a few samples of his field (it has
+   detail every few km), so zoomed-out hexes don't speckle. Underbuilt keeps our field. */
+const BLEND_KM = 15;
+function pedroAvg(lng: number, lat: number, cellKm: number) {
+  if (cellKm < 3) return roiAt(lat, lng);
+  const r = (cellKm * 0.35) / 111, k = Math.cos((lat * Math.PI) / 180);
+  let s = roiAt(lat, lng);
+  for (let i = 0; i < 6; i++) { const a = (i * Math.PI) / 3; s += roiAt(lat + r * Math.sin(a), lng + (r * Math.cos(a)) / k); }
+  return s / 7;
+}
+function roiPctAt(lng: number, lat: number, cellKm: number): number {
+  const d = kmFromLaBox(lng, lat), w = d <= 0 ? 1 : Math.max(0, 1 - d / BLEND_KM);
+  const ours = w < 1 ? valueAtPosition(heatValue("roi", lng, lat, cellKm), HEAT_BANDS.roi) : 0;
+  return w > 0 ? w * pedroAvg(lng, lat, cellKm) + (1 - w) * ours : ours;
+}
+
 /** The fake field as a percentage at a coordinate. Swap for the real service here. */
 /** `cellKm`: the hex's size, so coarse hexes read a smoothed field (see heatValue). */
 export function heatPct(kind: HeatLayer, lng: number, lat: number, cellKm = 0): number {
+  if (kind === "roi") return Math.round(roiPctAt(lng, lat, cellKm) * 10) / 10;
   return Math.round(valueAtPosition(heatValue(kind, lng, lat, cellKm), HEAT_BANDS[kind]) * 10) / 10;
 }
 
@@ -81,7 +101,8 @@ export function heatPct(kind: HeatLayer, lng: number, lat: number, cellKm = 0): 
    as in Pedro's build, while hexes keep the area average. */
 const lotSeed = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967295; };
 export function parcelPct(kind: HeatLayer, lng: number, lat: number, id: string | number): number {
-  const pos = heatValue(kind, lng, lat) + (lotSeed(kind + String(id)) - 0.5) * 0.5;
+  const base = kind === "roi" ? scalePosition(roiPctAt(lng, lat, 0), HEAT_BANDS.roi) : heatValue(kind, lng, lat);
+  const pos = base + (lotSeed(kind + String(id)) - 0.5) * 0.5;
   return Math.round(valueAtPosition(pos, HEAT_BANDS[kind]) * 10) / 10;
 }
 
