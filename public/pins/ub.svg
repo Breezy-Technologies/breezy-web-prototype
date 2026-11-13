@@ -27,8 +27,8 @@
 <feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_0_38" result="shape"/>
 </filter>
 <linearGradient id="paint0_linear_0_38" x1="22" y1="4" x2="22" y2="35.9976" gradientUnits="userSpaceOnUse">
-<stop stop-color="#F2C852"/>
-<stop offset="1" stop-color="#D38900"/>
+<stop stop-color="#F9DBB4"/>
+<stop offset="1" stop-color="#AD740A"/>
 </linearGradient>
 <path id="stroke0_0_38" d="M22 4C29.732 4 36 10.3133 36 18.1006C35.9999 23.0085 33.5097 27.3294 29.7327 29.8542C27.8925 31.0843 26.0621 32.4311 24.9297 34.333C23.6075 36.5524 20.3925 36.5524 19.0703 34.333C18.3268 33.0846 17.5229 31.5432 16.2022 30.9373C11.3638 28.7173 8.00015 23.8049 8 18.1006C8 10.3133 14.2681 4.00008 22 4Z"/>
 </defs>
