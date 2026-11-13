@@ -10,6 +10,8 @@ import { css } from "@/lib/css";
 import { hashStr } from "@/lib/geo";
 import { ledger, siteOf, upsideOf } from "@/lib/roi";
 import { BellButton } from "./Saved";
+import { CompsEstimate } from "../comps/CompsEstimate";
+import type { CompsSession } from "../comps/useComps";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
 type Tab = (typeof TABS)[number];
@@ -55,7 +57,7 @@ const FEATS: Feat[] = [
 // replaces the estimate card. The CTA runs a short estimate, then reveals the card and
 // raises a positive snackbar via `onToast`. Estimated properties stay revealed this session.
 const estimated = new Set<string>();
-export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell, onShare, onToast }: { l: Listing; onClose: () => void; onGetComps: () => void; onFlow?: (k: "ub" | "roi") => void; alertN?: number; onBell?: () => void; onShare?: () => void; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
+export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell, onShare, onToast, comps }: { comps?: CompsSession | null; l: Listing; onClose: () => void; onGetComps: () => void; onFlow?: (k: "ub" | "roi") => void; alertN?: number; onBell?: () => void; onShare?: () => void; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
   const d = useMemo(() => listingDetail(l), [l]);
   const qeKey = `${l.addr}|${l.lng.toFixed(5)},${l.lat.toFixed(5)}`;
   const [qeState, setQeState] = useState<"none" | "loading" | "ready">(() => !l.noQe || estimated.has(qeKey) ? "ready" : "none");
@@ -237,7 +239,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
         {tab === "Summary" && <>
           {/* Quick estimate (floating card) + Get comps */}
           <div style={css("display:flex;flex-direction:column;padding:16px 16px 0")}>
-            {qeState !== "ready" ? (
+            {comps ? <CompsEstimate cs={comps} l={l} /> : qeState !== "ready" ? (
               // No quick estimate: the full-width CTA route (review decision): text with the
               // illustration on the right, full-width outline "Get price estimate" underneath.
                 <div style={css("display:flex;flex-direction:column;gap:16px;padding:20px;border-radius:20px;background:rgb(243,240,238)")}>

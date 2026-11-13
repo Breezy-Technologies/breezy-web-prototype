@@ -9,7 +9,7 @@ const hexThumb = (c: readonly string[]) => `linear-gradient(135deg, ${c[1]} 0%, 
 
 // Bottom-right column, bottom to top: Layers, zoom, my location, info.
 // Zoom buttons tag their camera events `bzUser` so "Search this area" treats them as user moves.
-export function MapControls({ onLocate }: { onLocate: () => void }) {
+export function MapControls({ onLocate, right = 20 }: { onLocate: () => void; right?: number }) {
   const { map, heat, setHeat, mode, setMode } = useMapCtx();
   const palettes = useHeatPrefs();
   const keyKind = heat === "ub" ? "ub" : "roi";
@@ -20,7 +20,7 @@ export function MapControls({ onLocate }: { onLocate: () => void }) {
   const label = { roi: "ROI heat", ub: "Underbuilt", none: "No layer" }[heat] + ({ light: "", dark: " · Dark", streets: " · Streets", satellite: " · Sat" } as const)[mode];
   const thumb = mode === "satellite" ? "url(/map/sat-bh-se.jpg) center/cover" : heat === "none" ? "url(/map/bh-se.jpg) center/cover" : hexThumb(HEAT_PALETTES[palettes[heat]].c);
   return (
-    <div style={{ position: "absolute", right: 20, bottom: 20, zIndex: open || info ? 80 : 60, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+    <div style={{ position: "absolute", right, bottom: 20, transition: "right .5s cubic-bezier(.2,.8,.2,1)", zIndex: open || info ? 80 : 60, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
       <div style={{ position: "relative" }}>
         <button style={round} title="Map key" onClick={() => setInfo(v => !v)}><i className="ph-bold ph-info" /></button>
         {info && (

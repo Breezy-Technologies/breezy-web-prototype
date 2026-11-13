@@ -20,12 +20,12 @@ import { config, isLiveMap } from "@/lib/config";
 import { hashStr } from "@/lib/geo";
 import { LOTS } from "@/lib/silverlake";
 
-const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", SOLD = "rgb(153,92,77)", ACTIVE = "rgb(56,128,104)", GREEN = "rgb(13,87,57)", PURPLE = "rgb(108,72,180)";
-const SPARK = (c: string, s = 11) => <svg width={s} height={s} viewBox="0 0 24 24" fill={c} aria-hidden><path d="M12 0c.8 6.4 5.6 11.2 12 12-6.4.8-11.2 5.6-12 12-.8-6.4-5.6-11.2-12-12C6.4 11.2 11.2 6.4 12 0z" /></svg>;
+export const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", SOLD = "rgb(153,92,77)", ACTIVE = "rgb(56,128,104)", GREEN = "rgb(13,87,57)", PURPLE = "rgb(108,72,180)";
+export const SPARK = (c: string, s = 11) => <svg width={s} height={s} viewBox="0 0 24 24" fill={c} aria-hidden><path d="M12 0c.8 6.4 5.6 11.2 12 12-6.4.8-11.2 5.6-12 12-.8-6.4-5.6-11.2-12-12C6.4 11.2 11.2 6.4 12 0z" /></svg>;
 const k = (n: number) => n.toLocaleString("en-US");
-const avg = (a: number[]) => { const b = a.filter(v => v > 0); return b.length ? b.reduce((s, v) => s + v, 0) / b.length : 0; };
+export const avg = (a: number[]) => { const b = a.filter(v => v > 0); return b.length ? b.reduce((s, v) => s + v, 0) / b.length : 0; };
 // Estimates the user set, per property, for the session.
-const myEstimates = new Map<string, number>();
+export const myEstimates = new Map<string, number>();
 
 function Carousel({ photos, h, radius, children, onClickPhoto }: { photos: string[]; h: number | string; radius: number; children?: React.ReactNode; onClickPhoto?: () => void }) {
   const [i, setI] = useState(0);
@@ -46,7 +46,7 @@ function Carousel({ photos, h, radius, children, onClickPhoto }: { photos: strin
 }
 const navBtn: React.CSSProperties = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 32, height: 32, border: "none", borderRadius: 9999, background: "rgba(253,252,252,.9)", color: INK, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 };
 
-function Switch({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+export function Switch({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
     <button onClick={onClick} aria-pressed={on} aria-label={label} style={{ position: "relative", flex: "none", width: 46, height: 28, padding: 0, border: "none", borderRadius: 9999, cursor: "pointer", transition: "background .2s", background: on ? INK : "rgb(222,218,215)" }}>
       <span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 22, height: 22, borderRadius: 9999, background: "rgb(253,252,252)", boxShadow: "0 1px 3px rgba(0,0,0,.2)", transition: "left .2s cubic-bezier(.2,.8,.2,1)" }} />
@@ -63,7 +63,7 @@ function Cell({ k: label, v, strong, tone }: { k: string; v: React.ReactNode; st
   );
 }
 
-function CompCard({ c, n, of, on, vacant, onToggle }: { c: Comp; n: number; of: number; on: boolean; vacant: boolean; onToggle: () => void }) {
+export function CompCard({ c, n, of, on, vacant, onToggle, compact }: { c: Comp; n: number; of: number; on: boolean; vacant: boolean; onToggle: () => void; compact?: boolean }) {
   const d = compDetail(c);
   const [hist, setHist] = useState(false);
   const sold = c.st === "S";
@@ -71,13 +71,13 @@ function CompCard({ c, n, of, on, vacant, onToggle }: { c: Comp; n: number; of: 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "6px 6px 14px", borderRadius: 24, background: "rgb(253,252,252)", boxShadow: "inset 0 0 0 1px rgb(236,231,228),0 8px 24px rgba(30,18,12,.05)", transition: "opacity .3s", opacity: on ? 1 : 0.72 }}>
       <div style={{ filter: on ? "none" : "grayscale(1)", transition: "filter .3s" }}>
-        <Carousel photos={d.photos} h={210} radius={18}>
+        <Carousel photos={d.photos} h={compact ? 150 : 210} radius={18}>
           <span style={{ position: "absolute", left: 10, top: 10, display: "flex", alignItems: "center", gap: 5, height: 28, padding: "0 10px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 13px/16px var(--font-sans)", color: PURPLE }}>{SPARK("currentColor")}{c.score}% Match</span>
         </Carousel>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "0 10px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ font: "700 19px/24px var(--font-sans)", color: INK }}>{c.addr}</span>
+          <span style={{ font: compact ? "700 17px/22px var(--font-sans)" : "700 19px/24px var(--font-sans)", color: INK }}>{c.addr}</span>
           <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED }}>
             {vacant ? <><b style={{ color: INK, fontWeight: 400 }}>{k(c.lot)}</b> ft² lot · {c.mi < 0.1 ? "<0.1" : c.mi.toFixed(1)} mi</>
               : <><b style={{ color: INK, fontWeight: 400 }}>{c.beds}</b> bed <b style={{ color: INK, fontWeight: 400 }}>{c.baths}</b> bath <b style={{ color: INK, fontWeight: 400 }}>{k(c.sqft)}</b> ft² <b style={{ color: INK, fontWeight: 400 }}>{k(c.lot)}</b> ft² lot · {c.mi < 0.1 ? "<0.1" : c.mi.toFixed(1)} mi</>}
@@ -127,12 +127,12 @@ function CompCard({ c, n, of, on, vacant, onToggle }: { c: Comp; n: number; of: 
     </div>
   );
 }
-const chip: React.CSSProperties = { flex: "none", display: "flex", alignItems: "center", gap: 4, height: 28, padding: "0 10px", borderRadius: 9999, boxShadow: "inset 0 0 0 1px rgba(18,18,18,.18)", font: "400 13px/16px var(--font-sans)", color: INK, whiteSpace: "nowrap" };
+export const chip: React.CSSProperties = { flex: "none", display: "flex", alignItems: "center", gap: 4, height: 28, padding: "0 10px", borderRadius: 9999, boxShadow: "inset 0 0 0 1px rgba(18,18,18,.18)", font: "400 13px/16px var(--font-sans)", color: INK, whiteSpace: "nowrap" };
 
 /* "Show analytics" (breezy AnalyticsOverlay): Sold / Active, four averages, and the
    comps as bars sorted by the picked average. */
 type Metric = "sales" | "home" | "lot" | "dom";
-function Analytics({ sold, active, onHide }: { sold: Comp[]; active: Comp[]; onHide: () => void }) {
+export function Analytics({ sold, active, onHide, embedded }: { sold: Comp[]; active: Comp[]; onHide?: () => void; embedded?: boolean }) {
   const [tab, setTab] = useState<"sold" | "active">("sold");
   const [metric, setMetric] = useState<Metric>("sales");
   const [hover, setHover] = useState(-1);
@@ -151,7 +151,7 @@ function Analytics({ sold, active, onHide }: { sold: Comp[]; active: Comp[]; onH
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", gap: 14, padding: 20, borderRadius: 24, background: "rgb(253,252,252)", boxShadow: "inset 0 0 0 1px rgb(236,231,228)", animation: "fadeIn .25s ease both" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={onHide} style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", border: "none", borderRadius: 9999, background: INK, font: "700 14px/18px var(--font-sans)", color: "rgb(253,252,252)", cursor: "pointer" }}><i className="ph-bold ph-images" style={{ fontSize: 16 }} />Show photos</button>
+        {!embedded && <button onClick={onHide} style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", border: "none", borderRadius: 9999, background: INK, font: "700 14px/18px var(--font-sans)", color: "rgb(253,252,252)", cursor: "pointer" }}><i className="ph-bold ph-images" style={{ fontSize: 16 }} />Show photos</button>}
         <span style={{ flex: 1 }} />
         <div role="radiogroup" aria-label="Listing status" style={{ display: "flex", gap: 2, padding: 3, borderRadius: 9999, background: "rgba(18,18,18,.06)" }}>
           {(["sold", "active"] as const).map(t => (
@@ -159,7 +159,7 @@ function Analytics({ sold, active, onHide }: { sold: Comp[]; active: Comp[]; onH
           ))}
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 8 }}>
         {tiles.map(([id, label, v]) => (
           <button key={id} onClick={() => { setMetric(id); setHover(-1); }} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, padding: "10px 12px", border: "none", borderRadius: 16, cursor: "pointer", textAlign: "left", background: metric === id ? INK : "rgb(247,246,245)", color: metric === id ? "rgb(253,252,252)" : INK }}>
             <span style={{ font: "400 12px/16px var(--font-sans)", opacity: 0.75 }}>Avg. {label}</span>
@@ -189,7 +189,7 @@ function Analytics({ sold, active, onHide }: { sold: Comp[]; active: Comp[]; onH
   );
 }
 
-function Table({ rows, isOn, onToggle }: { rows: { c: Comp; n: number; of: number }[]; isOn: (c: Comp) => boolean; onToggle: (c: Comp) => void }) {
+export function Table({ rows, isOn, onToggle }: { rows: { c: Comp; n: number; of: number }[]; isOn: (c: Comp) => boolean; onToggle: (c: Comp) => void }) {
   const th: React.CSSProperties = { position: "sticky", top: 0, padding: "10px 8px", background: "rgb(247,246,245)", font: "700 12px/16px var(--font-sans)", color: MUTED, textAlign: "left", whiteSpace: "nowrap" };
   const td: React.CSSProperties = { padding: "10px 8px", font: "400 14px/19px var(--font-sans)", color: INK, whiteSpace: "nowrap", boxShadow: "inset 0 -.5px 0 rgba(13,12,12,.12)" };
   return (
@@ -402,7 +402,7 @@ const LOT = (c: Comp) => { const lt = compLatLng(c); return `${lt[0]},${lt[1]}`;
 const compLatLng = (c: Comp) => LOTS[c.i].c;
 const pillDark: React.CSSProperties = { position: "absolute", left: 16, top: 16, display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", border: "none", borderRadius: 9999, background: INK, font: "700 14px/18px var(--font-sans)", color: "rgb(253,252,252)", cursor: "pointer" };
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   // Escape closes this dialog, not the whole report sheet (capture phase, claimed).
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onClose(); } };
@@ -425,7 +425,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function EstimateModal({ start, lo, hi, onClose, onSave }: { start: number; lo: number; hi: number; onClose: () => void; onSave: (v: number) => void }) {
+export function EstimateModal({ start, lo, hi, onClose, onSave }: { start: number; lo: number; hi: number; onClose: () => void; onSave: (v: number) => void }) {
   const [v, setV] = useState(start);
   return (
     <Modal title="Set your estimate" onClose={onClose}>

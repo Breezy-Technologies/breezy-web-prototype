@@ -18,6 +18,9 @@ import { MapControls } from "@/components/home/MapControls";
 import { AreaCompsPreview } from "@/components/home/CompsFlow";
 import { FlowKind, ReportFlow } from "@/components/report/ReportFlow";
 import { frameLot } from "@/lib/map/frame";
+import { useComps, compLngLat } from "@/components/comps/useComps";
+import { CompsSide } from "@/components/comps/CompsSide";
+import { CompPins } from "@/components/comps/CompPins";
 import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
@@ -147,7 +150,7 @@ export default function HomeWeb() {
     if (!map) return;
     frameLot(map, { ring, at: at || [l!.lng, l!.lat], lotAc: l?.lotAc, left: GAP + COL + GAP + 420, top: BAR_BOTTOM });
   };
-  const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); };
+  const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); setCompsOn(false); setCompsOut(false); };
   // Set by the side nav's "New buyer search": the next area search ends on the Save search sheet.
   const buyerRef = useRef(false);
   const [buyer, setBuyerS] = useState(false);
@@ -215,6 +218,61 @@ export default function HomeWeb() {
   const openComps = (l: Listing) => openFlow(l, "comps");
 
   const detailOpen = !!sel;
+
+  // ---- Comps interaction 2.0 (Get comps in the detail panel) ----
+  // The detail panel slides left over the results column and gains the comps estimate
+  // (Home / Lot price, Set your estimate); the comps list slides in from the right, in
+  // two columns; the map stays open in between with a pin per comp. Other entry points
+  // (report tabs, saved reports) still open the report sheet.
+  const [compsOn, setCompsOn] = useState(false);
+  const [compsOut, setCompsOut] = useState(false);
+  const [compsReveal, setCompsReveal] = useState(true);
+  const cm = useComps(compsOn && sel ? sel : null, compsReveal);
+  const compsShift = compsOn && !compsOut;
+  const sideCols: 1 | 2 = winW >= 1360 ? 2 : 1;
+  const SIDE_W = sideCols === 2 ? 580 : 360;
+  const DETAIL_X = compsShift ? GAP : GAP + COL + GAP;
+  const selKey = sel ? `${sel.id}|${sel.addr}` : "";
+  // Another property (pin, parcel, saved home) leaves comps.
+  useEffect(() => { setCompsOn(false); setCompsOut(false); }, [selKey]);
+  // Frame the subject and every comp in the open map between the two panels.
+  const frameComps = (l: Listing) => {
+    if (!map) return;
+    const pts = [[l.lng, l.lat], ...cm.all.map(compLngLat)];
+    if (!cm.all.length) return frameSel(l);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], {
+      padding: { left: GAP + 420 + GAP + 56, right: SIDE_W + GAP * 2 + 56, top: 64, bottom: 56 }, maxZoom: 16.5, duration: 1100, essential: true,
+    });
+  };
+  const openCompsMode = () => {
+    if (!sel) return;
+    alerts.close(); setHoverId(null); fs.setDd(null); setSortOpen(false); setAreaPill(false);
+    setCompsReveal(!rp.has(sel)); setCompsOut(false); setCompsOn(true);
+  };
+  // Frame once the session (and so its comps) exists.
+  useEffect(() => { if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [compsOn, cm.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const closeComps = () => {
+    if (!compsOn || compsOut) return;
+    setCompsOut(true); cm.setHoverC(null);
+    if (sel) frameSel(sel);
+    setTimeout(() => { setCompsOn(false); setCompsOut(false); }, 380);
+  };
+  // Escape leaves comps (a dialog inside claims Escape first, in the capture phase).
+  useEffect(() => {
+    if (!compsOn) return;
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") closeComps(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+  // The first run saves the comps report, like the report sheet did.
+  const wasLoading = useRef(false);
+  useEffect(() => {
+    if (cm.loading) { wasLoading.current = true; return; }
+    if (!wasLoading.current || !sel || !compsOn) return;
+    wasLoading.current = false;
+    if (!rp.has(sel)) { rp.save(sel); showToast("Report saved to Reports"); }
+  }, [cm.loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- "Search this area" (Expedia-style pill, top centre of the map under the filter bar) ----
   // After a user pan / zoom (drag, scroll, pinch, keyboard or the zoom buttons; never the
@@ -294,7 +352,7 @@ export default function HomeWeb() {
   const topOn = (view === "results" && ((!!fs.fd && !fs.panelOut) || ss.on)) || (rp.open && !rp.out);
   const depth = (svOn ? 1 : 0) + (topOn ? 1 : 0);
   const layerOn = depth > 0;
-  const pillOn = areaPill && !detailOpen && !searching && !flow && !areaComps && !layerOn && !savedOpen;
+  const pillOn = areaPill && !compsOn && !detailOpen && !searching && !flow && !areaComps && !layerOn && !savedOpen;
   const layerBack = () => { if (fs.fd) fs.closePanel(); if (ss.open) ss.requestClose(); if (savedOpen) closeSaved(); if (rp.open) rp.close(); };
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
@@ -325,7 +383,9 @@ export default function HomeWeb() {
         if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
       }} />
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
-        <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none", transformOrigin: "0 50%",
+          transition: "opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1),visibility 0s linear " + (compsShift ? ".55s" : "0s"),
+          ...(compsShift ? { opacity: 0, transform: "translateX(-28px) scale(.97)", visibility: "hidden" as const } : {}) }}>
           <div style={{ pointerEvents: "auto" }}>
             {/* Entering the search step (`onSearchFocus`) closes dropdowns and the detail panel, as the canvas step change does. */}
             <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : areaSq(fieldAreas.map(a => a.label))} near={place.center}
@@ -367,12 +427,17 @@ export default function HomeWeb() {
         </div>
         {detailOpen && (
           // The detail column steps back while the Alerts sheet sits on top of it (`dtT` / `dtF`).
-          <div style={{ position: "absolute", left: GAP + COL + GAP, top: GAP, bottom: GAP, transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
-            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={() => openComps(sel!)} onFlow={k => openFlow(sel!, k)}
+          <div style={{ position: "absolute", left: DETAIL_X, top: GAP, bottom: GAP, zIndex: 4, transformOrigin: "50% 0", transition: "left .6s cubic-bezier(.2,.8,.2,1),transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
+            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openFlow(sel!, k)}
               alertN={alerts.count(sel)} onBell={() => alerts.open(sel!)} onShare={() => shareOne(sel!)} onToast={showToast} />
           </div>
         )}
-        {detailOpen && alerts.panel(GAP + COL + GAP)}
+        {detailOpen && alerts.panel(DETAIL_X)}
+        {compsOn && sel && cm.key && (
+          <div style={{ position: "absolute", right: GAP, top: GAP, bottom: GAP, zIndex: 4 }}>
+            <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} />
+          </div>
+        )}
         {pillOn && (
           // "Search this area": centred over the visible map, just under the filter bar.
           <div style={{ position: "absolute", left: detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + GAP, right: 0, top: BAR_BOTTOM, zIndex: 2, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
@@ -381,11 +446,11 @@ export default function HomeWeb() {
             </button>
           </div>
         )}
-        <FilterBar fs={fs} left={detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} />
+        {!compsOn && <FilterBar fs={fs} left={detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} />}
         <FilterDropdown fs={fs} listings={listings} />
         <AllFiltersPanel fs={fs} top={view === "results" ? 88 : 76} listings={listings} onApply={() => { if (view === "home") { closeDetail(); setView("results"); } }} />
         {sortOpen && view === "results" && <SortMenu value={sortBy} onPick={k => { setSortBy(k); setSortOpen(false); }} onClose={() => setSortOpen(false)} left={GAP + COL - 49} top={72} />}
-        <div style={{ pointerEvents: "auto" }}><MapControls onLocate={() => fit(GAP + COL + GAP)} /></div>
+        <div style={{ pointerEvents: "auto" }}><MapControls right={compsShift ? SIDE_W + GAP * 2 + 8 : 20} onLocate={() => fit(GAP + COL + GAP)} /></div>
         {offline && (
           <span style={{ position: "absolute", right: 120, bottom: 22, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 12px/28px var(--font-sans)", color: "var(--fg-2)", pointerEvents: "auto" }} title="Add NEXT_PUBLIC_MAPBOX_TOKEN to load live Mapbox tiles">
             Offline demo map
@@ -398,9 +463,10 @@ export default function HomeWeb() {
         )}
       </div>
 
-      <PricePins signal={signalIds} listings={pinListings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
+      {compsOn && cm.key && <CompPins cs={cm} />}
+      <PricePins signal={signalIds} listings={compsOn ? [] : pinListings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
         onHover={id => { clearTimeout(keepT.current); if (id == null) keepT.current = setTimeout(() => setHoverId(null), 160); else setHoverId(id); }} />
-      {hover && hoverId !== selId && (
+      {hover && hoverId !== selId && !compsOn && (
         <HoverCard l={hover} onKeep={() => clearTimeout(keepT.current)} onLeave={() => { keepT.current = setTimeout(() => setHoverId(null), 160); }} onOpen={() => openListing(hover.id)} />
       )}
       <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => {
@@ -415,7 +481,7 @@ export default function HomeWeb() {
       {ss.modals}
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
-      <HeatPaletteSwitcher style={{ right: 104, bottom: 20 }} />
+      <HeatPaletteSwitcher style={{ right: compsShift ? SIDE_W + GAP * 2 + 92 : 104, bottom: 20, transition: "right .5s cubic-bezier(.2,.8,.2,1)" }} />
     </>
   );
 }
