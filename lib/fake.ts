@@ -1,7 +1,7 @@
 // Fake Breezy data: listings, opportunities, owners, quick estimates and heat
 // values, all generated deterministically from a place so every search feels
 // populated. Swap these functions for real API calls later.
-import { BBox, LngLat, Ring, field, hashStr, pointInRings, rng } from "./geo";
+import { BBox, LngLat, Ring, hashStr, pointInRings, rng } from "./geo";
 import { HEAT_AREA, LOTS, LOT_ZONE, Lot, PIN_LOTS, boxesMeet, fromHeatCenter, inBox, inLotZone, lotId, lotRng } from "./silverlake";
 import SL_HOMES from "./data/sl-homes.json";
 import { metersPerDegLat, metersPerDegLng } from "./geo";
@@ -309,10 +309,27 @@ export function areaListings(prev: Listing[], bbox: BBox, n: number): Listing[] 
 /* Three scales, so the US-wide demo heat reads like real data at every zoom:
    regions (~250 km), metros (~25 km) and streets (~4 km, the old field). Hexes at
    every resolution and the demo parcels read the same function, so they agree. */
-export function heatValue(kind: "roi" | "ub", lng: number, lat: number) {
+/* Level of detail (13 Nov, Jimsy: the zoomed-out US heat looked speckled): a coarse hex
+   only reads the waves much longer than itself (`cellKm`), so neighbouring cells agree
+   and the country view shows regions, not noise; what's left is scaled up so the
+   colours stay as spread. `cellKm` 0 (parcels, res 8 hexes) is the full field. */
+const OCTAVES: [number, number, number, number][] = [[90, 110, 0.75, 0], [14, 17, 0.55, 5], [1.5, 1.8, 0.6, 9]];
+const TERM_AMP = [0.22, 0.16, 0.1], TERM_FREQ = [1.7, 4.7, 12];
+export function heatValue(kind: "roi" | "ub", lng: number, lat: number, cellKm = 0) {
   const k = kind === "roi" ? 31 : 77;
-  const v = 0.5 + (field(k, lng * 90, lat * 110) - 0.5) * 0.75 + (field(k + 5, lng * 14, lat * 17) - 0.5) * 0.55 + (field(k + 9, lng * 1.5, lat * 1.8) - 0.5) * 0.6;
-  return Math.max(0, Math.min(0.999, v));
+  let dev = 0, kept = 0, full = 0;
+  for (const [sx, sy, a, off] of OCTAVES) {
+    const s = (k + off) % 1000, x = lng * sx, y = lat * sy;
+    // The same three terms as `field` (lib/geo), one by one.
+    const terms = [0.22 * Math.sin(x * 1.7 + s) * Math.cos(y * 1.3 - s * 0.7), 0.16 * Math.sin(x * 4.1 - y * 2.3 + s * 1.9), 0.1 * Math.cos(x * 9.7 + y * 7.1 - s)];
+    for (let i = 0; i < 3; i++) {
+      const amp = TERM_AMP[i] * a, periodKm = (2 * Math.PI / (TERM_FREQ[i] * sx)) * 111;
+      full += amp * amp;
+      if (periodKm > 2.5 * cellKm) { dev += terms[i] * a; kept += amp * amp; }
+    }
+  }
+  const gain = kept ? Math.min(2.4, Math.sqrt(full / kept)) : 0;
+  return Math.max(0, Math.min(0.999, 0.5 + dev * gain));
 }
 
 // Colours for these values live in lib/heat (one scale for hexes, parcels and pins).
