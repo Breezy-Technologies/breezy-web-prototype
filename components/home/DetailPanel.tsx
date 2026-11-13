@@ -185,11 +185,12 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
 
   return (
     <div style={{ position: "relative", width: 420, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 24, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgb(245,240,238),0 14px 36px rgba(40,26,20,.14)", pointerEvents: "auto", animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) backwards" }}>
-      <div style={css("position:absolute;right:20px;top:20px;z-index:10;display:flex;align-items:center;gap:8px")}>
+      {/* In comps mode the comps panel's × closes comps; the panel itself has no close (review). */}
+      {!comps && <div style={css("position:absolute;right:20px;top:20px;z-index:10;display:flex;align-items:center;gap:8px")}>
         <button className="dt-white" onClick={onClose} title="Close" style={css("width:32px;height:32px;border:none;border-radius:9999px;background:rgb(253,252,252);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
           <span style={maskIco("/ui/x.svg", 13, "rgb(17,16,16)")} />
         </button>
-      </div>
+      </div>}
       {hdr && (
         <div style={css("position:absolute;left:0;right:0;top:0;z-index:12;height:64px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 12px;background:rgb(253,252,252);animation:bzPanelDrop .2s cubic-bezier(.2,.8,.2,1) both")}>
           {tab !== "Summary"
@@ -198,9 +199,9 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
               </button>
             : <span style={{ flex: "none", width: 40 }} />}
           <span style={css("flex:1;min-width:0;text-align:center;font:700 16px/22px var(--font-sans);color:rgb(18,18,18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis")}>{l.addr}</span>
-          <button className="dt-round" onClick={onClose} title="Close" style={css("flex:none;width:40px;height:40px;border:none;border-radius:9999px;background:rgba(13,12,12,.06);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
+          {comps ? <span style={{ flex: "none", width: 40 }} /> : <button className="dt-round" onClick={onClose} title="Close" style={css("flex:none;width:40px;height:40px;border:none;border-radius:9999px;background:rgba(13,12,12,.06);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
+          </button>}
         </div>
       )}
       <div ref={scroller} className="no-scrollbar" onScroll={e => { const on = e.currentTarget.scrollTop > 210; if (on !== hdr) setHdr(on); }} style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
