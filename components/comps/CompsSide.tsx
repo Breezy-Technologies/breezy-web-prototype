@@ -14,17 +14,23 @@ import { fullPrice, shortPrice } from "@/lib/fake";
 import type { Comp } from "@/lib/comps";
 import { ACTIVE, Analytics, CompCard, GREEN, INK, MUTED, Modal, SOLD, Table } from "../report/CompsReport";
 import type { CompsSession } from "./useComps";
+import { ParamsButton, ParamsSheet, type ParamsUi } from "./CompParams";
 
 type View = "cards" | "table" | "analytics";
 const k = (n: number) => n.toLocaleString("en-US");
 
-export function CompsSide({ cs, width, cols, out, onClose }: { cs: CompsSession; width: number; cols: 1 | 2; out?: boolean; onClose: () => void }) {
+export function CompsSide({ cs, width, cols, out, onClose, paramsUi, onEstimate }: { cs: CompsSession; width: number; cols: 1 | 2; out?: boolean; onClose: () => void; paramsUi: ParamsUi; onEstimate: () => void }) {
   const [view, setView] = useState<View>("cards");
+  const [paramsOpen, setParamsOpen] = useState(false);
+  useEffect(() => { if (paramsUi !== "panel") setParamsOpen(false); }, [paramsUi]);
+  const est = cs.mine ?? (cs.homePrice > 0 ? Math.round(cs.homePrice / 1000) * 1000 : 0);
   const [adding, setAdding] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<number, HTMLDivElement>());
   const [flash, setFlash] = useState<number | null>(null);
   const narrow = width < 480;
+  // With the Parameters button in the row (version B), Add comps keeps only its icon.
+  const addIcon = narrow || paramsUi === "panel";
   const { sold, active, total, ready, loading, isReady, isOn, hideExcl } = cs;
 
   // A pin picked on the map: show its card (switching back to cards), centred, with a brief ring.
@@ -79,13 +85,14 @@ export function CompsSide({ cs, width, cols, out, onClose }: { cs: CompsSession;
             ))}
           </div>
           <span style={{ flex: 1 }} />
+          {paramsUi === "panel" && <ParamsButton n={cs.changed.length} on={paramsOpen} narrow={narrow} onClick={() => setParamsOpen(o => !o)} />}
           <button onClick={() => cs.setHideExcl(!hideExcl)} aria-pressed={hideExcl} title={hideExcl ? "Show excluded comps" : "Hide excluded comps"} className={hideExcl ? undefined : "cs-act"}
             style={{ flex: "none", width: 40, height: 40, border: "none", borderRadius: 9999, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: hideExcl ? INK : "rgb(236,234,233)", color: hideExcl ? "rgb(253,252,252)" : INK }}>
             <i className={`ph-bold ph-${hideExcl ? "eye-closed" : "eye"}`} style={{ fontSize: 17 }} />
           </button>
           <button onClick={() => setAdding(true)} title="Add comps" className="cs-act"
-            style={{ flex: "none", display: "flex", alignItems: "center", gap: 7, height: 40, padding: narrow ? 0 : "0 16px 0 13px", width: narrow ? 40 : undefined, justifyContent: "center", border: "none", borderRadius: 9999, cursor: "pointer", background: "rgb(236,234,233)", font: "700 14px/18px var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>
-            <i className="ph-bold ph-plus" style={{ fontSize: 16 }} />{!narrow && "Add comps"}
+            style={{ flex: "none", display: "flex", alignItems: "center", gap: 7, height: 40, padding: addIcon ? 0 : "0 16px 0 13px", width: addIcon ? 40 : undefined, justifyContent: "center", border: "none", borderRadius: 9999, cursor: "pointer", background: "rgb(236,234,233)", font: "700 14px/18px var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>
+            <i className="ph-bold ph-plus" style={{ fontSize: 16 }} />{!addIcon && "Add comps"}
           </button>
         </div>
       </div>
@@ -99,6 +106,14 @@ export function CompsSide({ cs, width, cols, out, onClose }: { cs: CompsSession;
         {view === "table" && <div className="cs-in"><Table rows={[...shown(sold), ...shown(active)]} isOn={isOn} onToggle={cs.toggle} /></div>}
         {view === "cards" && <>
           {loading && ready === 0 && <div className="cs-skel" style={{ height: 420, borderRadius: 24 }} />}
+          {!loading && total === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "48px 16px", textAlign: "center" }}>
+              <span style={{ width: 140, height: 110, background: "url('/iso/empty-search.png') center/contain no-repeat" }} />
+              <span style={{ font: "400 20px/26px var(--font-sans)", color: INK }}>No comps match these parameters</span>
+              <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED, maxWidth: 300 }}>Widen the radius, the months sold or the size range to find more.</span>
+              <button className="btn-soft" onClick={() => cs.setParams({ ...cs.params, radius: Math.max(cs.params.radius, 1), months: 12, size: null, lot: null, beds: [null, null], baths: [null, null], yearFrom: null, status: { S: true, L: true } })} style={{ marginTop: 6, height: 40, padding: "0 16px", font: "700 14px/18px var(--font-sans)" }}>Reset to default</button>
+            </div>
+          )}
           {([["S", sold, SOLD, "Sold"], ["L", active, ACTIVE, "Active"]] as [string, Comp[], string, string][]).map(([st, list, color, label]) => list.some(isReady) && (
             <div key={st} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "2px 0" }}>
@@ -124,6 +139,19 @@ export function CompsSide({ cs, width, cols, out, onClose }: { cs: CompsSession;
         </>}
         <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED }}>Comps are real nearby homes (address, size, beds, baths, lot, year, $/ft², distance, month sold). Prices are value estimates; list prices, dates, days on market and garages are sample data until the listings service is connected.</span>
       </div>
+
+      {/* Main action (Figma: "Set price estimate", top right of the comps results): opens the
+          export sheet, where the estimate is set and the client report customised. */}
+      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px 12px 18px", boxShadow: "inset 0 1px 0 rgb(240,236,234)", background: "var(--paper)" }}>
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <span style={{ font: "400 13px/17px var(--font-sans)", color: MUTED, whiteSpace: "nowrap" }}>{cs.incSold.length + cs.incActive.length} comps · {cs.mine ? "Your estimate" : "Estimate"}</span>
+          <span style={{ font: "700 17px/22px var(--font-sans)", color: GREEN, whiteSpace: "nowrap" }}>{est > 0 ? fullPrice(est) : "…"}</span>
+        </span>
+        <button onClick={onEstimate} disabled={loading && ready === 0}
+          style={{ flex: "none", height: 48, padding: "0 22px", border: "none", borderRadius: 9999, background: INK, color: "rgb(253,252,252)", font: "700 15px/20px var(--font-sans)", cursor: "pointer", whiteSpace: "nowrap", opacity: loading && ready === 0 ? 0.4 : 1 }}>Set price estimate</button>
+      </div>
+
+      {paramsOpen && cs.l && <ParamsSheet p={cs.params} l={cs.l} onClose={() => setParamsOpen(false)} onApply={p => { cs.setParams(p); setView("cards"); scroller.current?.scrollTo({ top: 0 }); }} />}
 
       {adding && (
         <Modal title="Add comps" onClose={() => setAdding(false)}>

@@ -79,6 +79,12 @@ export function ensureLayers(m: MbMap) {
     add({ id: "bz-bldgs-fill", type: "fill", source: "bz-bldgs", minzoom: 15.6, paint: { "fill-color": "#B7969C", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.22, 17.5, 0.26] } });
     add({ id: "bz-bldgs-line", type: "line", source: "bz-bldgs", minzoom: 15.6, paint: { "line-color": "#8A7A72", "line-width": 0.6, "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.4] } });
   }
+  if (!m.getSource("bz-comp-r")) {
+    // Comps search radius (comps interaction 2.0): a soft clay disc with a dashed edge round the subject.
+    m.addSource("bz-comp-r", { type: "geojson", data: compR });
+    add({ id: "bz-comp-r-fill", type: "fill", source: "bz-comp-r", paint: { "fill-color": "rgb(147,89,75)", "fill-opacity": 0.07, "fill-opacity-transition": { duration: 300 } } });
+    add({ id: "bz-comp-r-line", type: "line", source: "bz-comp-r", layout: { "line-join": "round" }, paint: { "line-color": "rgb(147,89,75)", "line-width": 1.6, "line-opacity": 0.85, "line-dasharray": [2, 2] } });
+  }
   if (!m.getSource("bz-area")) {
     const Z = (a: number[]) => ["interpolate", ["exponential", 1.6], ["zoom"], ...a] as any;
     m.addSource("bz-area", { type: "geojson", data: EMPTY });
@@ -87,6 +93,19 @@ export function ensureLayers(m: MbMap) {
     add({ id: "bz-area-line", type: "line", source: "bz-area", layout: { "line-join": "round" }, paint: { "line-color": "rgb(147,89,75)", "line-width": 1.5, "line-opacity": 0.9 } });
   }
   return true;
+}
+
+// The comps search radius, kept here so a style change (map type) redraws it.
+let compR: any = { type: "FeatureCollection", features: [] };
+/** Draw (or clear, `center` null) the comps search circle, `miles` round `center`. */
+export function setCompRadius(m: MbMap, center: [number, number] | null, miles = 1) {
+  const ring: [number, number][] = [];
+  if (center) {
+    const dLat = miles / 69.05, dLng = dLat / Math.cos(center[1] * Math.PI / 180);
+    for (let k = 0; k <= 96; k++) { const a = (k / 96) * Math.PI * 2; ring.push([center[0] + dLng * Math.cos(a), center[1] + dLat * Math.sin(a)]); }
+  }
+  compR = { type: "FeatureCollection", features: center ? [{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } }] : [] };
+  (m.getSource("bz-comp-r") as GeoJSONSource | undefined)?.setData(compR);
 }
 
 export function setArea(m: MbMap, rings: Ring[] | null) {

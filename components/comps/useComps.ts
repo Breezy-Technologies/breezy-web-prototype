@@ -8,13 +8,13 @@
 // lib/comps.ts, excluded comps drop out of every average, Add comps appends the next
 // best candidates. What the user changes (exclusions, added comps, hide excluded, lot
 // mode) is kept per property for the session, so reopening comps finds it as it was.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Listing } from "@/lib/fake";
-import { type Comp, compDetail, compPool, compsFor } from "@/lib/comps";
+import { type Comp, type CompParams, DEFAULT_PARAMS, compDetail, compPool, compsFor, paramsChanged } from "@/lib/comps";
 import { LOTS } from "@/lib/silverlake";
 import { avg, myEstimates } from "../report/CompsReport";
 
-type Sess = { added: Comp[]; excl: Set<number>; hideExcl: boolean; byLot: boolean };
+type Sess = { added: Comp[]; excl: Set<number>; hideExcl: boolean; byLot: boolean; params: CompParams };
 const store = new Map<string, Sess>();
 const keyOf = (l: Listing) => `${l.id}|${l.addr}`;
 
@@ -30,11 +30,14 @@ export type CompsSession = ReturnType<typeof useComps>;
 export function useComps(l: Listing | null, reveal: boolean) {
   const key = l ? keyOf(l) : "";
   const [, bump] = useState(0);
-  const s: Sess = key ? (store.get(key) ?? (store.set(key, { added: [], excl: new Set(), hideExcl: false, byLot: false }), store.get(key)!)) : { added: [], excl: new Set(), hideExcl: false, byLot: false };
+  const s: Sess = key ? (store.get(key) ?? (store.set(key, { added: [], excl: new Set(), hideExcl: false, byLot: false, params: DEFAULT_PARAMS }), store.get(key)!)) : { added: [], excl: new Set(), hideExcl: false, byLot: false, params: DEFAULT_PARAMS };
   const set = (f: (s: Sess) => void) => { if (!key) return; f(s); bump(n => n + 1); };
 
-  const base = useMemo(() => (l ? compsFor(l) : { sold: [], active: [] }), [key]); // eslint-disable-line react-hooks/exhaustive-deps
-  const pool = useMemo(() => (l ? compPool(l) : { sold: [], active: [] }), [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Search parameters (radius, sold within, status, size / lot ±, beds, baths, year):
+  // changing them runs the search again and the comps arrive again, one by one.
+  const pk = JSON.stringify(s.params);
+  const base = useMemo(() => (l ? compsFor(l, s.params) : { sold: [], active: [] }), [key, pk]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pool = useMemo(() => (l ? compPool(l, s.params) : { sold: [], active: [] }), [key, pk]); // eslint-disable-line react-hooks/exhaustive-deps
   const sold = [...base.sold, ...s.added.filter(c => c.st === "S")];
   const active = [...base.active, ...s.added.filter(c => c.st === "L")];
   const all = [...sold, ...active];
@@ -44,6 +47,9 @@ export function useComps(l: Listing | null, reveal: boolean) {
   const [rv, setRv] = useState({ key, n: reveal ? 0 : Infinity });
   const ready = rv.key === key ? rv.n : reveal ? 0 : Infinity;
   useEffect(() => { setRv({ key, n: reveal ? 0 : Infinity }); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const firstPk = useRef(pk);
+  useEffect(() => { if (firstPk.current === pk) return; firstPk.current = pk; setRv({ key, n: 0 }); }, [pk]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { firstPk.current = pk; }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!key || ready >= total) return;
     const t = setTimeout(() => setRv(v => ({ key, n: (v.key === key ? v.n : 0) + 1 })), ready === 0 ? REVEAL_FIRST : REVEAL_STEP);
@@ -82,6 +88,7 @@ export function useComps(l: Listing | null, reveal: boolean) {
     l, key, sold, active, all, total, ready, loading, isReady, isOn, toggle, add, candidates,
     hideExcl: s.hideExcl, setHideExcl: (v: boolean) => set(x => { x.hideExcl = v; }),
     byLot: s.byLot, setByLot: (v: boolean) => set(x => { x.byLot = v; }),
+    params: s.params, setParams: (p: CompParams) => set(x => { x.params = p; x.added = []; }), changed: paramsChanged(s.params),
     incSold, incActive, homePsf, lotPsf, vacant, lotFt, lotMode, homePrice, average,
     mine, setMine, hoverC, setHoverC, focusC, focus: (i: number) => setFocusC({ i, t: Date.now() }),
   };

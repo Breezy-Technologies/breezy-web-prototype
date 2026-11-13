@@ -21,6 +21,9 @@ import { frameLot } from "@/lib/map/frame";
 import { useComps, compLngLat } from "@/components/comps/useComps";
 import { CompsSide } from "@/components/comps/CompsSide";
 import { CompPins } from "@/components/comps/CompPins";
+import { CompRadius } from "@/components/comps/CompRadius";
+import { CompsExport } from "@/components/comps/CompsExport";
+import { ParamsBar, ParamsPill, ParamsVersionSwitch, useParamsUi } from "@/components/comps/CompParams";
 import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
@@ -150,7 +153,7 @@ export default function HomeWeb() {
     if (!map) return;
     frameLot(map, { ring, at: at || [l!.lng, l!.lat], lotAc: l?.lotAc, left: GAP + COL + GAP + 420, top: BAR_BOTTOM });
   };
-  const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); setCompsOn(false); setCompsOut(false); };
+  const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); setCompsOn(false); setCompsOut(false); setExportOn(false); };
   // Set by the side nav's "New buyer search": the next area search ends on the Save search sheet.
   const buyerRef = useRef(false);
   const [buyer, setBuyerS] = useState(false);
@@ -229,20 +232,28 @@ export default function HomeWeb() {
   const [compsReveal, setCompsReveal] = useState(true);
   const cm = useComps(compsOn && sel ? sel : null, compsReveal);
   const compsShift = compsOn && !compsOut;
+  // Exploration: where the comps search parameters live (A map bar / B panel / C on the map).
+  const [paramsUi, setParamsUi] = useParamsUi();
+  // The export sheet ("Set price estimate").
+  const [exportOn, setExportOn] = useState(false);
   const sideCols: 1 | 2 = winW >= 1360 ? 2 : 1;
   const SIDE_W = sideCols === 2 ? 580 : 360;
   const DETAIL_X = compsShift ? GAP : GAP + COL + GAP;
   const selKey = sel ? `${sel.id}|${sel.addr}` : "";
   // Another property (pin, parcel, saved home) leaves comps.
-  useEffect(() => { setCompsOn(false); setCompsOut(false); }, [selKey]);
+  useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); }, [selKey]);
   // Frame the subject and every comp in the open map between the two panels.
   const frameComps = (l: Listing) => {
     if (!map) return;
     const pts = [[l.lng, l.lat], ...cm.all.map(compLngLat)];
-    if (!cm.all.length) return frameSel(l);
+    // "On map" parameters: the whole radius circle stays in view, so its handle can be reached.
+    if (paramsUi === "map" || !cm.all.length) {
+      const dLat = cm.params.radius / 69.05, dLng = dLat / Math.cos(l.lat * Math.PI / 180);
+      pts.push([l.lng - dLng, l.lat - dLat], [l.lng + dLng, l.lat + dLat]);
+    }
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], {
-      padding: { left: GAP + 420 + GAP + 56, right: SIDE_W + GAP * 2 + 56, top: 64, bottom: 56 }, maxZoom: 16.5, duration: 1100, essential: true,
+      padding: { left: GAP + 420 + GAP + 40, right: SIDE_W + GAP * 2 + 40, top: paramsUi === "panel" ? 56 : 84, bottom: 64 }, maxZoom: 16.5, duration: 1100, essential: true,
     });
   };
   const openCompsMode = () => {
@@ -252,6 +263,10 @@ export default function HomeWeb() {
   };
   // Frame once the session (and so its comps) exists.
   useEffect(() => { if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [compsOn, cm.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // New search parameters (or a different entry-point version): reframe once the new comps are known.
+  const pkey = JSON.stringify(cm.params) + paramsUi;
+  const firstP = useRef(pkey);
+  useEffect(() => { if (firstP.current === pkey) return; firstP.current = pkey; if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [pkey]); // eslint-disable-line react-hooks/exhaustive-deps
   const closeComps = () => {
     if (!compsOn || compsOut) return;
     setCompsOut(true); cm.setHoverC(null);
@@ -261,7 +276,7 @@ export default function HomeWeb() {
   // Escape leaves comps (a dialog inside claims Escape first, in the capture phase).
   useEffect(() => {
     if (!compsOn) return;
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") closeComps(); };
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented && !exportOn) closeComps(); };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }); // eslint-disable-line react-hooks/exhaustive-deps
@@ -435,9 +450,14 @@ export default function HomeWeb() {
         {detailOpen && alerts.panel(DETAIL_X)}
         {compsOn && sel && cm.key && (
           <div style={{ position: "absolute", right: GAP, top: GAP, bottom: GAP, zIndex: 4 }}>
-            <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} />
+            <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} paramsUi={paramsUi} onEstimate={() => setExportOn(true)} />
           </div>
         )}
+        {compsShift && sel && cm.key && <>
+          {paramsUi === "bar" && <ParamsBar p={cm.params} l={sel} left={GAP + 420 + GAP + 8} right={SIDE_W + GAP * 2} onApply={cm.setParams} />}
+          {paramsUi === "map" && <ParamsPill p={cm.params} l={sel} left={GAP + 420 + GAP} right={SIDE_W + GAP * 2} onApply={cm.setParams} />}
+          <ParamsVersionSwitch v={paramsUi} set={setParamsUi} left={GAP + 420 + GAP + 10} top={paramsUi === "panel" ? 18 : 76} />
+        </>}
         {pillOn && (
           // "Search this area": centred over the visible map, just under the filter bar.
           <div style={{ position: "absolute", left: detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + GAP, right: 0, top: BAR_BOTTOM, zIndex: 2, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
@@ -464,6 +484,9 @@ export default function HomeWeb() {
       </div>
 
       {compsOn && cm.key && <CompPins cs={cm} />}
+      {compsShift && sel && cm.key && <CompRadius at={[sel.lng, sel.lat]} miles={cm.params.radius} handle={paramsUi === "map"} onChange={mi => cm.setParams({ ...cm.params, radius: mi })} />}
+      {exportOn && sel && cm.key && <CompsExport cs={cm} l={sel} navW={navW} user={user.name} onClose={() => setExportOn(false)} onToast={(t, tone) => showToast(t, tone)}
+        onSaved={() => { if (!rp.has(sel)) rp.save(sel); }} />}
       <PricePins signal={signalIds} listings={compsOn ? [] : pinListings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
         onHover={id => { clearTimeout(keepT.current); if (id == null) keepT.current = setTimeout(() => setHoverId(null), 160); else setHoverId(id); }} />
       {hover && hoverId !== selId && !compsOn && (
