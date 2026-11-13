@@ -104,7 +104,7 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
         )}
         {view === "analytics" && (
           <div className="cs-in" style={{ position: "relative", flex: "none", height: 500 }}>
-            <Analytics embedded sold={cs.incSold} active={cs.incActive} />
+            <Analytics embedded sold={cs.incSold} active={cs.incActive} lit={cs.hoverC} onHover={cs.setHoverC} />
           </div>
         )}
         {view === "table" && <div className="cs-in"><Table rows={[...shown(sold), ...shown(active)]} isOn={isOn} onToggle={cs.toggle} /></div>}

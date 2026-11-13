@@ -132,10 +132,14 @@ export const chip: React.CSSProperties = { flex: "none", display: "flex", alignI
 /* "Show analytics" (breezy AnalyticsOverlay): Sold / Active, four averages, and the
    comps as bars sorted by the picked average. */
 type Metric = "sales" | "home" | "lot" | "dom";
-export function Analytics({ sold, active, onHide, embedded }: { sold: Comp[]; active: Comp[]; onHide?: () => void; embedded?: boolean }) {
+/** `lit` / `onHover` share the hovered comp (by id) with the map: hovering a bar lights its
+ *  pin, hovering a pin lights its bar. */
+export function Analytics({ sold, active, onHide, embedded, lit, onHover }: { sold: Comp[]; active: Comp[]; onHide?: () => void; embedded?: boolean; lit?: number | null; onHover?: (i: number | null) => void }) {
   const [tab, setTab] = useState<"sold" | "active">("sold");
   const [metric, setMetric] = useState<Metric>("sales");
-  const [hover, setHover] = useState(-1);
+  const [own, setOwn] = useState<number | null>(null);
+  const setHover = (i: number | null) => { setOwn(i); onHover?.(i); };
+  const hover = own ?? lit ?? null;
   const list = tab === "sold" ? sold : active;
   const val = (c: Comp, m: Metric) => { const d = compDetail(c); return m === "sales" ? (d.sold ?? d.listed) : m === "home" ? (c.sqft ? c.ppsf : 0) : m === "lot" ? d.perLot : d.dom; };
   const fmt = (v: number, m: Metric) => m === "sales" ? shortPrice(v) : m === "dom" ? String(Math.round(v)) : `$${k(Math.round(v))}`;
@@ -155,13 +159,13 @@ export function Analytics({ sold, active, onHide, embedded }: { sold: Comp[]; ac
         <span style={{ flex: 1 }} />
         <div role="radiogroup" aria-label="Listing status" style={{ display: "flex", gap: 2, padding: 3, borderRadius: 9999, background: "rgba(18,18,18,.06)" }}>
           {(["sold", "active"] as const).map(t => (
-            <button key={t} role="radio" aria-checked={tab === t} onClick={() => { setTab(t); setHover(-1); }} style={{ height: 32, padding: "0 14px", border: "none", borderRadius: 9999, cursor: "pointer", font: `${tab === t ? 700 : 400} 13px/16px var(--font-sans)`, color: INK, background: tab === t ? "rgb(253,252,252)" : "none", boxShadow: tab === t ? "0 1px 3px rgba(30,18,12,.14)" : "none" }}>{t === "sold" ? `Sold ${sold.length}` : `Active ${active.length}`}</button>
+            <button key={t} role="radio" aria-checked={tab === t} onClick={() => { setTab(t); setHover(null); }} style={{ height: 32, padding: "0 14px", border: "none", borderRadius: 9999, cursor: "pointer", font: `${tab === t ? 700 : 400} 13px/16px var(--font-sans)`, color: INK, background: tab === t ? "rgb(253,252,252)" : "none", boxShadow: tab === t ? "0 1px 3px rgba(30,18,12,.14)" : "none" }}>{t === "sold" ? `Sold ${sold.length}` : `Active ${active.length}`}</button>
           ))}
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 8 }}>
         {tiles.map(([id, label, v]) => (
-          <button key={id} onClick={() => { setMetric(id); setHover(-1); }} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, padding: "10px 12px", border: "none", borderRadius: 16, cursor: "pointer", textAlign: "left", background: metric === id ? INK : "rgb(247,246,245)", color: metric === id ? "rgb(253,252,252)" : INK }}>
+          <button key={id} onClick={() => { setMetric(id); setHover(null); }} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, padding: "10px 12px", border: "none", borderRadius: 16, cursor: "pointer", textAlign: "left", background: metric === id ? INK : "rgb(247,246,245)", color: metric === id ? "rgb(253,252,252)" : INK }}>
             <span style={{ font: "400 12px/16px var(--font-sans)", opacity: 0.75 }}>Avg. {label}</span>
             <span style={{ font: "400 18px/24px var(--font-sans)", whiteSpace: "nowrap" }}>{v}</span>
           </button>
@@ -171,18 +175,18 @@ export function Analytics({ sold, active, onHide, embedded }: { sold: Comp[]; ac
         <div style={{ flex: "none", width: 48, position: "relative" }}>
           {ticks.map(t => <span key={t} style={{ position: "absolute", right: 0, bottom: `calc(${(t / max) * 100}% - 8px)`, font: "400 11px/16px var(--font-sans)", color: MUTED }}>{fmt(t, metric)}</span>)}
         </div>
-        <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "flex-end", gap: 6, paddingTop: 8 }} onMouseLeave={() => setHover(-1)}>
+        <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "flex-end", gap: 6, paddingTop: 8 }} onMouseLeave={() => setHover(null)}>
           {ticks.map(t => <span key={t} style={{ position: "absolute", left: 0, right: 0, bottom: `${(t / max) * 100}%`, height: 1, background: "rgba(13,12,12,.07)" }} />)}
           {bars.length === 0 && <span style={{ margin: "auto", font: "400 14px/20px var(--font-sans)", color: MUTED }}>No {tab} comps included.</span>}
-          {bars.map((b, i) => (
-            <span key={b.c.i} onMouseEnter={() => setHover(i)} style={{ position: "relative", flex: "1 1 0", maxWidth: 34, height: `${(b.v / max) * 100}%`, borderRadius: 9999, cursor: "default", transition: "height .35s cubic-bezier(.2,.8,.2,1),background .15s", background: hover === i ? INK : tab === "sold" ? SOLD : ACTIVE, opacity: hover === -1 || hover === i ? 1 : 0.55 }}>
-              {hover === i && (
+          {bars.map(b => { const on = hover === b.c.i; const dim = hover != null && bars.some(x => x.c.i === hover); return (
+            <span key={b.c.i} onMouseEnter={() => setHover(b.c.i)} style={{ position: "relative", flex: "1 1 0", maxWidth: 34, height: `${(b.v / max) * 100}%`, borderRadius: 9999, cursor: "default", transition: "height .35s cubic-bezier(.2,.8,.2,1),background .15s", background: on ? INK : tab === "sold" ? SOLD : ACTIVE, opacity: !dim || on ? 1 : 0.55 }}>
+              {on && (
                 <span style={{ position: "absolute", left: "50%", bottom: "calc(100% + 8px)", transform: "translateX(-50%)", zIndex: 2, display: "flex", flexDirection: "column", gap: 1, padding: "8px 10px", borderRadius: 12, background: INK, color: "rgb(253,252,252)", whiteSpace: "nowrap", font: "400 12px/16px var(--font-sans)", pointerEvents: "none" }}>
                   <b style={{ font: "700 14px/18px var(--font-sans)" }}>{fmt(b.v, metric)}{metric === "home" || metric === "lot" ? "/ft²" : metric === "dom" ? " days" : ""}</b>{b.c.addr}
                 </span>
               )}
             </span>
-          ))}
+          ); })}
         </div>
       </div>
     </div>
