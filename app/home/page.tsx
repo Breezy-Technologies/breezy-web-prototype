@@ -32,6 +32,8 @@ import { Listing, OppType, listingAt } from "@/lib/fake";
 import { Filters, SortKey, fDims, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, pointInRings, ringBBox } from "@/lib/geo";
+import { accessNow, paywall, reportKey, spend, useEntitlements } from "@/lib/billing";
+import { BillingHost } from "@/components/billing/Paywall";
 
 const GAP = 12;
 // Results column width per layout (1 / 2 / 3 columns of cards); Home and 1 column stay 388.
@@ -218,6 +220,15 @@ export default function HomeWeb() {
   const shareItems = sh.only != null ? (shareL ? [shareL] : []) : picked.map(p => p.l);
   // A comps report that has already been run reopens on its result (sprint item).
   const openFlow = (l: Listing, kind: FlowKind) => { setCompsCached(rp.has(l)); setFlow({ l, kind }); };
+  // Paywall, "Locked tile" lock style (Dev menu): a locked Max build / Profit potential tile
+  // opens the upsell (or a credit confirmation) over the map instead of a veiled report.
+  const ent = useEntitlements();
+  const openReport = (l: Listing, kind: "ub" | "roi") => {
+    const f = kind === "ub" ? "maxBuild" as const : "roi" as const, key = reportKey(l), a = accessNow(f, key);
+    if (ent.s.lockStyle !== "tile" || (a !== "locked" && a !== "plan" && a !== "credit")) return openFlow(l, kind);
+    if (a === "plan") return paywall.open({ kind: "offer", feature: f });
+    paywall.open({ kind: "upsell", feature: f, then: () => { spend(f, key); openFlow(l, kind); } });
+  };
   const openComps = (l: Listing) => openFlow(l, "comps");
 
   const detailOpen = !!sel;
@@ -400,7 +411,16 @@ export default function HomeWeb() {
         if (k === "Buyer search") { if (rp.open) rp.close(); setBuyer(true); sv.setActive(null); closeDetail(); setSearching(true); }
         // Reports (side-nav footer) opens the saved reports sheet over the left column.
         if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
+        // Nimbus: Settings opens Plan & usage; Inman News is included with the plan; the AI
+        // places and Run comps need an active trial / plan.
+        if (k === "Settings") paywall.open({ kind: "plan" });
+        if (k === "Inman News") paywall.open({ kind: "news" });
+        if (k === "AI Notes" || k === "Assistant" || k === "Comps") {
+          if (!ent.planOn) paywall.open({ kind: "offer", feature: k === "Comps" ? "comps" : "assistant" });
+          else showToast(`${k === "Comps" ? "Run comps" : k} isn't in the prototype yet`, "neutral");
+        }
       }} />
+      <BillingHost onToast={showToast} />
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none", transformOrigin: "0 50%",
           transition: "opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1),visibility 0s linear " + (compsShift ? ".55s" : "0s"),
@@ -447,15 +467,15 @@ export default function HomeWeb() {
         {detailOpen && (
           // The detail column steps back while the Alerts sheet sits on top of it (`dtT` / `dtF`).
           <div style={{ position: "absolute", left: DETAIL_X, top: DETAIL_TOP, bottom: GAP, zIndex: 4, transformOrigin: "50% 0", transition: "left .6s cubic-bezier(.2,.8,.2,1),top .6s cubic-bezier(.2,.8,.2,1),transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
-            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openFlow(sel!, k)}
-              alertN={alerts.count(sel)} onBell={() => alerts.open(sel!)} onShare={() => shareOne(sel!)} onToast={showToast} />
+            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openReport(sel!, k)}
+              alertN={alerts.count(sel)} onBell={() => ent.planOn ? alerts.open(sel!) : paywall.open({ kind: "offer", feature: "alerts" })} onShare={() => shareOne(sel!)} onToast={showToast} />
           </div>
         )}
         {detailOpen && alerts.panel(DETAIL_X)}
         {compsOn && sel && cm.key && (
           <div style={{ position: "absolute", right: GAP, top: GAP, bottom: GAP, zIndex: 4 }}>
-            <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} onEstimate={() => setExportOn(true)}
-              filtered={fCount} onClearFilters={fs.reset} onAddSold={() => fs.setF({ st: { "Recently sold": true }, tg: {} })} />
+            <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} onEstimate={() => ent.planOn ? setExportOn(true) : paywall.open({ kind: "offer", feature: "comps" })}
+              locked={!ent.planOn} onToast={showToast} filtered={fCount} onClearFilters={fs.reset} onAddSold={() => fs.setF({ st: { "Recently sold": true }, tg: {} })} />
           </div>
         )}
         {pillOn && (
@@ -501,7 +521,7 @@ export default function HomeWeb() {
         frameSel(p.listing, p.ring, [p.cx, p.cy]);
       }} />
       {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached} onClose={() => setFlow(null)}
-        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); }} onShare={() => shareOne(flow.l)} />}
+        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); }} onShare={() => shareOne(flow.l)} onToast={showToast} />}
       {areaComps && <AreaCompsPreview key={areaComps.title + areaComps.comps.length} {...areaComps} saved={rp.hasArea(areaComps)} onClose={() => setAreaComps(null)}
         onSave={() => { rp.saveArea(areaComps); showToast("Report saved to Reports"); }} />}
       {ss.modals}

@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fullPrice, shortPrice } from "@/lib/fake";
 import type { Comp } from "@/lib/comps";
+import { LockVeil } from "../billing/Paywall";
 import { ACTIVE, Analytics, CompCard, GREEN, INK, MUTED, Modal, SOLD, Table } from "../report/CompsReport";
 import type { CompsSession } from "./useComps";
 
@@ -20,7 +21,9 @@ const k = (n: number) => n.toLocaleString("en-US");
 
 /** `onAddSold`: the search filters leave sold homes out (status Active / Pending only);
  *  turns Sold on in those same filters. `onClearFilters`: no comp matches the filters. */
-export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold, onClearFilters, filtered }: { cs: CompsSession; width: number; cols: 1 | 2; out?: boolean; onClose: () => void; onEstimate: () => void; onAddSold: () => void; onClearFilters: () => void; filtered: number }) {
+/** `locked` (Nimbus paywall, no active trial / plan): the comps still arrive and the first
+ *  ones show, then a veil offers Agents Pro. */
+export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold, onClearFilters, filtered, locked, onToast }: { cs: CompsSession; width: number; cols: 1 | 2; out?: boolean; onClose: () => void; onEstimate: () => void; onAddSold: () => void; onClearFilters: () => void; filtered: number; locked?: boolean; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
   const [view, setView] = useState<View>("cards");
   const est = cs.mine ?? (cs.homePrice > 0 ? Math.round(cs.homePrice / 1000) * 1000 : 0);
   const [adding, setAdding] = useState(false);
@@ -94,6 +97,8 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
         </div>
       </div>
 
+      <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      {locked && <LockVeil access="plan" feature="comps" clear={300} card={Math.min(440, width - 24)} onUnlock={() => {}} onToast={onToast} />}
       <div ref={scroller} style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 18, padding: "16px 14px 28px", scrollbarWidth: "thin" }}>
         {(!cs.soldAllowed || filtered > 0) && (
           <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px 10px 14px", borderRadius: 14, background: cs.soldAllowed ? "rgb(246,245,244)" : "rgb(252,243,236)", font: "400 13px/18px var(--font-sans)", color: INK }}>
@@ -147,6 +152,7 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
         <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED }}>Comps are real nearby homes (address, size, beds, baths, lot, year, $/ft², distance, month sold). Prices are value estimates; list prices, dates, days on market and garages are sample data until the listings service is connected.</span>
       </div>
 
+      </div>
       {/* Main action (Figma: "Set price estimate", top right of the comps results): opens the
           export sheet, where the estimate is set and the client report customised. */}
       <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px 12px 18px", boxShadow: "inset 0 1px 0 rgb(240,236,234)", background: "var(--paper)" }}>

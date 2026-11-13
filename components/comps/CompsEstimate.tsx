@@ -11,7 +11,8 @@ import type { CompsSession } from "./useComps";
 
 const k = (n: number) => Math.round(n).toLocaleString("en-US");
 
-export function CompsEstimate({ cs, l }: { cs: CompsSession; l: Listing }) {
+/** `locked` (paywall, no plan): the estimate stays blurred; the comps veil offers the plan. */
+export function CompsEstimate({ cs, l, locked }: { cs: CompsSession; l: Listing; locked?: boolean }) {
   const [estOpen, setEstOpen] = useState(false);
   const n = cs.incSold.length;
   const price = cs.homePrice > 0 ? Math.round(cs.homePrice / 1000) * 1000 : 0;
@@ -30,7 +31,7 @@ export function CompsEstimate({ cs, l }: { cs: CompsSession; l: Listing }) {
           </div>
         )}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, ...(locked ? { filter: "blur(7px)", userSelect: "none", pointerEvents: "none" } : {}) }}>
         {cs.mine ? <span style={{ font: "300 36px/1.1 var(--font-sans)", letterSpacing: "-1px", color: GREEN }}>{fullPrice(cs.mine)}</span>
           : price > 0 ? <span key={cs.lotMode ? "lot" : "home"} style={{ font: "300 36px/1.1 var(--font-sans)", letterSpacing: "-1px", color: GREEN, animation: "fadeIn .3s ease both" }}>{fullPrice(price)}</span>
           : <span style={{ display: "block", width: 210, height: 34, margin: "3px 0 2px", borderRadius: 10, background: "linear-gradient(100deg,rgb(244,241,239) 30%,rgb(250,248,247) 50%,rgb(244,241,239) 70%) 0 0/250% 100%", animation: "lineShimmer 1.4s linear infinite" }} />}

@@ -21,6 +21,9 @@ import { UBReport } from "./UBReport";
 import { compsFor } from "@/lib/comps";
 import { UpsideReport } from "./upside/UpsideReport";
 import { upsideOf } from "@/lib/roi";
+import { reportKey, useEntitlements } from "@/lib/billing";
+import { PRICING } from "@/lib/pricing.config";
+import { LockVeil } from "../billing/Paywall";
 
 export type FlowKind = "comps" | "ub" | "roi";
 
@@ -44,9 +47,10 @@ const gotKey = (l: Listing, k: FlowKind) => `${k}:${l.addr}|${l.lng.toFixed(5)},
 
 type Phase = "review" | "choose" | "run" | "done" | "report";
 
-export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onShare }: {
+export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onShare, onToast }: {
   l: Listing; kind: FlowKind; navW: number; cached?: boolean;
   onClose: () => void; onDone?: (k: FlowKind) => void; onShare?: () => void;
+  onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void;
 }) {
   if (cached) got.add(gotKey(l, "comps"));
   // Max build and Profit potential open straight on the report, written in front of the
@@ -132,6 +136,28 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   const cps = compsFor(l);
   const doneTitle = { comps: `${cps.sold.length} sold and ${cps.active.length} active\nproperties found`, ub: "Your report is ready", roi: `This property could\nbe worth ${shortPrice(upGross)}` }[kind];
   const loading = phase === "run" || phase === "done";
+
+  // Paywall (Nimbus): Max Build / ROI reports are metered per property. Opening one spends
+  // from the monthly allowance (with a usage toast); past that, the report still writes its
+  // top part in front of the user and a veil offers a credit or the upsell. Comps only need
+  // an active trial / plan. "Lock style" (Dev menu) sets how much shows: partial or full blur.
+  const ent = useEntitlements();
+  const pk = reportKey(l);
+  const feat = kind === "ub" ? "maxBuild" as const : kind === "roi" ? "roi" as const : null;
+  const acc = feat ? ent.access(feat, pk) : ent.access("comps");
+  const locked = acc === "credit" || acc === "locked" || acc === "plan";
+  useEffect(() => {
+    if (phase !== "report" || !feat || acc !== "allowance") return;
+    ent.spend(feat, pk);
+    const n = ent.left(feat) - 1;
+    onToast?.(`${PRICING.names[feat]} · ${n} of ${PRICING.allowance[feat]} left this month`, "neutral");
+  }, [phase, kind, acc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const unlock = () => {
+    if (!feat) return;
+    const was = ent.access(feat, pk);
+    const a = ent.spend(feat, pk);
+    if (a === "credit" || was === "credit") onToast?.(`${PRICING.names[feat]} unlocked · 1 credit used`, "positive");
+  };
 
   return (
     <>
@@ -225,9 +251,12 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
                 )}
               </div>
             </div>
-            {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
-            {kind === "ub" && <UBReport l={l} write={write} onComps={() => pick("comps")} />}
-            {kind === "roi" && <UpsideReport l={l} write={write} onComps={() => pick("comps")} />}
+            <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
+              {kind === "ub" && <UBReport l={l} write={write} onComps={() => pick("comps")} />}
+              {kind === "roi" && <UpsideReport l={l} write={write} onComps={() => pick("comps")} />}
+              {locked && <LockVeil key={kind} access={acc} feature={feat ?? "comps"} clear={ent.s.lockStyle === "blur" ? 0 : "42%"} onUnlock={unlock} onToast={onToast} />}
+            </div>
           </div>
         )}
       </div>

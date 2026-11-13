@@ -129,7 +129,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - **No estimate (`noQe`):** only reachable from the Dev menu ("Property with no estimate"; every property has an estimate). The full-width CTA layout (decided): title and one-line explanation with the illustration on the right, a full-width outline "Get price estimate" underneath; it loads, then shows the estimate and a positive toast.
 - "View more" buttons have no arrows.
 - Footer: alert + share icons and a primary **Contact owner** (no "1 credit" text on the button). Once unlocked it becomes one primary **Email owner** (`mailto:`); no Call on web (12 Nov comment).
-- **Credits (10 Nov review):** the Owner section says "Uses 1 credit · 24 left" before unlocking and "1 credit used · 23 left" after, plus an "Owner unlocked · 23 credits left" toast. No confirmation step; each owner is charged once per session (fake balance). Pressing it scrolls the panel to the Owner section (switching to Summary if needed); once the scroll settles, the phone, email and address are written in left to right by a soft clay → violet gradient edge (staggered 160 ms, a faint sheen behind), then settle to plain copyable text; the footer becomes Email owner.
+- **Contacts (10 Nov review, metered since the paywall):** the Owner section shows the lines masked and "Uses 1 contact · 18 of 25 left this month" before unlocking, "Contact unlocked · 17 of 25 left this month" after, plus an "Owner unlocked · …" toast. No confirmation step; each owner is charged once per period (mock billing, see Paywall). Pressing it scrolls the panel to the Owner section (switching to Summary if needed); once the scroll settles, the phone, email and address are written in left to right by a soft clay → violet gradient edge (staggered 160 ms, a faint sheen behind), then settle to plain copyable text; the footer becomes Email owner.
 
 **Flows and sheets**
 - **Report sheet** (`components/report/ReportFlow.tsx`, canvas `rptLayer` / `_wsTilt` / `_runFlow`): opened by **Get comps**, the **Max build** tile (Underbuilt) and the **Profit potential** tile (ROI).
@@ -158,11 +158,25 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - **Reports** (`Reports.tsx`): comps and area reports.
 - **Toasts** (`Toast.tsx`), bottom centre, tones neutral / positive / negative. "No property found" uses the neutral black info icon.
 
+**Paywall: Nimbus pricing (branch `paywall`, 13 Nov; launch January 2027)**
+- **One plan, Agents Pro** ($24.90/month, shown as a special offer over ~~$39.90~~, single seat). Included: comps & notes, AI assistant, Market Radar alerts (unlimited), Inman News; **5 Max Build reports, 5 ROI reports, 25 owner contacts a month**. Overages are bought as credits (single vs 5-pack, ~20% saving; Max Build + ROI bundle; 10 contacts for $5). No customer unlimited plan, no tier picker. Trials and win-back by segment; $9.90/month save offer on cancel.
+- **Every price, allowance, pack, trial and offer lives in `lib/pricing.config.ts`.** Components never hard-code one.
+- **Entitlements (`lib/billing.ts`, mock, localStorage `bz-billing`):** `useEntitlements()` gives `access(feature, key)` = unlimited / owned / allowance / credit / locked / plan / open, and `spend`. Allowance first, then credits, then the upsell. An item unlocked this period (per property, `reportKey`) reopens free. `paywall.open({ kind })` opens a sheet from anywhere (upsell, offer, plan, winback, news), rendered by `BillingHost`.
+- **Lock at the point of need, never hidden (`components/billing/Paywall.tsx`):**
+  - Max build / Profit potential tiles carry a usage chip ("3 left", credits, lock). Opening a report spends from the allowance with a toast ("ROI report · 2 of 5 left this month").
+  - Past the allowance, the report still writes its top part, and `LockVeil` blurs the rest with a credit confirmation ("Use 1 credit") or the upsell (single vs 5-pack side by side). Buying unlocks at once.
+  - Contacts: locked lines show masked ("(•••) •••-4821"); Contact owner spends one contact (no confirmation, 10 Nov rule); none left → "Get 10 contacts · $5" → upsell, then unlock.
+  - No trial / plan (expired, churned): reports and Contact owner show the Agents Pro offer; comps still arrive with a veil after the first cards and a blurred estimate; Set price estimate and the alerts bell open the offer; AI Notes, Assistant, Inman News and Run comps show a small lock in the nav.
+  - **Heat layers stay free** (the hook).
+- **Surfaces:** the trial card in the side nav footer (days left, bar; replaces "Upgrade to team"; teams are out of scope), Settings → Plan & usage (plan, renewal, a meter per metered feature, purchased credits, Buy more, Cancel plan → save offer), win-back sheet for Breezy 1.0 segments (60 / 30 days free, card required; paying 1.0 users: "billing starts 14 days after install"), Inman News sheet (sample placeholders until the feed is connected).
+- **Dev menu:** "Plan state…" (user state presets: trial day 3 of 14 / 27 of 30, active, some used, allowance used up, has credits, trial expired, 1.0 segments; **lock style**: partial report / full blur / locked tile; new-user trial A/B 14 / 30) and **"Unlimited (internal)"** on / off (bypasses all metering; never a customer plan).
+
 **Developer menu** (side nav), to preview states on demand:
 - Restart onboarding
 - Snackbars (neutral / positive / negative)
 - Search failed / timed out / no recents
 - Property with no estimate
+- Plan state… and Unlimited (internal) (paywall, see above)
 
 ## Heat palette (exploration, not yet decided)
 
@@ -199,11 +213,11 @@ Muted in the 10 Nov review (the first set read too garish): same hues, lower sat
 
 - **Side nav:**
   - Collapse toggle at the top, with the Breezy wordmark next to it when expanded.
-  - Items: Map, Comps, Underbuilt, AI Notes, Assistant. **No News.**
+  - Items: Map, Comps, Underbuilt, AI Notes, Assistant, **Inman News** (13 Nov: added as the entry point for the news included in Agents Pro; it replaces the earlier "No News" rule).
   - **Exploring (10 Nov review): actions version, on by default.** Comps and Underbuilt become actions at the top, like Claude's "New chat" / "Search": "Run comps", "Find underbuilt", and **"New buyer search"** (12 Nov review, so agents find search: it opens the search step with "Where is your buyer looking?", and once an area is picked the Save search sheet opens), plain rows in regular weight with their existing icons and no selected pill. A hairline, then the places (Map, AI Notes, Assistant) in regular weight, keeping the dark pill. The Dev menu switches "Side nav: classic / actions" (localStorage `bz-nav-style`). Run comps / Find underbuilt aren't wired to flows yet.
   - Icons are transparent isometric PNG / SVG in `public/nav` (`map-iso`, `comps-iso`, `radar`, `ai-notes-new`, `assistant`), optically equalised by `ICON_SCALE`.
   - The active item has a **dark pill**. Icons never fade.
-  - Footer: Upgrade to team, Reports, Settings, Dev menu, avatar.
+  - Footer: the trial / plan card, Reports, Settings (opens Plan & usage), Dev menu, avatar. "Upgrade to team" is gone (single-seat plan).
 - **Illustrations:** isometric "skeuomorphic" scenes in the Breezify Core Figma style (file `N81mxdVxHzi9rmqU2qw0xn`, node 7612:60), in `public/iso/`. Full-resolution copies for the team are in `~/Downloads/Breezy-isometric-illustrations/`.
 - **Colours:** ink rgb(18,18,18), paper rgb(253,252,252), clay rgb(175,127,113), deep clay rgb(147,89,75), nav background rgb(245,243,243), Breezy yellow rgb(255,209,41).
 - **Type and icons:** Akkurat LL (`public/fonts`); Phosphor icons (`public/vendor/phosphor`).
@@ -243,6 +257,8 @@ components/home/            SideNav (+DevMenu), SearchBar, HomeCard, ForYouFeed,
 components/report/          ReportFlow (report sheet + flows), UBReport (Underbuilt analysis), aiWrite (AI-writing reveal)
 components/comps/           comps interaction 2.0: useComps (session, follows the search filters), CompsSide, CompPins,
                             CompsEstimate, CompRadius (circle + RadiusChip), CompsExport (Set price estimate sheet)
+components/billing/         Paywall: OfferCard, UpsellOptions, LockVeil, UsageChip, BillingHost (plan & usage, cancel,
+                            win-back, news), TrialCard, BillingDevPanel
 components/onboarding/      OppPins
 lib/config.ts               env-driven config, isLiveMap / hasRegrid
 lib/map/style.ts            live vs offline styles
@@ -256,6 +272,8 @@ lib/fake.ts                 demo data (listings, detail, owners, estimates, heat
 lib/silverlake.ts           Pedro's Silver Lake lots (lib/data/silverlake.json), HEAT_AREA circle, lot zone
 lib/filters.ts              filter model and defaults
 lib/pinColors.ts            signal pin colour families
+lib/pricing.config.ts       Nimbus pricing: plan, allowances, SKUs, segments, save offer
+lib/billing.ts              mock billing state, presets, useEntitlements, paywall requests
 lib/heat/                   heat colour scale (scale.ts ported from underbuilt-roi), palettes, bands, values
 lib/css.ts                  converts canvas style strings to React styles
 ```
