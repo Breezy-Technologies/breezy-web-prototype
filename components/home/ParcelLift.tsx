@@ -125,8 +125,18 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   const fs = Math.max(10, Math.min(14, 8 + (map.getZoom() - 15.4) * 3));
   const ccy = q.reduce((a, v) => a + v.y, 0) / q.length;
   const showCard = hit && !suppressCard && !selected;
-  // The card is placed in screen pixels (it doesn't scale with the map).
-  const CH = 150, below = p0.y + top - CH < 124 && p0.y + bot + 16 + CH < H - 12;
+  // The card is placed in screen pixels (it doesn't scale with the map), beside the lifted
+  // parcel, never over it (team feedback: "hover not feeling too good with card covering"):
+  // right of the slab when there's room, else left, vertically centred on it; only a parcel
+  // too wide for either side puts the card above or below.
+  const CW = 268, CH = hit && !hit.listing.noQe ? 152 : 112, GAPX = 18;
+  const minX = Math.min(...q.map(v => v.x)), maxX = Math.max(...q.map(v => v.x));
+  const rightX = p0.x + maxX + GAPX, leftX = p0.x + minX - GAPX - CW;
+  const side: "right" | "left" | null = rightX + CW < W - 12 ? "right" : leftX > 12 ? "left" : null;
+  const below = !side && p0.y + top - CH < 124 && p0.y + bot + 16 + CH < H - 12;
+  const cardPos: React.CSSProperties = side
+    ? { left: side === "right" ? rightX : leftX, top: Math.max(84, Math.min(H - CH - 12, p0.y + ccy - CH / 2)) }
+    : { left: Math.max(CW / 2 + 12, Math.min(W - CW / 2 - 12, p0.x + cx)), top: below ? p0.y + bot + 16 : Math.max(124 + CH, p0.y + top - 12), transform: `translate(-50%,${below ? "0" : "-100%"})` };
   return (
     <MapOverlay>
       <div ref={wrapRef} style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, zIndex: 45, pointerEvents: "none", willChange: "transform", transformOrigin: "0 0", transform: `translate3d(${p0.x}px,${p0.y}px,0)` }}>
@@ -155,7 +165,7 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
       </svg>
       </div>
       {showCard && (
-        <div ref={cardRef} style={{ position: "absolute", left: Math.max(146, Math.min(W - 146, p0.x + cx)), top: below ? p0.y + bot + 16 : Math.max(124 + CH, p0.y + top - 12), transform: `translate(-50%,${below ? "0" : "-100%"})`, width: 268, display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 18, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.2),0 0 0 .5px rgba(13,12,12,.08)", zIndex: 60, pointerEvents: "none", animation: "hvPop .2s cubic-bezier(.2,.8,.2,1) both" }}>
+        <div ref={cardRef} style={{ position: "absolute", ...cardPos, width: CW, display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 18, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.2),0 0 0 .5px rgba(13,12,12,.08)", zIndex: 60, pointerEvents: "none", animation: "hvPop .2s cubic-bezier(.2,.8,.2,1) both" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
             <span style={{ font: "700 14px/19px var(--font-sans)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hit!.addr}</span>
             <span style={{ flex: "none", font: "400 11px/16px var(--font-sans)", color: "rgb(98,90,89)" }}>{hasRegrid() ? "Parcel" : "Off market"}</span>
