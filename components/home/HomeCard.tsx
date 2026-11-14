@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Listing, OppType, fullPrice } from "@/lib/fake";
 import { EXTERIORS } from "@/lib/photos";
-import { CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
+import { ALERT_DEFS, AlertSet, CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, initials, useSaved } from "@/components/SavedState";
 import { PickedFooter } from "./Saved";
 import { ForYouFeed } from "./ForYouFeed";
 import { ColsToggle } from "./LeftPanel";
@@ -18,7 +18,27 @@ import { userLocationLabel } from "@/lib/places";
 export type Tab = "For you" | "Searches" | "Properties";
 type Sort = "Default" | "Newest" | "Oldest";
 
-const PROP_STATUS = ["Increased 1% to $1M", "Price dropped 3%", "New photos added", "Back on market", "Open house Sat", "Price dropped 5%"];
+// Alert-type chips on saved-property rows (mobile "Searches & alerts" design, Figma
+// mc4hlX3SnSl5PAwf887XBJ node 386:137102): which alerts are set, as outlined pills with a
+// coloured icon, and the latest update in a grey strip under them. Every type set = "Any activity".
+const ALERT_CHIP: Record<string, [string, string]> = {
+  drop: ["ph-trend-down", "rgb(196,72,52)"], bump: ["ph-trend-up", "rgb(70,155,112)"], status: ["ph-article", "rgb(196,96,72)"],
+  stale: ["ph-timer", "rgb(44,136,181)"], refresh: ["ph-arrows-clockwise", "rgb(44,136,181)"], seller: ["ph-camera", "rgb(147,89,75)"], any: ["ph-pulse", "rgb(44,136,181)"],
+};
+const ALERT_LABEL: Record<string, string> = { ...Object.fromEntries(ALERT_DEFS.map(d => [d[0], d[1]])), any: "Any activity" };
+// Seed saved properties come without alerts; give each a stable demo set so the chips show.
+const SEED_ALERTS: string[][] = [["bump"], ["drop", "status"], ["status"], ALERT_DEFS.map(d => d[0]), ["stale"], ["refresh"]];
+const alertKinds = (a?: AlertSet | null) => ALERT_DEFS.map(d => d[0]).filter(k => a?.[k]);
+// The latest update, worded for the alert that fired (mobile copy).
+function alertUpdate(kind: string, l: Listing): string {
+  const h = Math.abs(l.id * 7 + l.addr.length), pr = fullPrice(l.price);
+  if (kind === "drop") return `Reduced ${1 + h % 5}% to ${pr}`;
+  if (kind === "bump") return `Increased ${1 + h % 4}% to ${pr}`;
+  if (kind === "status") return [`Listed at ${pr}`, `Agreed at ${pr}`, `Closed at ${pr}`, "No longer for sale"][h % 4];
+  if (kind === "stale") return `Over ${[30, 60, 90][h % 3]} days on market`;
+  if (kind === "refresh") return `Back on market after ${8 + h % 20} days`;
+  return ["New photos added", "Description updated", "Open house scheduled"][h % 3];
+}
 const PROP_WHEN = ["Today", "Today", "Yesterday", "Mon", "Last week", "Last week"];
 const THUMB = [0, 4, 9, 1, 13, 6, 16, 2].map(i => EXTERIORS[i]); // `_bhInfo[i].ph[0]`, from the listing photo set
 const RANK: Record<string, number> = { Today: 0, Yesterday: 1, Mon: 2, "Last week": 3 };
@@ -100,29 +120,47 @@ function SearchRow({ x, hover, full, onEnter, onLeave, onOpen, onDel }: { x: Sav
   );
 }
 
-type PropItem = { key: string; l: Listing; status: string; when: string; viewed: boolean };
+type PropItem = { key: string; l: Listing; status: string; when: string; viewed: boolean; kinds: string[] };
+
+function AlertChip({ k }: { k: string }) {
+  const [ic, col] = ALERT_CHIP[k] || ["ph-bell", "rgb(98,90,89)"];
+  return (
+    <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 4, height: 24, padding: "0 8px 0 6px", borderRadius: 9999, boxShadow: "inset 0 0 0 1px rgba(18,18,18,.16)", font: "400 12px/16px var(--font-sans)", letterSpacing: ".25px", color: "rgb(48,42,40)", whiteSpace: "nowrap" }}>
+      <i className={`ph-bold ${ic}`} style={{ fontSize: 13, color: col }} />{ALERT_LABEL[k] || k}
+    </span>
+  );
+}
 
 function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; hover: boolean; onEnter: () => void; onLeave: () => void; onOpen: () => void; onDel: () => void }) {
   const { l } = x;
+  const chips = x.kinds.length === ALERT_DEFS.length ? ["any"] : x.kinds;
   return (
-    <div onClick={onOpen} onMouseEnter={onEnter} onMouseLeave={onLeave} className="hc-row" style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 8, margin: -8, borderRadius: 16, cursor: "pointer", transition: "background .16s" }}>
+    <div onClick={onOpen} onMouseEnter={onEnter} onMouseLeave={onLeave} className="hc-row" style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10, padding: 8, margin: -8, borderRadius: 16, cursor: "pointer", transition: "background .16s" }}>
       {hover && <DelBtn title="Remove saved property" top={4} onClick={e => { e.stopPropagation(); onDel(); }} />}
-      <span style={{ flex: "none", width: 76, height: 76, borderRadius: 8, background: `rgb(241,231,228) url('${l.photos[0]}') center/cover no-repeat` }} />
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 4, font: "400 12px/1.26 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)", whiteSpace: "nowrap", overflow: "hidden" }}>
-            {!x.viewed && <UnreadDot />}{x.status}
-          </span>
-          <span style={{ flex: "none", font: "400 12px/1.26 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)" }}>{x.when}</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <span style={{ flex: "none", width: 76, height: 76, borderRadius: 8, background: `rgb(241,231,228) url('${l.photos[0]}') center/cover no-repeat` }} />
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
           <span style={{ font: "700 15px/20px var(--font-sans)", color: "rgb(17,16,16)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.addr}{l.city ? ", " + l.city.split(",")[0] : ""}</span>
           <span style={{ display: "flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap", overflow: "hidden" }}>
             <span style={{ font: "700 15px/21px var(--font-sans)", color: INK }}>{fullPrice(l.price)}</span>
             <span style={{ font: "400 12px/16px var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)" }}>/ ${Math.round(l.price / l.sqft).toLocaleString()} per ft² · {l.dom} DOM</span>
           </span>
+          {/* Which alerts are set. Every type = one "Any activity" chip; more than two = two chips + "+n". */}
+          <span style={{ display: "flex", alignItems: "center", gap: 4, overflow: "hidden" }}>
+            {chips.length ? <>{chips.slice(0, 2).map(k => <AlertChip key={k} k={k} />)}
+              {chips.length > 2 && <span title={chips.slice(2).map(k => ALERT_LABEL[k]).join(", ")} style={{ flex: "none", height: 24, padding: "0 8px", borderRadius: 9999, display: "inline-flex", alignItems: "center", background: "rgba(18,18,18,.06)", font: "700 12px/16px var(--font-sans)", color: "rgb(73,67,65)" }}>+{chips.length - 2}</span>}</>
+              : <span style={{ font: "400 12px/24px var(--font-sans)", letterSpacing: ".25px", color: "rgb(130,122,120)" }}>No alerts set</span>}
+          </span>
         </div>
       </div>
+      {/* The latest update, as on mobile. The red dot stays only until the property is opened (web read rule). */}
+      {x.kinds.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 12px", borderRadius: 10, background: "rgb(246,242,240)" }}>
+          {!x.viewed && <UnreadDot />}
+          <span style={{ flex: 1, minWidth: 0, font: "400 13px/18px var(--font-sans)", letterSpacing: ".25px", color: "rgb(48,42,40)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.status}</span>
+          <span style={{ flex: "none", font: "400 12px/16px var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)" }}>{x.when}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -159,7 +197,14 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
   // Opening (clicking) a saved search marks its new matches as seen (store `markSeen`).
   const searches = sorted(sv.searches);
   // Status + "when" follow the row position, as the canvas `mapP` does. Row keys are "p:" + the store key.
-  const props: PropItem[] = sorted(sv.props.map((p, k) => ({ key: "p:" + p.key, l: p.l, status: PROP_STATUS[k % PROP_STATUS.length], when: PROP_WHEN[Math.min(k, PROP_WHEN.length - 1)], viewed: !!p.viewed })));
+  // Alert types: the ones set on the property, else a demo set for the seeds. The update line
+  // is worded for one of them (stable per property).
+  const props: PropItem[] = sorted(sv.props.map((p, k) => {
+    const set = alertKinds(sv.alerts[p.key]);
+    const kinds = set.length ? set : p.seed ? SEED_ALERTS[k % SEED_ALERTS.length] : [];
+    const fired = kinds[Math.abs(p.l.id) % Math.max(1, kinds.length)];
+    return { key: "p:" + p.key, l: p.l, status: fired ? alertUpdate(fired, p.l) : "", when: PROP_WHEN[Math.min(k, PROP_WHEN.length - 1)], viewed: !!p.viewed, kinds };
+  }));
   // The tab bells show while anything is unseen: a search with new matches, a property with its red dot.
   const bellS = searches.some(x => x.newN > 0), bellP = props.some(x => !x.viewed);
 
