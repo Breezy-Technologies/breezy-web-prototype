@@ -160,24 +160,36 @@ export default function HomeWeb() {
     frameLot(map, { ring, at: at || [l!.lng, l!.lat], lotAc: l?.lotAc, left: GAP + COL + GAP + 420, top: BAR_BOTTOM });
   };
   const closeDetail = () => { alerts.close(); setSelId(null); setParcel(null); setSoloL(null); setCompsOn(false); setCompsOut(false); setExportOn(false); };
-  // Set by the side nav's "New buyer search": the next area search ends on the Save search sheet.
-  const buyerRef = useRef(false);
-  const [buyer, setBuyerS] = useState(false);
-  const setBuyer = (on: boolean) => { buyerRef.current = on; setBuyerS(on); };
-  const afterBuyerSearch = (was: boolean) => { if (was) setTimeout(() => openSheet(), 450); };
+  // Create intent, set by the side nav (New buyer search / the Create button): the search
+  // step asks the matching question, and what's picked next finishes the job.
+  // buyer: the next area search ends on the Save search sheet.
+  // underbuilt: the next area search shows results with the Underbuilt heat and "Build potential 40%+".
+  // comps: the next address opens that property straight into comps.
+  type Intent = "buyer" | "underbuilt" | "comps" | null;
+  const intentRef = useRef<Intent>(null);
+  const [intent, setIntentS] = useState<Intent>(null);
+  const setIntent = (i: Intent) => { intentRef.current = i; setIntentS(i); };
+  const setBuyer = (on: boolean) => setIntent(on ? "buyer" : null);
+  const INTENT_PROMPT: Record<string, string> = { buyer: "Where is your buyer looking?", underbuilt: "Where should we look for underbuilt lots?", comps: "Which property do you want comps for?" };
+  const afterBuyerSearch = (was: Intent) => {
+    if (was === "buyer") setTimeout(() => openSheet(), 450);
+    if (was === "underbuilt") { setHeat("ub"); fs.setF({ ...fs.f, ub: Math.max(fs.f.ub || 0, 40) }); showToast("Showing lots with 40%+ build potential", "positive"); }
+  };
+  // Comps intent: once the picked property is open, go straight into comps.
+  const compsNext = useRef(false);
   const goPlace = async (p: Place) => { setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
   // `_commitAreas`: results for the field's area(s); leaves the active saved search.
   // Each chip resolves to a Place (live geocoding / gazetteer; "Current location" via
   // geolocation), then they go to `chooseAreas` together (outlines + listings for all).
   const commitAreas = async (list: Area[]) => {
-    let wasBuyer = buyerRef.current; setBuyer(false);
+    let wasBuyer = intentRef.current; setIntent(null);
     sv.setActive(null); closeDetail(); setSearching(false); setView("results"); setUnsup(null); setAreaPill(false);
     const ps = await Promise.all(list.map(a => resolveArea(a, place.center)));
     const ok = ps.filter((p): p is Place => !!p);
     const missed = list.filter((_, k) => !ps[k]);
     if (!ok.length) { setUnsup({ label: list[list.length - 1].label, placed: false }); return; }
     if (missed.length) showToast("No results for " + missed.map(a => a.label.split(",")[0]).join(", "), "info");
-    if (!ok.some(isCovered)) { wasBuyer = false; setUnsup({ label: ok[ok.length - 1].label, placed: true }); }
+    if (!ok.some(isCovered)) { wasBuyer = null; setUnsup({ label: ok[ok.length - 1].label, placed: true }); }
     await chooseAreas(ok);
     afterBuyerSearch(wasBuyer);
   };
@@ -185,9 +197,10 @@ export default function HomeWeb() {
   // coverage there's no property data: neutral "No property found" toast (sprint item).
   const pickAddress = (p: Place) => {
     sv.setActive(null);
+    compsNext.current = intentRef.current === "comps"; setIntent(null);
     const [lng, lat] = p.center;
     const l = isCovered(p) ? listingAt("addr:" + p.id, p.center, p.label.split(", ").slice(1, 2).join("")) : null;
-    if (!l) return showToast("No property found", "info");
+    if (!l) { compsNext.current = false; return showToast("No property found", "info"); }
     // A real lot keeps its own spot and address; a generated home takes the searched ones.
     openSavedProp(l.apn ? l : { ...l, lng, lat, addr: p.name });
   };
@@ -280,6 +293,13 @@ export default function HomeWeb() {
     alerts.close(); setHoverId(null); fs.setDd(null); setSortOpen(false); setAreaPill(false);
     setCompsReveal(!rp.has(sel)); setCompsOut(false); setCompsOn(true);
   };
+  // Create → Run comps: the property just picked opens, then slides into comps.
+  useEffect(() => {
+    if (!compsNext.current || !sel) return;
+    compsNext.current = false;
+    const t = setTimeout(openCompsMode, 600);
+    return () => clearTimeout(t);
+  }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Frame once the session (and so its comps) exists.
   useEffect(() => { if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [compsOn, cm.key]); // eslint-disable-line react-hooks/exhaustive-deps
   // New filters or radius: reframe once the new comps are known.
@@ -421,10 +441,17 @@ export default function HomeWeb() {
         // places and Run comps need an active trial / plan.
         if (k === "Settings") paywall.open({ kind: "plan" });
         if (k === "Inman News") paywall.open({ kind: "news" });
-        if (k === "AI Notes" || k === "Assistant" || k === "Comps") {
-          if (!ent.planOn) paywall.open({ kind: "offer", feature: k === "Comps" ? "comps" : "assistant" });
-          else showToast(`${k === "Comps" ? "Run comps" : k} isn't in the prototype yet`, "neutral");
+        if (k === "AI Notes" || k === "Assistant") {
+          if (!ent.planOn) paywall.open({ kind: "offer", feature: "assistant" });
+          else showToast(`${k} isn't in the prototype yet`, "neutral");
         }
+        // Run comps: pick a property, then comps open on it. Find underbuilt: pick an area,
+        // then results with the Underbuilt heat. Both start in the search step, like buyer search.
+        if (k === "Comps") {
+          if (!ent.planOn) paywall.open({ kind: "offer", feature: "comps" });
+          else { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("comps"); setSearching(true); }
+        }
+        if (k === "Underbuilt") { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("underbuilt"); setSearching(true); }
       }} />
       <BillingHost onToast={showToast} />
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
@@ -434,8 +461,8 @@ export default function HomeWeb() {
           <div style={{ pointerEvents: "auto" }}>
             {/* Entering the search step (`onSearchFocus`) closes dropdowns and the detail panel, as the canvas step change does. */}
             <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : areaSq(fieldAreas.map(a => a.label))} near={place.center}
-              areas={fieldAreas} searching={searching} prompt={buyer ? "Where is your buyer looking?" : undefined}
-              onSearching={on => { setSearching(on); if (!on) setTimeout(() => { buyerRef.current = false; setBuyerS(false); }, 0); if (on) { fs.setDd(null); setSortOpen(false); closeDetail(); } }}
+              areas={fieldAreas} searching={searching} prompt={intent ? INTENT_PROMPT[intent] : undefined}
+              onSearching={on => { setSearching(on); if (!on) setTimeout(() => setIntent(null), 0); if (on) { fs.setDd(null); setSortOpen(false); closeDetail(); } }}
               onCommit={commitAreas} onPickAddress={pickAddress} onClearAll={clearSearch}
               onClear={() => { if (detailOpen) closeDetail(); else { setView("home"); setUnsup(null); } }}
               active={detailOpen ? null : active} onManage={() => openSheet(active)} onClearActive={clearActive} />
