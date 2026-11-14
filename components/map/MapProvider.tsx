@@ -8,7 +8,7 @@ import { config, isLiveMap } from "@/lib/config";
 import { MapMode, offlineStyle, styleFor } from "@/lib/map/style";
 import { applyBreezyTheme } from "@/lib/map/theme";
 import { applyBreezyBasemap, breezyTransformRequest } from "@/lib/map/breezyTheme";
-import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors, stampParcels, fadeHeatTo } from "@/lib/map/layers";
+import { HeatKind, ensureLayers, setArea, syncHeat, fakeParcelsFor, FakeParcel, applyHeatColors, stampParcels, fadeHeatTo, syncWaterOverHeat } from "@/lib/map/layers";
 import { HEAT_PALETTE_EVENT, setHeatDarkBase } from "@/lib/heat";
 import { updateUsHeat } from "@/lib/map/usHeat";
 import { Ring } from "@/lib/geo";
@@ -78,6 +78,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       if (!ensureLayers(m)) return;
       applyBreezyTheme(m);
       applyBreezyBasemap(m, modeRef.current === "dark");
+      syncWaterOverHeat(m, modeRef.current === "dark");
       setArea(m, areaRef.current);
       syncHeat(m, heatRef.current);
       setParcels(fakeParcelsFor(m, heatRef.current));
@@ -100,7 +101,12 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     m.on("error", e => { (window as any).__bzErr = String((e as any)?.error?.message || e); });
     m.on("error", e => { if (!(m as any).style?._loaded && /style|token|401|403|Failed to fetch/i.test(String((e as any)?.error?.message || ""))) fallback(); });
     const t = setTimeout(() => { if (!(m as any).style?._loaded) fallback(); }, 4000);
+    // US heat cells are listed during the move too (throttled), so a tier fading in
+    // is already drawn instead of popping in when the move ends.
+    let usAt = 0;
     m.on("move", () => {
+      const now = performance.now();
+      if (now - usAt > 350) { usAt = now; updateUsHeat(m); }
       cancelAnimationFrame(raf.current);
       raf.current = requestAnimationFrame(() => setTick(x => x + 1));
     });
@@ -148,7 +154,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     setHeatDarkBase(md === "dark");
     if (!map) return;
     // Breezy light ↔ dark is one style with two presets: switch in place.
-    if (!offline && (prev === "light" || prev === "dark") && (md === "light" || md === "dark")) { applyBreezyBasemap(map, md === "dark"); applyHeatColors(map, heatRef.current); return; }
+    if (!offline && (prev === "light" || prev === "dark") && (md === "light" || md === "dark")) { applyBreezyBasemap(map, md === "dark"); syncWaterOverHeat(map, md === "dark"); applyHeatColors(map, heatRef.current); return; }
     map.setStyle(offline ? offlineStyle(md) : styleFor(md), { diff: false } as any);
   }, [map, offline]);
 
@@ -194,6 +200,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     return () => ov.removeEventListener("wheel", wheel);
   }, [map]);
 
+  useEffect(() => { (window as any).__bzSetMode = setMode; }, [setMode]); // console / test hook, like __bzMap
   const value = useMemo(() => ({ map, ready, mode, setMode, heat, setHeat, setAreaRings, inset, setInset, parcels, offline }),
     [map, ready, mode, setMode, heat, setHeat, setAreaRings, inset, parcels, offline]);
   return (

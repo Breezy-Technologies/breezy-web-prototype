@@ -1,6 +1,7 @@
 // Fake Breezy data: listings, opportunities, owners, quick estimates and heat
 // values, all generated deterministically from a place so every search feels
 // populated. Swap these functions for real API calls later.
+import { onUsLand } from "./usLand";
 import { BBox, LngLat, Ring, hashStr, pointInRings, rng } from "./geo";
 import { HEAT_AREA, LOTS, LOT_ZONE, Lot, PIN_LOTS, boxesMeet, fromHeatCenter, inBox, inLotZone, lotId, lotRng } from "./silverlake";
 import SL_HOMES from "./data/sl-homes.json";
@@ -287,10 +288,45 @@ function cellListings(i: number, j: number) {
   }
   return c;
 }
+/* Wide views (15 Nov: "even looking at the entire US I should see pins everywhere"): the box
+   is cut into zones of a fixed global grid (cell size CELL × 2^L, L picked so about n zones
+   fit), and each zone shows one home. A zone's home is found by walking down its quarters
+   in a fixed hashed order to one ~500 m cell and taking that cell's best-ranked home, so a
+   zone's pick is also the pick of one of its quarters: zooming in and searching again keeps
+   the same homes in the same places and adds more. Picks stay on US land (lib/usLand). */
+const quarter = (k: number, i: number, j: number) => {
+  const kids: [number, number][] = [[2 * i, 2 * j], [2 * i + 1, 2 * j], [2 * i, 2 * j + 1], [2 * i + 1, 2 * j + 1]];
+  return kids.map((c, q) => ({ c, h: hashStr(`z${k}:${i}:${j}:${q}`) })).sort((a, b) => a.h - b.h).map(x => x.c);
+};
+function zoneHome(L: number, i: number, j: number): Listing | null {
+  for (let k = L; k > 0; k--) {
+    const kids = quarter(k, i, j), sz = CELL * 2 ** (k - 1);
+    // Coarse quarters: take the first whose middle is on land (keeps homes off the sea).
+    const pick = k >= 3 ? kids.find(([a, b]) => onUsLand((a + 0.5) * sz, (b + 0.5) * sz)) : kids[0];
+    if (!pick) return null;
+    [i, j] = pick;
+  }
+  const best = cellListings(i, j).filter(c => onUsLand(c.l.lng, c.l.lat)).sort((a, b) => a.rank - b.rank)[0];
+  return best ? best.l : null;
+}
+function spreadListings(bbox: BBox, n: number, have: Set<number>): Listing[] {
+  const [w, s, e, nn] = bbox;
+  const L = Math.max(0, Math.ceil(Math.log2(Math.sqrt(((e - w) * (nn - s)) / n) / CELL)));
+  const size = CELL * 2 ** L, out: Listing[] = [];
+  for (let i = Math.floor(w / size); i <= Math.floor(e / size); i++)
+    for (let j = Math.floor(s / size); j <= Math.floor(nn / size); j++) {
+      const l = zoneHome(L, i, j);
+      if (l && !have.has(l.id) && l.lng >= w && l.lng <= e && l.lat >= s && l.lat <= nn) { have.add(l.id); out.push(l); }
+    }
+  return out;
+}
+
 export function areaListings(prev: Listing[], bbox: BBox, n: number): Listing[] {
   // every pin already on screen inside the box stays (up to 2n, for very dense views)
   const kept = prev.filter(l => l.lng >= bbox[0] && l.lng <= bbox[2] && l.lat >= bbox[1] && l.lat <= bbox[3]).slice(0, 2 * n);
-  // new homes: as before, a zoomed-out box only gets them in a window round its centre
+  // A box wider than a neighbourhood: homes spread over all of it (see spreadListings).
+  if (bbox[2] - bbox[0] > 0.06 || bbox[3] - bbox[1] > 0.045) return [...kept, ...spreadListings(bbox, n, new Set(kept.map(l => l.id)))];
+  // A neighbourhood-sized box: the best-ranked homes of every cell in it.
   let [w, s, e, nn] = bbox;
   const cx = (w + e) / 2, cy = (s + nn) / 2, hx = Math.min(0.03, (e - w) / 2), hy = Math.min(0.0225, (nn - s) / 2);
   n = Math.round(n * pinDensity([cx, cy]));

@@ -31,7 +31,7 @@ import { AreaReport, ReportsSheet, useReports } from "@/components/home/Reports"
 import { Listing, OppType, listingAt } from "@/lib/fake";
 import { Filters, SortKey, fDims, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
-import { BBox, LngLat, pointInRings, ringBBox } from "@/lib/geo";
+import { BBox, LngLat, hashStr, pointInRings, ringBBox } from "@/lib/geo";
 import { accessNow, paywall, reportKey, spend, useEntitlements } from "@/lib/billing";
 import { BillingHost } from "@/components/billing/Paywall";
 
@@ -131,7 +131,11 @@ export default function HomeWeb() {
   const hover = hoverId != null ? listings.find(l => l.id === hoverId) || null : null;
   const forYou = useMemo(() => {
     const on = Object.entries(picks).filter(([, v]) => v).map(([k]) => k);
-    return on.length ? listings.filter(l => on.includes(l.opp)) : listings.slice(0, 10);
+    if (on.length) return listings.filter(l => on.includes(l.opp));
+    // No picks: a fixed ~30% of the homes, spread over the whole search (15 Nov: a US-wide
+    // search shows special pins everywhere, not just the first ten, which sat in one city).
+    const some = listings.filter(l => hashStr("fy:" + l.id) % 10 < 3);
+    return some.length >= 10 ? some : listings.slice(0, 10);
   }, [listings, picks]);
   // Special pins (review feedback): only while Home's "For you" tab is showing. They
   // follow the feed's signal filter, and a pin reverts to a plain white pill once its
@@ -364,7 +368,9 @@ export default function HomeWeb() {
     // On Home's For you tab the search stays there (review comment): the feed and its
     // special pins refresh for the newly searched area. Elsewhere it opens Results.
     if (!fyOn) setView("results");
-    setUnsup(isCovered(p) ? null : { label: "This area", placed: true });
+    // A map area is searched wherever it is: the demo listings and heat cover the whole US
+    // (15 Nov). Named places keep the coverage check.
+    setUnsup(null);
     chooseAreas([p]);
   };
 

@@ -1,61 +1,47 @@
 // US-wide demo heat (12 Nov review: "cover the full US for the heatmap", dummy data).
 //
-// Silver Lake keeps its real res 8 grid (layers.ts, bz-hex-sub). Everywhere else in
-// the 50 states, hexes sit on the fixed H3 grid at a resolution that steps with the
-// zoom, so a country view isn't millions of cells:
-//   zoom  < 6.5   res 4  (~45 km across)
-//   6.5 – 9       res 5  (~17 km)
-//   9 – 11.5      res 7  (~2.5 km)
-//   ≥ 11.5        res 8  (~1 km): the same grid as Silver Lake, so they meet seamlessly
-// Cells are listed for the viewport (plus a margin) after each move and cached per
-// resolution: a cell's value never changes and a drawn cell is never redrawn
-// differently, it only gains neighbours (review: rebuilt hexes kept changing).
-// Values: heatPct (lib/heat), the same three-scale field the demo parcels read.
-// Land only: a cell is kept when its centre is inside a state outline
-// (public/data/us-states.json, scripts/fetch-us-outline.mjs, loaded on demand).
+// Pedro's LA box has its own two tiers (layers.ts: bz-hex res 7, bz-hex-sub res 8).
+// Everywhere else in the 50 states, hexes sit on the fixed H3 grid at a resolution
+// that steps with the zoom, so a country view isn't millions of cells. Neighbouring
+// tiers crossfade over the same zoom window, as Pedro's city / submarket hand-over
+// (14 Nov: transitions used to snap, and a tier could pop in late):
+//   res 4 (~45 km)   to 6.9, fading out 6.1 → 6.9
+//   res 5 (~17 km)   6.1 → 9.4, in by 6.9, out from 8.6
+//   res 7 (~2.5 km)  8.6 → 13, in by 9.4, out 11.8 → 13   (= the LA city tier)
+//   res 8 (~1 km)    11.9 → 16, in by 13, out 15 → 16     (= the LA submarket tier)
+// Cells are listed for the viewport (plus a margin) during and after each move, for
+// every tier visible at this zoom and the next one coming, and cached per resolution:
+// a cell's value never changes, it only gains neighbours. Res 4 / 5 cover LA too (the
+// box has no tier that coarse); res 7 / 8 leave the box to its own tiers.
+// Values: heatPct (lib/heat): ROI blends into Pedro's field near LA, no seam.
+// Land: a cell is kept when its centre or any corner is inside a state outline
+// (public/data/us-states.json, loaded on demand); the water drawn over the heat trims
+// it to the coast, so the shore has neither gaps nor overhang.
 import type { Map as MbMap, GeoJSONSource } from "mapbox-gl";
 import { cellToBoundary, cellToLatLng, polygonToCells } from "h3-js";
 import { heatPct } from "../heat";
-import { fromHeatCenter, HEAT_AREA } from "../silverlake";
-import SL_HEAT from "../data/sl-heat.json";
+import { inLaBox } from "../heat/pedroField";
+import { loadUsLand, onUsLand as onLand, usLandReady } from "../usLand";
 
 export const US_TIERS = [
-  { res: 4, min: 0, max: 6.5 },
-  { res: 5, min: 6.5, max: 9 },
-  { res: 7, min: 9, max: 11.5 },
-  { res: 8, min: 11.5, max: 16 },
+  { res: 4, min: 0, max: 6.9 },
+  { res: 5, min: 6.1, max: 9.4 },
+  { res: 7, min: 8.6, max: 13.2 },
+  { res: 8, min: 11.9, max: 16 },
 ] as const;
 export const usSrc = (res: number) => `bz-us-${res}`;
 export const US_FILLS = US_TIERS.map(t => usSrc(t.res) + "-fill");
+const zr = (...stops: number[]) => ["interpolate", ["linear"], ["zoom"], ...stops] as any;
+/** Fill opacity by zoom for a tier at layer alpha A (Pedro's ramps for res 7 / 8). */
+export function usOpacity(res: number, A: number) {
+  if (res === 4) return zr(6.1, 0.95 * A, 6.9, 0);
+  if (res === 5) return zr(6.1, 0, 6.9, 0.95 * A, 8.6, 0.95 * A, 9.4, 0);
+  if (res === 7) return zr(8.6, 0, 9.4, 0.95 * A, 11.8, 0.92 * A, 13, 0);
+  return zr(11.9, 0, 13, 0.92 * A, 15, 0.8 * A, 16, 0);
+}
 
-type State = { bb: [number, number, number, number]; ring: number[][] };
-let states: State[] | null = null, loading: Promise<void> | null = null;
-function loadStates() {
-  return loading ||= fetch("/data/us-states.json").then(r => r.json()).then((d: Record<string, number[][][]>) => {
-    states = Object.values(d).flat().map(ring => {
-      let w = 180, s = 90, e = -180, n = -90;
-      for (const [x, y] of ring) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
-      return { bb: [w, s, e, n], ring };
-    });
-  }).catch(() => { states = []; });
-}
-function onLand(x: number, y: number) {
-  for (const st of states!) {
-    const [w, s, e, n] = st.bb;
-    if (x < w || x > e || y < s || y > n) continue;
-    let inside = false;
-    const r = st.ring;
-    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
-      const [xi, yi] = r[i], [xj, yj] = r[j];
-      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    if (inside) return true;
-  }
-  return false;
-}
 // The 50 states' rough box (Alaska's Aleutians cross the antimeridian; they're left out).
 const US_BOX = [-170, 18, -66, 72];
-const SL_CELLS = new Set(Object.keys(SL_HEAT.hex as Record<string, unknown>));
 
 const seen = new Map<number, Set<string>>();          // every cell looked at, per res
 const feats = new Map<number, GeoJSON.Feature[]>();   // the land cells kept, per res
@@ -64,7 +50,6 @@ const MAX_CELLS = 40000;
 // Res 8 reads the full field, like the Silver Lake grid and the parcels it meets.
 const CELL_KM: Record<number, number> = { 4: 45, 5: 17, 7: 2.5, 8: 0 };
 
-function tierFor(z: number) { return US_TIERS.find(t => z < t.max) || US_TIERS[US_TIERS.length - 1]; }
 
 export function addUsLayers(add: (layer: any) => void, m: MbMap) {
   for (const t of US_TIERS) {
@@ -75,22 +60,33 @@ export function addUsLayers(add: (layer: any) => void, m: MbMap) {
   }
 }
 
-/** List the cells for the current view (call after each move); a no-op when nothing is new. */
+/** List the cells for the current view (call during and after each move); a no-op when nothing is new. */
 export function updateUsHeat(m: MbMap) {
   if (!m.getSource(usSrc(8))) return;
-  if (!states) { loadStates().then(() => updateUsHeat(m)); return; }
+  if (!usLandReady()) { loadUsLand().then(() => updateUsHeat(m)); return; }
   const z = m.getZoom();
-  if (z >= 16) return;
-  const t = tierFor(z), res = t.res;
   const b = m.getBounds();
   if (!b) return;
-  const dx = (b.getEast() - b.getWest()) * 0.25, dy = (b.getNorth() - b.getSouth()) * 0.25;
-  const w = Math.max(US_BOX[0], b.getWest() - dx), e = Math.min(US_BOX[2], b.getEast() + dx);
-  const s = Math.max(US_BOX[1], b.getSouth() - dy), n = Math.min(US_BOX[3], b.getNorth() + dy);
-  if (w >= e || s >= n) return;
-  let cells: string[];
-  try { cells = polygonToCells([[s, w], [s, e], [n, e], [n, w], [s, w]], res); } catch { return; }
-  if (cells.length > 30000) return; // far too zoomed out for this tier
+  // Every tier drawn at this zoom, plus the next one coming (0.8 zoom ahead), so a
+  // tier is already there when it starts fading in.
+  for (const t of US_TIERS) if (z >= t.min - 0.8 && z < t.max) listTier(m, t.res, b, z < t.min ? 0 : 0.25);
+}
+
+function listTier(m: MbMap, res: number, b: NonNullable<ReturnType<MbMap["getBounds"]>>, margin: number) {
+  const box = (k: number) => {
+    const dx = (b.getEast() - b.getWest()) * k, dy = (b.getNorth() - b.getSouth()) * k;
+    return [Math.max(US_BOX[0], b.getWest() - dx), Math.max(US_BOX[1], b.getSouth() - dy), Math.min(US_BOX[2], b.getEast() + dx), Math.min(US_BOX[3], b.getNorth() + dy)];
+  };
+  let cells: string[] | null = null;
+  // A large view lists the visible box only rather than drawing nothing (a gap).
+  for (const k of [margin, 0]) {
+    const [w, s, e, n] = box(k);
+    if (w >= e || s >= n) return;
+    try { cells = polygonToCells([[s, w], [s, e], [n, e], [n, w], [s, w]], res); } catch { return; }
+    if (cells.length <= 30000) break;
+    cells = null;
+  }
+  if (!cells) return;
   const done = seen.get(res) || new Set<string>(), list = feats.get(res) || [];
   seen.set(res, done); feats.set(res, list);
   let added = 0;
@@ -98,10 +94,10 @@ export function updateUsHeat(m: MbMap) {
     if (done.has(h)) continue;
     done.add(h);
     const [lat, lng] = cellToLatLng(h);
-    if (!onLand(lng, lat)) continue;
-    // Silver Lake's own grid covers the heat circle.
-    if (res === 8 ? SL_CELLS.has(h) : fromHeatCenter([lng, lat]) < HEAT_AREA.radius) continue;
+    // Pedro's LA box has its own res 7 / 8 tiers (layers.ts).
+    if (res >= 7 && inLaBox(lng, lat)) continue;
     const ring = cellToBoundary(h, true);
+    if (!onLand(lng, lat) && !ring.some(([x, y]) => onLand(x, y))) continue;
     ring.push(ring[0]);
     list.push({ type: "Feature", properties: { h3: h, roi: heatPct("roi", lng, lat, CELL_KM[res]), ub: heatPct("ub", lng, lat, CELL_KM[res]), x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } });
     added++;

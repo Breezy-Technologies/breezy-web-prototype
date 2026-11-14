@@ -1,12 +1,14 @@
 import type { Map as MbMap, GeoJSONSource } from "mapbox-gl";
 import { config, hasRegrid } from "../config";
 import { Ring, metersPerDegLat, metersPerDegLng, rng, hashStr } from "../geo";
-import { cellToBoundary, cellToLatLng, polygonToCells } from "h3-js";
+import { cellToBoundary, cellToLatLng, latLngToCell, polygonToCells } from "h3-js";
 import { isStandardStyle } from "./breezyTheme";
 import { heatAlpha, heatColors, heatPct, heatStep, parcelPct } from "../heat";
-import { LOTS, HEAT_AREA, fromHeatCenter, heatAreaLatLng } from "../silverlake";
+import { LOTS, HEAT_AREA, fromHeatCenter } from "../silverlake";
+import { LA_BOX_LATLNG, inSea } from "../heat/pedroField";
+import { BREEZY_DARK, BREEZY_LIGHT } from "./breezyTheme";
 import SL_HEAT from "../data/sl-heat.json";
-import { US_FILLS, addUsLayers } from "./usHeat";
+import { US_FILLS, US_TIERS, addUsLayers, usOpacity, usSrc } from "./usHeat";
 
 export type HeatKind = "roi" | "ub" | "none";
 
@@ -29,21 +31,27 @@ export function ensureLayers(m: MbMap) {
   const glow = (l: any) => ({ ...l, slot: "middle", paint: { ...l.paint, [l.type + "-emissive-strength"]: 1 } });
   const add = (layer: any): void => { m.addLayer(std ? glow(layer) : layer, before); };
   if (!m.getSource("bz-hex")) {
-    // Two hex tiers, as in Pedro's build: city cells (bz-hex) hand over to
-    // submarket cells (bz-hex-sub) between zoom 11.9 and 13. No outlines; the
-    // line layers stay invisible except for the onboarding wave's front.
-    // One continuous grid (review: hexes still changed as you zoomed): the res 8
-    // cells draw at every zoom, so zooming only scales them. The city tier
-    // (bz-hex) stays as an empty source so the rest of the code is unchanged.
-    // tolerance 0: no per-zoom simplification, so hex edges never shift.
-    for (const [src, min, max] of [["bz-hex", 0, 13.2], ["bz-hex-sub", 0, 16]] as const) {
-      m.addSource(src, { type: "geojson", data: src === "bz-hex" ? EMPTY : hexData(8), tolerance: 0, buffer: 16 });
+    // Two hex tiers over Pedro's LA box, as in his build (14 Nov: match Pedro): city
+    // cells (bz-hex, H3 res 7) hand over to submarket cells (bz-hex-sub, res 8) between
+    // zoom 11.9 and 13, with his fade ranges. The res 8 tier covers the whole box (his
+    // only covers the core, which left blank edges). No outlines; the line layers stay
+    // invisible except for the onboarding wave's front. tolerance 0: hex edges never shift.
+    for (const [src, min, max, res] of [["bz-hex", 0, 13.2, 7], ["bz-hex-sub", 11.9, 16, 8]] as const) {
+      m.addSource(src, { type: "geojson", data: hexData(res), tolerance: 0, buffer: 16 });
       add({ id: src + "-fill", type: "fill", source: src, minzoom: min, maxzoom: max, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0, "fill-opacity-transition": { duration: 400 }, "fill-antialias": false } }); // no seams where translucent cells meet
       add({ id: src + "-line", type: "line", source: src, minzoom: min, maxzoom: max, paint: { "line-color": "rgba(0,0,0,0)", "line-width": 1, "line-opacity": 0 } });
     }
   }
   // The rest of the US: demo hexes, one H3 resolution per zoom band (usHeat.ts).
   addUsLayers(add, m);
+  // Water drawn again over the heat (as Pedro's build): colour stops exactly at the
+  // coastline, lakes and reservoirs at every zoom. Our own streets source, since
+  // Standard's basemap water lives inside an import; its colour follows the preset
+  // (syncWaterOverHeat). Not offline (no token).
+  if (!m.getSource("bz-water") && config.mapboxToken) {
+    m.addSource("bz-water", { type: "vector", url: "mapbox://mapbox.mapbox-streets-v8" });
+    m.addLayer({ id: "bz-water-over", type: "fill", source: "bz-water", "source-layer": "water", maxzoom: 16.5, ...(std ? { slot: "middle" } : {}), paint: { "fill-color": waterColor(m, false), "fill-antialias": true } } as any, before);
+  }
   if (!m.getSource("bz-par")) {
     resetParcelStamps();
     if (hasRegrid()) {
@@ -123,7 +131,7 @@ export function applyHeatColors(m: MbMap, kind: HeatKind) {
   const A = kind === "none" ? 0 : heatAlpha(kind) * fadeA;
   m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
   m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
-  for (const id of US_FILLS) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", subOpacity(A));
+  for (const t of US_TIERS) if (m.getLayer(usSrc(t.res) + "-fill")) m.setPaintProperty(usSrc(t.res) + "-fill", "fill-opacity", usOpacity(t.res, A));
   if (m.getLayer("bz-par-fill")) m.setPaintProperty("bz-par-fill", "fill-opacity", parcelOpacity(A));
   for (const id of ["bz-lots-fill", "bz-la-fill"]) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", parcelOpacity(A));
   if (kind === "none") return;
@@ -155,7 +163,7 @@ function setAlpha(m: MbMap, kind: HeatKind, f: number) {
   const A = heatAlpha(kind) * f;
   m.setPaintProperty("bz-hex-fill", "fill-opacity", cityOpacity(A));
   m.setPaintProperty("bz-hex-sub-fill", "fill-opacity", subOpacity(A));
-  for (const id of US_FILLS) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", subOpacity(A));
+  for (const t of US_TIERS) if (m.getLayer(usSrc(t.res) + "-fill")) m.setPaintProperty(usSrc(t.res) + "-fill", "fill-opacity", usOpacity(t.res, A));
   for (const id of ["bz-par-fill", "bz-lots-fill", "bz-la-fill"]) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", parcelOpacity(A));
 }
 function animate(ms: number, f: (t: number) => void, done: () => void) {
@@ -187,8 +195,10 @@ export function fadeHeatTo(m: MbMap, kind: HeatKind) {
    submarket hexes fade in 11.9 → 13 and out 15 → 16, lots fade in 15.6 → 16.2
    and strengthen to 17. */
 const zr = (...stops: number[]) => ["interpolate", ["linear"], ["zoom"], ...stops] as any;
-const cityOpacity = (A: number) => zr(9.5, 0.95 * A, 11.8, 0.92 * A, 13, 0);
-const subOpacity = (A: number) => zr(9.5, 0.95 * A, 13, 0.92 * A, 15, 0.8 * A, 16, 0);
+// The LA tiers use the same ramps as the US res 7 / res 8 tiers (usHeat), so the
+// box and the country around it fade at the same zooms.
+const cityOpacity = (A: number) => usOpacity(7, A);
+const subOpacity = (A: number) => usOpacity(8, A);
 const parcelOpacity = (A: number) => zr(15.6, 0, 16.2, 0.8 * A, 17, 0.9 * A);
 
 // ---- Regrid parcel colour ----
@@ -231,21 +241,51 @@ const hexDataCache = new Map<number, GeoJSON.FeatureCollection>();
 function hexData(res: number): GeoJSON.FeatureCollection {
   const hit = hexDataCache.get(res);
   if (hit) return hit;
-  // Real cells: the average of every lot / county parcel inside, spread by rank over
-  // the lots' range (lib/data/sl-heat.json). Elsewhere (none at res 8 today) the fake field.
+  // ROI, Pedro's rule (derive.ts buildHexes): a cell holding more than 3 of his lots
+  // takes their plain average; any other cell reads his field at its centre (heatPct).
+  // Underbuilt keeps ours: the real Silver Lake cells (lib/data/sl-heat.json, spread by
+  // rank: the team found plain UB averages too flat), else the lots' average, else the field.
+  const lots = new Map<string, { roi: number; ub: number; n: number }>();
+  for (const l of LOTS) {
+    const c = latLngToCell(l.c[1], l.c[0], res), a = lots.get(c);
+    if (a) { a.roi += l.roi; a.ub += l.ub; a.n++; } else lots.set(c, { roi: l.roi, ub: l.ub, n: 1 });
+  }
   const real = SL_HEAT.hex as Record<string, number[]>;
-  const features: GeoJSON.Feature[] = polygonToCells([heatAreaLatLng()], res).map(h => {
+  const cellKm = res === 7 ? 2.5 : 0;
+  const features: GeoJSON.Feature[] = [];
+  for (const h of polygonToCells([LA_BOX_LATLNG], res)) {
     const [lat, lng] = cellToLatLng(h);
     const ring = cellToBoundary(h, true);
+    // Open sea has no properties: drop a cell only when it's all water; the water drawn
+    // over the heat trims the rest to the coastline (no gaps along the shore).
+    if (inSea(lat, lng) && ring.every(([x, y]) => inSea(y, x))) continue;
     ring.push(ring[0]);
-    const r = res === 8 ? real[h] : undefined;
-    const roi = r ? r[0] : heatPct("roi", lng, lat);
-    const ub = r ? r[1] : heatPct("ub", lng, lat);
-    return { type: "Feature", properties: { h3: h, roi, ub, x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } };
-  });
+    const L = lots.get(h), many = !!L && L.n > 3;
+    const roi = many ? Math.round(L!.roi / L!.n) : Math.round(heatPct("roi", lng, lat, cellKm));
+    const ub = res === 8 && real[h] ? real[h][1] : many ? Math.round((L!.ub / L!.n) * 10) / 10 : heatPct("ub", lng, lat, cellKm);
+    features.push({ type: "Feature", properties: { h3: h, roi, ub, x: lng, y: lat }, geometry: { type: "Polygon", coordinates: [ring] } });
+  }
   const fc = { type: "FeatureCollection", features } as GeoJSON.FeatureCollection;
   hexDataCache.set(res, fc);
   return fc;
+}
+
+/** Water colour of the current basemap (Breezy light / dark presets, or the classic style's own). */
+function waterColor(m: MbMap, dark: boolean): string {
+  if (isStandardStyle(m)) return String((dark ? BREEZY_DARK : BREEZY_LIGHT).colorWater);
+  try { const c = m.getPaintProperty("water", "fill-color"); if (typeof c === "string") return c; } catch {}
+  return String(BREEZY_LIGHT.colorWater);
+}
+/** Recolour (or hide, on satellite) the water drawn over the heat for the current basemap. */
+export function syncWaterOverHeat(m: MbMap, dark: boolean) {
+  if (!m.getLayer("bz-water-over")) return;
+  const sat = /satellite/i.test(String((m.getStyle() as any)?.name || "")) || (!isStandardStyle(m) && !m.getLayer("water"));
+  m.setLayoutProperty("bz-water-over", "visibility", sat ? "none" : "visible");
+  if (sat) return;
+  m.setPaintProperty("bz-water-over", "fill-color", waterColor(m, dark));
+  // Standard's water isn't darkened by the night light the way a plain fill is: draw ours
+  // at its true colour (emissive) so it matches; the day preset matches either way.
+  if (isStandardStyle(m)) try { m.setPaintProperty("bz-water-over", "fill-emissive-strength" as any, 1); } catch {}
 }
 
 let lotFC: GeoJSON.FeatureCollection | null = null;
@@ -318,9 +358,13 @@ export function heatWave(m: MbMap, c: [number, number], R: number, band: number)
   const A = lastKind === "none" ? 0 : heatAlpha(lastKind);
   const kx = metersPerDegLng(c[1]), ky = metersPerDegLat;
   const d = ["sqrt", ["+", ["^", ["*", ["-", ["get", "x"], c[0]], kx], 2], ["^", ["*", ["-", ["get", "y"], c[1]], ky], 2]]];
-  const on = "bz-hex-sub", off = "bz-hex"; // one grid at every zoom
+  const sub = m.getZoom() >= 12.45, on = sub ? "bz-hex-sub" : "bz-hex", off = sub ? "bz-hex" : "bz-hex-sub"; // the tier on screen
   m.setPaintProperty(on + "-fill", "fill-opacity", ["case", ["<", d, R - band], 0.92 * A, ["<", d, R], Math.min(1, 0.92 * A + 0.3), 0] as any);
-  for (const id of US_FILLS) if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", ["case", ["<", d, R - band], 0.92 * A, ["<", d, R], Math.min(1, 0.92 * A + 0.3), 0] as any);
+  // Outside LA, the US tier matching the LA one on screen rolls out with it; the others stay hidden.
+  for (const t of US_TIERS) {
+    const id = usSrc(t.res) + "-fill";
+    if (m.getLayer(id)) m.setPaintProperty(id, "fill-opacity", t.res === (sub ? 8 : 7) ? ["case", ["<", d, R - band], 0.92 * A, ["<", d, R], Math.min(1, 0.92 * A + 0.3), 0] as any : 0);
+  }
   m.setPaintProperty(on + "-line", "line-opacity", ["case", ["<", d, R - band], 0, ["<", d, R], 0.9, 0] as any);
   m.setPaintProperty(off + "-fill", "fill-opacity", 0);
 }
