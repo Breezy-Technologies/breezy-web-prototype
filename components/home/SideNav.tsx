@@ -1,8 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { billing, useEntitlements } from "@/lib/billing";
+import { BillingDevPanel, TrialCard } from "../billing/Paywall";
 
-const MAIN: [string, string][] = [["Map", "/nav/map-iso.png"], ["Comps", "/nav/comps-iso.png"], ["Underbuilt", "/nav/radar.png"], ["AI Notes", "/nav/ai-notes-new.svg"], ["Assistant", "/nav/assistant.png"]];
-const FOOT: [string, string, boolean?][] = [["Upgrade to team", "ph-users", true], ["Reports", "ph-file-text"], ["Settings", "ph-gear"]];
+const MAIN: [string, string][] = [["Map", "/nav/map-iso.png"], ["Comps", "/nav/comps-iso.png"], ["Underbuilt", "/nav/radar.png"], ["AI Notes", "/nav/ai-notes-new.svg"], ["Assistant", "/nav/assistant.png"], ["Inman News", "ph-newspaper"]];
+// Plan-gated places (Nimbus pricing): a small lock shows on them while no trial / plan is active.
+const GATED = new Set(["AI Notes", "Assistant", "Inman News", "Comps"]);
+// "Upgrade to team" is gone (Nimbus: one single-seat plan); the trial / plan card takes its place.
+const FOOT: [string, string, boolean?][] = [["Reports", "ph-file-text"], ["Settings", "ph-gear"]];
 
 // Optical size per icon (relative to the 28px box).
 const ICON_SCALE: Record<string, number> = { "Buyer search": 0.82, Map: 1.18, Comps: 1.1, Underbuilt: 0.86, "AI Notes": 0.86, Assistant: 0.9 };
@@ -28,20 +33,23 @@ function useNavStyle(): [NavStyle, (s: NavStyle) => void] {
   return [v, (n: NavStyle) => { setV(n); try { localStorage.setItem(NAV_STYLE_KEY, n); } catch {} }];
 }
 
-function NavIcon({ k, ic, size = 28 }: { k: string; ic: string; size?: number }) {
+function NavIcon({ k, ic, size = 28, locked }: { k: string; ic: string; size?: number; locked?: boolean }) {
   return (
-    <span style={{ flex: "none", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <span style={{ flex: "none", width: size * (ICON_SCALE[k] || 1), height: size * (ICON_SCALE[k] || 1), background: `url(${ic}) center/contain no-repeat` }} />
+    <span style={{ position: "relative", flex: "none", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {ic.startsWith("ph-")
+        ? <span style={{ width: 26, height: 26, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(160deg,rgb(250,246,244),rgb(232,219,214))", boxShadow: "inset 0 0 0 1px rgba(147,89,75,.18),0 1px 2px rgba(30,18,12,.12)" }}><i className={`ph-fill ${ic}`} style={{ fontSize: 16, color: "rgb(147,89,75)" }} /></span>
+        : <span style={{ flex: "none", width: size * (ICON_SCALE[k] || 1), height: size * (ICON_SCALE[k] || 1), background: `url(${ic}) center/contain no-repeat` }} />}
+      {locked && <span title="Part of Agents Pro" style={{ position: "absolute", right: -4, bottom: -3, width: 15, height: 15, borderRadius: 9999, background: "rgb(253,252,252)", boxShadow: "0 0 0 1px rgba(13,12,12,.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-lock-simple" style={{ fontSize: 9, color: "rgb(147,89,75)" }} /></span>}
     </span>
   );
 }
 
 // A place: dark pill when it's the current page (design rule).
-function PlaceRow({ k, ic, on, expanded, onPick, light }: { k: string; ic: string; on: boolean; expanded: boolean; onPick?: (k: string) => void; light?: boolean }) {
+function PlaceRow({ k, ic, on, expanded, onPick, light, locked }: { k: string; ic: string; on: boolean; expanded: boolean; onPick?: (k: string) => void; light?: boolean; locked?: boolean }) {
   return (
     <button title={k} onClick={() => onPick?.(k)} className={on ? "" : "btn-ghost"}
       style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", background: on ? "rgb(52,47,46)" : undefined, boxShadow: on ? "inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(30,18,12,.18)" : "none" }}>
-      <NavIcon k={k} ic={ic} />
+      <NavIcon k={k} ic={ic} locked={locked} />
       {expanded && <span style={{ font: `${light ? 400 : 700} 15px/20px var(--font-sans)`, color: on ? "var(--paper)" : light ? "var(--ink)" : "rgb(77,71,69)" }}>{k}</span>}
     </button>
   );
@@ -51,7 +59,13 @@ export type DevAction = { label: string; icon: string; run: () => void };
 
 export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, dev = [] }: { expanded: boolean; onToggle: () => void; active?: string; onPick?: (k: string) => void; userName: string; dev?: DevAction[] }) {
   const [navStyle, setNavStyle] = useNavStyle();
-  const devAll: DevAction[] = [...dev, navStyle === "actions"
+  const { planOn, s: bill } = useEntitlements();
+  const lockOf = (k: string) => !planOn && GATED.has(k);
+  const [planDev, setPlanDev] = useState(false);
+  const devAll: DevAction[] = [
+    { label: "Plan state…", icon: "ph-credit-card", run: () => setPlanDev(true) },
+    { label: `Unlimited (internal): ${bill.unlimited ? "on" : "off"}`, icon: "ph-infinity", run: () => billing.set({ unlimited: !bill.unlimited }) },
+    ...dev, navStyle === "actions"
     ? { label: "Side nav: classic", icon: "ph-list", run: () => setNavStyle("classic") }
     : { label: "Side nav: actions", icon: "ph-lightning", run: () => setNavStyle("actions") }];
   return (
@@ -68,13 +82,13 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
             // An action: a plain row with a verb, like Claude's "New chat". No selected state.
             <button key={k} title={label} onClick={() => onPick?.(k)} className="btn-ghost"
               style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden" }}>
-              <NavIcon k={k} ic={ic} />
+              <NavIcon k={k} ic={ic} locked={lockOf(k)} />
               {expanded && <span style={{ font: "400 15px/20px var(--font-sans)", color: "var(--ink)" }}>{label}</span>}
             </button>
           ))}
           <span style={{ height: 1, margin: "8px 6px", background: "rgba(13,12,12,.1)" }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {PLACES.map(([k, ic]) => <PlaceRow key={k} k={k} ic={ic} on={k === active} expanded={expanded} onPick={onPick} light />)}
+            {PLACES.map(([k, ic]) => <PlaceRow key={k} k={k} ic={ic} on={k === active} expanded={expanded} onPick={onPick} light locked={lockOf(k)} />)}
           </div>
         </div>
       ) : (
@@ -86,9 +100,7 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
             // comps) get a little extra size so they read at the same visual weight as the round ones.
             <button key={k} title={k} onClick={() => onPick?.(k)} className={on ? "" : "btn-ghost"}
               style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", background: on ? "rgb(52,47,46)" : undefined, boxShadow: on ? "inset 0 1px 0 rgba(255,255,255,.08),0 2px 6px rgba(30,18,12,.18)" : "none" }}>
-              <span style={{ flex: "none", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ flex: "none", width: 28 * (ICON_SCALE[k] || 1), height: 28 * (ICON_SCALE[k] || 1), background: `url(${ic}) center/contain no-repeat` }} />
-              </span>
+              <NavIcon k={k} ic={ic} locked={lockOf(k)} />
               {expanded && <span style={{ font: "700 15px/20px var(--font-sans)", color: on ? "var(--paper)" : "rgb(77,71,69)" }}>{k}</span>}
             </button>
           );
@@ -97,6 +109,7 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
       )}
       <div style={{ flex: 1 }} />
       <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "8px 8px 16px" }}>
+        <TrialCard expanded={expanded} />
         {FOOT.map(([k, ic, dot]) => (
           <button key={k} title={k} onClick={() => onPick?.(k)} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: 0, border: "none", whiteSpace: "nowrap" }}>
             <span style={{ position: "relative", flex: "none", width: 40, height: 40, borderRadius: 9999, background: "rgba(13,12,12,.07)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -107,6 +120,7 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
           </button>
         ))}
         {dev.length > 0 && <DevMenu actions={devAll} expanded={expanded} />}
+        {planDev && <BillingDevPanel left={(expanded ? NAV_W.expanded : NAV_W.collapsed) + 8} onClose={() => setPlanDev(false)} />}
         <button title={userName} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: 0, border: "none", whiteSpace: "nowrap" }}>
           <span style={{ flex: "none", width: 40, height: 40, borderRadius: 9999, background: "url(/photos/avatar.jpg) center/cover", boxShadow: "0 0 0 2px var(--paper)" }} />
           {expanded && <span style={{ font: "700 15px/20px var(--font-sans)", color: "rgb(77,71,69)" }}>{userName}</span>}

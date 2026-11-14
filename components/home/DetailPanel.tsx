@@ -12,6 +12,9 @@ import { ledger, siteOf, upsideOf } from "@/lib/roi";
 import { BellButton } from "./Saved";
 import { CompsEstimate } from "../comps/CompsEstimate";
 import type { CompsSession } from "../comps/useComps";
+import { accessNow, billing, paywall, reportKey, useEntitlements } from "@/lib/billing";
+import { PRICING, money, sku } from "@/lib/pricing.config";
+import { UsageChip } from "../billing/Paywall";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
 type Tab = (typeof TABS)[number];
@@ -68,8 +71,12 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   };
   const [tab, setTab] = useState<Tab>("Summary");
   const ownerKey = l.apn || l.addr;
-  const [revealed, setRevealed] = useState(() => unlockedOwners.has(ownerKey));
-  const [credits, setCredits] = useState(creditsLeft);
+  // Owner contacts are metered (Nimbus): 25 a month, then purchased contact credits.
+  const ent = useEntitlements();
+  const cAcc = ent.access("contacts", ownerKey);
+  const [revealed, setRevealed] = useState(() => unlockedOwners.has(ownerKey) || cAcc === "owned");
+  const pk = reportKey(l);
+  const tileAcc = { ub: ent.access("maxBuild", pk), roi: ent.access("roi", pk) };
   const ownerRef = useRef<HTMLDivElement>(null);
   // Contact owner reveals the contact lines and scrolls the Owner section into view,
   // just under the compact header and the sticky tabs (review feedback).
@@ -78,12 +85,17 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   // place (so the scroll target is exact), "play" runs the reveal, "done" is plain text.
   const [reveal, setReveal] = useState<"wait" | "play" | "done">("done");
   const contactOwner = () => {
-    // One credit per owner, spent on the tap itself (no confirmation step); reopening an unlocked owner is free.
+    // One contact per owner, spent on the tap itself (no confirmation step, 10 Nov review);
+    // reopening an unlocked owner is free. Nothing left: the contacts upsell, then unlock.
     if (!unlockedOwners.has(ownerKey)) {
+      const a = accessNow("contacts", ownerKey);
+      if (a === "plan") { paywall.open({ kind: "offer", feature: "contacts" }); return; }
+      if (a === "locked") { paywall.open({ kind: "upsell", feature: "contacts", then: contactOwner }); return; }
+      const spent = ent.spend("contacts", ownerKey);
       unlockedOwners.add(ownerKey);
-      creditsLeft = Math.max(0, creditsLeft - 1);
-      setCredits(creditsLeft);
-      onToast?.(`Owner unlocked · ${creditsLeft} credits left`, "positive");
+      if (spent === "allowance") onToast?.(`Owner unlocked · ${Math.max(0, PRICING.allowance.contacts - billing.get().used.contacts)} of ${PRICING.allowance.contacts} contacts left this month`, "positive");
+      else if (spent === "credit") onToast?.(`Owner unlocked · 1 contact credit used`, "positive");
+      else if (spent !== "owned") onToast?.("Owner unlocked", "positive");
     }
     setRevealed(true);
     setReveal("wait");
@@ -240,7 +252,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
         {tab === "Summary" && <>
           {/* Quick estimate (floating card) + Get comps */}
           <div style={css("display:flex;flex-direction:column;padding:16px 16px 0")}>
-            {comps ? <CompsEstimate cs={comps} l={l} /> : qeState !== "ready" ? (
+            {comps ? <CompsEstimate cs={comps} l={l} locked={!ent.planOn} /> : qeState !== "ready" ? (
               // No quick estimate: the full-width CTA route (review decision): text with the
               // illustration on the right, full-width outline "Get price estimate" underneath.
                 <div style={css("display:flex;flex-direction:column;gap:16px;padding:20px;border-radius:20px;background:rgb(243,240,238)")}>
@@ -271,15 +283,23 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
           </div>
           {/* Max build + Profit potential tiles (canvas `detailTiles`): open the Underbuilt / ROI report flows */}
           <div style={css("position:relative;z-index:7;display:flex;gap:8px;padding:16px 16px 0")}>
-            {tiles.map(([v, k, c, ic]) => (
-              <button key={k} className="dt-tile" onClick={() => onFlow?.(k.startsWith("Max") ? "ub" : "roi")} title={k.startsWith("Max") ? "Underbuilt analysis" : "Upside analysis"} style={css("flex:1;min-width:0;height:88px;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;padding:8px;border:none;border-radius:8px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
-                <span style={css("height:24px;display:flex;align-items:center;gap:4px")}>
+            {tiles.map(([v, k, c, ic]) => {
+              // Usage on the tile (Nimbus): "3 left", credits, or a lock. In the "Locked tile"
+              // lock style the figure itself is hidden until the report is unlocked.
+              const fk = k.startsWith("Max") ? "ub" : "roi", a = tileAcc[fk];
+              const hide = ent.s.lockStyle === "tile" && (a === "locked" || a === "plan" || a === "credit");
+              return (
+              <button key={k} className="dt-tile" onClick={() => onFlow?.(fk)} title={k.startsWith("Max") ? "Underbuilt analysis" : "Upside analysis"} style={css("flex:1;min-width:0;height:88px;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;padding:8px;border:none;border-radius:8px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
+                <span style={css("align-self:stretch;height:24px;display:flex;align-items:center;gap:4px")}>
                   <span style={maskIco(ic, 16, c)} />
-                  <span style={css("font:400 16px/1.48 var(--font-sans);white-space:nowrap;color:" + c)}>{v}</span>
+                  <span style={{ ...css("font:400 16px/1.48 var(--font-sans);white-space:nowrap;color:" + c), ...(hide ? { filter: "blur(6px)", userSelect: "none" } : {}) }}>{hide ? (fk === "ub" ? "00%" : "$0.0m") : v}</span>
+                  <span style={{ flex: 1 }} />
+                  <UsageChip access={a} feature={fk === "ub" ? "maxBuild" : "roi"} />
                 </span>
                 <span style={css("flex:1;align-self:stretch;font:400 12px/1.48 var(--font-sans);letter-spacing:.25px;color:rgb(73,67,65);text-align:left;white-space:pre-line")}>{k}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
           {/* Owner: `onOwnersTab` (View history), contact lines unlock with Contact owner (`onOwnerReveal`) */}
           <div ref={ownerRef} style={css("display:flex;flex-direction:column;gap:12px;padding:24px 16px 8px")}>
@@ -302,11 +322,19 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                     <span style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg,rgba(174,106,91,0) 0%,rgba(174,106,91,.10) 35%,rgba(186,160,251,.12) 55%,rgba(186,160,251,0) 80%)", animation: "revealSheen 1.5s cubic-bezier(.3,.7,.3,1) both" }} />
                   </span>}
                   <CopyLine text={l.owner.phone} reveal={reveal} delay={0} verified={isVerified(l.owner.phone, 0.7)} /><CopyLine text={l.owner.email} reveal={reveal} delay={160} verified={isVerified(l.owner.email, 0.55)} /><CopyLine text={l.owner.mail} muted reveal={reveal} delay={320} verified={isVerified(l.owner.mail, 0.8)} />
-                  <CreditLine text={`1 credit used · ${credits} left`} used />
+                  {cAcc !== "unlimited" && <CreditLine text={`Contact unlocked · ${ent.left("contacts")} of ${PRICING.allowance.contacts} left this month${ent.s.credits.contacts ? ` · ${ent.s.credits.contacts} credits` : ""}`} used />}
                 </div>
+              // Locked: the lines keep their shape, masked, so it's clear what unlocks.
               : <div style={css("padding-left:70px;display:flex;flex-direction:column;gap:6px")}>
-                  <span style={css("font:400 13px/18px var(--font-sans);color:rgb(129,117,111)")}>Phone, email and mailing address unlock with Contact owner below.</span>
-                  <CreditLine text={`Uses 1 credit · ${credits} left`} />
+                  {[mask(l.owner.phone, "phone"), mask(l.owner.email, "email"), "Mailing address"].map(t => (
+                    <span key={t} style={css("display:flex;align-items:center;gap:8px;height:22px;font:400 14px/20px var(--font-sans);color:rgb(129,117,111)")}>
+                      <i className="ph-bold ph-lock-simple" style={{ fontSize: 13, color: "rgb(147,89,75)" }} />{t}
+                    </span>
+                  ))}
+                  <CreditLine text={cAcc === "allowance" ? `Uses 1 contact · ${ent.left("contacts")} of ${PRICING.allowance.contacts} left this month`
+                    : cAcc === "credit" ? `Uses 1 contact credit · ${ent.s.credits.contacts} left`
+                    : cAcc === "locked" ? `No contacts left this month · ${sku("ct-10").label} for ${money(sku("ct-10").price)}`
+                    : cAcc === "plan" ? `Owner contacts are part of ${PRICING.plan.name}` : "Unlimited (internal)"} />
                 </div>}
           </div>
           <div style={css("display:flex;flex-direction:column;gap:24px;padding:24px 16px 0")}>
@@ -519,8 +547,10 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
           </a>
         ) : (
           <button className="btn-dark" style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap" }} onClick={contactOwner}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
-            Contact owner
+            {cAcc === "locked" || cAcc === "plan"
+              ? <i className="ph-bold ph-lock-simple" style={{ fontSize: 16 }} />
+              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>}
+            {cAcc === "locked" ? `Get ${sku("ct-10").adds.contacts} contacts · ${money(sku("ct-10").price)}` : "Contact owner"}
           </button>
         )}
       </div>
@@ -535,8 +565,9 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
 /* Owner contact credits (10 Nov review): show clearly that unlocking spends one
    credit and how many remain, without a confirmation step. Fake balance for the
    session; each owner is charged once. */
-let creditsLeft = 24;
 const unlockedOwners = new Set<string>();
+// "(•••) •••-4821", "j•••@gmail.com": enough to show what unlocks, not the value.
+const mask = (v: string, k: "phone" | "email") => k === "phone" ? `(•••) •••-${v.replace(/\D/g, "").slice(-4)}` : `${v[0]}•••@${v.split("@")[1] ?? "•••"}`;
 function CreditLine({ text, used }: { text: string; used?: boolean }) {
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 6, padding: used ? "6px 8px 0" : 0, font: "400 12px/16px var(--font-sans)", color: used ? "rgb(129,117,111)" : "rgb(98,90,89)", animation: used ? "fadeIn .4s ease .5s both" : undefined }}>
