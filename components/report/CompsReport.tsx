@@ -83,7 +83,7 @@ export function CompCard({ c, n, of, on, vacant, onToggle, compact }: { c: Comp;
           <span style={{ font: compact ? "700 17px/22px var(--font-sans)" : "700 19px/24px var(--font-sans)", color: INK }}>{c.addr}</span>
           <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED }}>
             {vacant ? <><b style={{ color: INK, fontWeight: 400 }}>{k(c.lot)}</b> ft² lot · {c.mi < 0.1 ? "<0.1" : c.mi.toFixed(1)} mi</>
-              : <><b style={{ color: INK, fontWeight: 400 }}>{c.beds}</b> bed <b style={{ color: INK, fontWeight: 400 }}>{c.baths}</b> bath <b style={{ color: INK, fontWeight: 400 }}>{k(c.sqft)}</b> ft² <b style={{ color: INK, fontWeight: 400 }}>{k(c.lot)}</b> ft² lot · {c.mi < 0.1 ? "<0.1" : c.mi.toFixed(1)} mi</>}
+              : <><span title={`${c.beds} bed${c.beds === 1 ? "" : "s"}`} style={{ whiteSpace: "nowrap" }}><i className="ph ph-bed" aria-hidden style={{ fontSize: 16, verticalAlign: "-3px", marginRight: 4 }} /><b style={{ color: INK, fontWeight: 400 }}>{c.beds}</b><span className="sr-only"> bed</span></span>{"  "}<span title={`${c.baths} bath${c.baths === 1 ? "" : "s"}`} style={{ whiteSpace: "nowrap", marginLeft: 8 }}><i className="ph ph-bathtub" aria-hidden style={{ fontSize: 16, verticalAlign: "-3px", marginRight: 4 }} /><b style={{ color: INK, fontWeight: 400 }}>{c.baths}</b><span className="sr-only"> bath</span></span>{" · "}<b style={{ color: INK, fontWeight: 400 }}>{k(c.sqft)}</b> ft² · <b style={{ color: INK, fontWeight: 400 }}>{k(c.lot)}</b> ft² lot · {c.mi < 0.1 ? "<0.1" : c.mi.toFixed(1)} mi</>}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

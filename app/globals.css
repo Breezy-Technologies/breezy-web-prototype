@@ -153,3 +153,6 @@ html[data-flow] [data-maparea] * { pointer-events: none !important; }
 .create-card:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px rgba(13,12,12,.14), 0 8px 20px rgba(24,14,10,.12) !important; }
 .create-art { mix-blend-mode: multiply; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
 .create-card:hover .create-art { transform: scale(1.05); }
+
+/* Visually hidden, still read by screen readers (e.g. "bed" next to a bed icon). */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
