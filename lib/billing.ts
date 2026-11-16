@@ -29,10 +29,12 @@ export type BillingState = {
   /** On the $9.90 save offer after trying to cancel. */
   saved: boolean;
   lockStyle: LockStyle;
+  /** State version: 2 = locked tiles open the paywall only (17 Nov review). */
+  v?: number;
 };
 
 const ZERO = { maxBuild: 0, roi: 0, contacts: 0 };
-const BASE: BillingState = { unlimited: false, status: "trial", segment: "new2", trialVariant: 14, trialDay: 3, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], saved: false, lockStyle: "partial" };
+const BASE: BillingState = { unlimited: false, status: "trial", segment: "new2", trialVariant: 14, trialDay: 3, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], saved: false, lockStyle: "tile", v: 2 };
 
 /** Dev menu presets (one tap sets the whole state). */
 export const PRESETS: { id: string; label: string; state: Partial<BillingState> }[] = [
@@ -56,7 +58,10 @@ const subs = new Set<() => void>();
 function load() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
-  try { const s = localStorage.getItem(KEY); if (s) state = { ...BASE, ...JSON.parse(s) }; } catch {}
+  try {
+    const s = localStorage.getItem(KEY);
+    if (s) { const o = JSON.parse(s); state = { ...BASE, ...o, ...(o.v === 2 ? {} : { lockStyle: "tile", v: 2 }) }; }
+  } catch {}
 }
 function set(next: Partial<BillingState>) {
   state = { ...state, ...next };

@@ -510,8 +510,8 @@ export function TrialCard({ expanded }: { expanded: boolean }) {
 }
 
 /** Collapsed side nav: a ring round the avatar shows the monthly allowance left (Max
- *  Build + ROI reports + owner contacts, review comment). Breezy yellow while there's
- *  plenty, clay at a fifth or less. Hover says what's left; click opens Plan & usage.
+ *  Build + ROI reports + owner contacts, review comment). Ink (black, review: more
+ *  prominent) while there's plenty, clay at a fifth or less. Hover says what's left; click opens Plan & usage.
  *  Without a trial / plan (or with Unlimited) the avatar is drawn plain. */
 export function AllowanceRing({ children }: { children: React.ReactNode }) {
   const { s, planOn, left, trialLeft } = useEntitlements();
@@ -526,7 +526,7 @@ export function AllowanceRing({ children }: { children: React.ReactNode }) {
       style={{ position: "relative", flex: "none", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
       <svg width="46" height="46" viewBox="0 0 46 46" style={{ position: "absolute", left: -3, top: -3, transform: "rotate(-90deg)", overflow: "visible" }} aria-hidden>
         <circle cx="23" cy="23" r={R} fill="none" stroke="rgba(13,12,12,.13)" strokeWidth="3" />
-        <circle cx="23" cy="23" r={R} fill="none" stroke={low ? CLAY : "rgb(255,209,41)"} strokeWidth="3" strokeLinecap="round"
+        <circle cx="23" cy="23" r={R} fill="none" stroke={low ? CLAY : INK} strokeWidth="3" strokeLinecap="round"
           strokeDasharray={`${C * frac} ${C}`} style={{ transition: "stroke-dasharray .5s ease, stroke .3s" }} />
       </svg>
       <span style={{ transform: "scale(.8)", display: "flex" }}>{children}</span>
