@@ -147,3 +147,9 @@ html[data-flow] [data-maparea] * { pointer-events: none !important; }
 /* Owner contact lines: gradient write-in after Contact owner (DetailPanel CopyLine) */
 @keyframes revealText { from { background-position: 100% 0 } to { background-position: 0% 0 } }
 @keyframes revealSheen { 0% { transform: translateX(-70%); opacity: 0 } 25% { opacity: 1 } 100% { transform: translateX(70%); opacity: 0 } }
+
+/* New navigation exploration: Create flyout / launcher cards. */
+.create-card { transition: transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s; }
+.create-card:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px rgba(13,12,12,.14), 0 8px 20px rgba(24,14,10,.12) !important; }
+.create-art { mix-blend-mode: multiply; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+.create-card:hover .create-art { transform: scale(1.05); }

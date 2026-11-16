@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { billing, useEntitlements } from "@/lib/billing";
 import { BillingDevPanel, TrialCard } from "../billing/Paywall";
+import { CreateButton, CreateStyle } from "./CreateMenu";
 
 const MAIN: [string, string][] = [["Map", "/nav/map-iso.png"], ["Comps", "/nav/comps-iso.png"], ["Underbuilt", "/nav/radar.png"], ["AI Notes", "/nav/ai-notes-new.svg"], ["Assistant", "/nav/assistant.png"], ["Inman News", "ph-newspaper"]];
 // Plan-gated places (Nimbus pricing): a small lock shows on them while no trial / plan is active.
@@ -20,7 +21,12 @@ export const NAV_W = { collapsed: 56, expanded: 239 };
    their existing icons. The places (Map, AI Notes, Assistant) follow under a
    hairline and keep the dark pill. "classic" is the previous nav; the Dev menu
    switches between them (localStorage `bz-nav-style`). Not wired to flows yet. */
-type NavStyle = "actions" | "classic";
+// New navigation (14 Nov, branch new-navigation): "create-*" put one primary Create
+// action at the top (see CreateMenu.tsx); the places follow. Default on this branch.
+type NavStyle = "actions" | "classic" | "create-menu" | "create-flyout" | "create-launcher";
+const NAV_STYLES: [NavStyle, string, string][] = [
+  ["create-menu", "Create: menu", "ph-plus-circle"], ["create-flyout", "Create: card flyout", "ph-squares-four"],
+  ["create-launcher", "Create: launcher", "ph-app-window"], ["actions", "Actions list", "ph-lightning"], ["classic", "Classic", "ph-list"]];
 // "New buyer search" (12 Nov review): an explicit way into location search, since some
 // agents won't realise the search field is where a buyer search starts. It opens the
 // search step, then offers Save search once an area is picked.
@@ -28,8 +34,8 @@ const ACTIONS: [string, string, string][] = [["Comps", "Run comps", "/nav/comps-
 const PLACES = MAIN.filter(([k]) => !ACTIONS.some(a => a[0] === k));
 const NAV_STYLE_KEY = "bz-nav-style";
 function useNavStyle(): [NavStyle, (s: NavStyle) => void] {
-  const [v, setV] = useState<NavStyle>("actions");
-  useEffect(() => { try { if (localStorage.getItem(NAV_STYLE_KEY) === "classic") setV("classic"); } catch {} }, []);
+  const [v, setV] = useState<NavStyle>("create-menu");
+  useEffect(() => { try { const s = localStorage.getItem(NAV_STYLE_KEY); if (NAV_STYLES.some(n => n[0] === s)) setV(s as NavStyle); } catch {} }, []);
   return [v, (n: NavStyle) => { setV(n); try { localStorage.setItem(NAV_STYLE_KEY, n); } catch {} }];
 }
 
@@ -65,9 +71,8 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
   const devAll: DevAction[] = [
     { label: "Plan state…", icon: "ph-credit-card", run: () => setPlanDev(true) },
     { label: `Unlimited (internal): ${bill.unlimited ? "on" : "off"}`, icon: "ph-infinity", run: () => billing.set({ unlimited: !bill.unlimited }) },
-    ...dev, navStyle === "actions"
-    ? { label: "Side nav: classic", icon: "ph-list", run: () => setNavStyle("classic") }
-    : { label: "Side nav: actions", icon: "ph-lightning", run: () => setNavStyle("actions") }];
+    ...dev,
+    ...NAV_STYLES.map(([k, label, icon]) => ({ label: `Side nav: ${label}${k === navStyle ? " ✓" : ""}`, icon, run: () => setNavStyle(k) }))];
   return (
     <nav style={{ position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 80, width: expanded ? NAV_W.expanded : NAV_W.collapsed, display: "flex", flexDirection: "column", background: "var(--nav-bg)", overflow: "hidden", transition: "width .45s cubic-bezier(.2,.8,.2,1)" }}>
       <div style={{ flex: "none", height: 72, display: "flex", alignItems: "center", gap: 6, padding: "0 8px", whiteSpace: "nowrap" }}>
@@ -76,7 +81,15 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
         </button>
         {expanded && <span title="Breezy" style={{ flex: "none", width: 68, height: 23, background: "var(--ink)", WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", animation: "fadeIn .3s ease .1s both" }} />}
       </div>
-      {navStyle === "actions" ? (
+      {navStyle.startsWith("create-") ? (
+        // One constant primary Create action, then the places (dark pill on the current one).
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: 8 }}>
+          <div style={{ padding: "2px 0 10px" }}>
+            <CreateButton variant={navStyle.slice(7) as CreateStyle} expanded={expanded} navW={expanded ? NAV_W.expanded : NAV_W.collapsed} locked={lockOf} onPick={k => onPick?.(k)} />
+          </div>
+          {PLACES.map(([k, ic]) => <PlaceRow key={k} k={k} ic={ic} on={k === active} expanded={expanded} onPick={onPick} light locked={lockOf(k)} />)}
+        </div>
+      ) : navStyle === "actions" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: 8 }}>
           {ACTIONS.map(([k, label, ic]) => (
             // An action: a plain row with a verb, like Claude's "New chat". No selected state.
