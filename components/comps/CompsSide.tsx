@@ -175,7 +175,7 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
         </>}
         {!(cs.intro && ready === 0) && <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED }}>Comps are real nearby homes (address, size, beds, baths, lot, year, $/ft², distance, month sold). Prices are value estimates; list prices, dates, days on market and garages are sample data until the listings service is connected.</span>}
       </div>
-      <AiTicker on={cs.intro} radius={cs.radius} />
+      <AiTicker on={cs.intro && ready === 0} radius={cs.radius} />
       </div>
       {/* Main action (Figma: "Set price estimate", top right of the comps results): opens the
           export sheet, where the estimate is set and the client report customised. */}
@@ -234,7 +234,7 @@ function CompSkel({ delay = 0 }: { delay?: number }) {
 
 /** The first Get comps on a property: what the AI is doing, one step at a time, centred
  *  on a top-to-bottom gradient over the panel's bottom half (manages the wait). Each
- *  step shimmers; it fades out once every comp is in. */
+ *  step shimmers; it fades out as the first comp card arrives. */
 const STEP_MS = 1700;
 function AiTicker({ on, radius }: { on: boolean; radius: number }) {
   const [mounted, setMounted] = useState(on);
@@ -261,7 +261,7 @@ function AiTicker({ on, radius }: { on: boolean; radius: number }) {
     "Working out the price per ft²",
     "Estimating the home's value",
   ];
-  // Runs through the steps once, then stays on the last ones while the cards finish.
+  // Runs through the steps once, then alternates the last two if the wait runs long.
   const step = i < steps.length ? steps[i] : steps[steps.length - 2 + (i % 2)];
   return (
     <div aria-live="polite" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "50%", zIndex: 2, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
