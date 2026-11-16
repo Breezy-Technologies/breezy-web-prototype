@@ -56,7 +56,7 @@ export function OfferCard({ compact, onDone, feature }: { compact?: boolean; onD
   const cta = win ? `Start ${win.trialDays} days free` : trialAgain ? `Start ${s.trialVariant}-day free trial` : `Start ${P.name}`;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: compact ? 12 : 16 }}>
-      {feature && <span style={{ display: "flex", alignItems: "center", gap: 8, font: "400 14px/20px var(--font-sans)", color: MUTED }}><Lock size={14} color={MUTED} />{PRICING.names[feature]} {feature === "maxBuild" || feature === "roi" || feature === "contacts" ? "is" : "is"} part of {P.name}{s.status === "expired" ? ". Your trial has ended." : "."}</span>}
+      {feature && <span style={{ display: "flex", alignItems: "center", gap: 8, font: "400 14px/20px var(--font-sans)", color: MUTED }}><Lock size={14} color={MUTED} />{LOCKED[feature]} part of {P.name}{s.status === "expired" ? ". Your trial has ended." : "."}</span>}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ font: "300 28px/1.15 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>{P.name}</span>
         <span style={{ height: 24, padding: "0 10px", display: "flex", alignItems: "center", borderRadius: 9999, background: "rgb(255,209,41)", font: "700 12px/16px var(--font-sans)", color: INK }}>{P.badge}</span>

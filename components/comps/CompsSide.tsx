@@ -108,7 +108,8 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
       </div>
 
       <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-      {locked && <LockVeil access="plan" feature="comps" clear={300} card={Math.min(440, width - 24)} onUnlock={() => {}} onToast={onToast} />}
+      {/* No plan: the veil waits for the first cards, so the narrated loading still plays. */}
+      {locked && !(cs.intro && ready === 0) && <LockVeil access="plan" feature="comps" clear={300} card={Math.min(440, width - 24)} onUnlock={() => {}} onToast={onToast} />}
       <div ref={scroller} style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 18, padding: "16px 14px 28px", scrollbarWidth: "thin" }}>
         {(!cs.soldAllowed || filtered > 0) && (
           <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px 10px 14px", borderRadius: 14, background: cs.soldAllowed ? "rgb(246,245,244)" : "rgb(252,243,236)", font: "400 13px/18px var(--font-sans)", color: INK }}>
