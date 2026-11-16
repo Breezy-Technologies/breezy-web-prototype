@@ -11,6 +11,8 @@ import { type Feature, type Metered, PRICING, type Segment, sku } from "./pricin
 
 export type Status = "trial" | "active" | "expired" | "none";
 export type LockStyle = "partial" | "blur" | "tile";
+/** One use of a metered feature: what, on which property (`reportKey`), when, paid how. */
+export type UseLog = { f: Metered; key: string; at: number; via: "allowance" | "credit" };
 export type BillingState = {
   unlimited: boolean;
   status: Status;
@@ -22,13 +24,15 @@ export type BillingState = {
   credits: Record<Metered, number>;
   /** Unlocked items this period ("maxBuild:<property key>"): reopening is free. */
   owned: string[];
+  /** Each use this period, newest last (Plan & usage → Usage detail). */
+  log: UseLog[];
   /** On the $9.90 save offer after trying to cancel. */
   saved: boolean;
   lockStyle: LockStyle;
 };
 
 const ZERO = { maxBuild: 0, roi: 0, contacts: 0 };
-const BASE: BillingState = { unlimited: false, status: "trial", segment: "new2", trialVariant: 14, trialDay: 3, used: { ...ZERO }, credits: { ...ZERO }, owned: [], saved: false, lockStyle: "partial" };
+const BASE: BillingState = { unlimited: false, status: "trial", segment: "new2", trialVariant: 14, trialDay: 3, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], saved: false, lockStyle: "partial" };
 
 /** Dev menu presets (one tap sets the whole state). */
 export const PRESETS: { id: string; label: string; state: Partial<BillingState> }[] = [
@@ -68,7 +72,7 @@ export const billing = {
   set,
   preset(id: string) {
     const p = PRESETS.find(x => x.id === id); if (!p) return;
-    set({ ...BASE, unlimited: state.unlimited, lockStyle: state.lockStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], ...p.state });
+    set({ ...BASE, unlimited: state.unlimited, lockStyle: state.lockStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
   },
   /** Mock purchase: adds the SKU's credits. */
   buy(id: string) {
@@ -76,8 +80,8 @@ export const billing = {
     for (const [k, n] of Object.entries(s.adds) as [Metered, number][]) c[k] += n;
     set({ credits: c });
   },
-  startPlan() { set({ status: "active", used: { ...ZERO }, owned: [], saved: false }); },
-  startTrial() { set({ status: "trial", trialDay: 1, used: { ...ZERO }, owned: [] }); },
+  startPlan() { set({ status: "active", used: { ...ZERO }, owned: [], log: [], saved: false }); },
+  startTrial() { set({ status: "trial", trialDay: 1, used: { ...ZERO }, owned: [], log: [] }); },
   cancel() { set({ status: "none", saved: false }); },
   acceptSave() { set({ saved: true }); },
 };
@@ -119,8 +123,9 @@ export const accessNow = (f: Feature, key?: string) => accessOf(snap(), f, key);
  *  so it works right after a purchase in the same handler. Returns what was spent. */
 export function spend(f: Metered, key: string): Access {
   const s = snap(), a = accessOf(s, f, key);
-  if (a === "allowance") set({ used: { ...s.used, [f]: s.used[f] + 1 }, owned: [...s.owned, `${f}:${key}`] });
-  else if (a === "credit") set({ credits: { ...s.credits, [f]: s.credits[f] - 1 }, owned: [...s.owned, `${f}:${key}`] });
+  const log = [...(s.log || []), { f, key, at: Date.now(), via: a === "credit" ? "credit" as const : "allowance" as const }];
+  if (a === "allowance") set({ used: { ...s.used, [f]: s.used[f] + 1 }, owned: [...s.owned, `${f}:${key}`], log });
+  else if (a === "credit") set({ credits: { ...s.credits, [f]: s.credits[f] - 1 }, owned: [...s.owned, `${f}:${key}`], log });
   return a;
 }
 

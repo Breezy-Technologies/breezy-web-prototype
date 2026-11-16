@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { billing, useEntitlements } from "@/lib/billing";
-import { BillingDevPanel, TrialCard } from "../billing/Paywall";
+import { AllowanceRing, BillingDevPanel, TrialCard } from "../billing/Paywall";
 import { CreateButton, CreateStyle } from "./CreateMenu";
 
 const MAIN: [string, string][] = [["Map", "/nav/map-iso.png"], ["Comps", "/nav/comps-iso.png"], ["Underbuilt", "/nav/radar.png"], ["AI Notes", "/nav/ai-notes-new.svg"], ["Assistant", "/nav/assistant.png"], ["Inman News", "ph-newspaper"]];
@@ -135,7 +135,8 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
         {dev.length > 0 && <DevMenu actions={devAll} expanded={expanded} />}
         {planDev && <BillingDevPanel left={(expanded ? NAV_W.expanded : NAV_W.collapsed) + 8} onClose={() => setPlanDev(false)} />}
         <button title={userName} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: 0, border: "none", whiteSpace: "nowrap" }}>
-          <span style={{ flex: "none", width: 40, height: 40, borderRadius: 9999, background: "url(/photos/avatar.jpg) center/cover", boxShadow: "0 0 0 2px var(--paper)" }} />
+          {expanded ? <span style={{ flex: "none", width: 40, height: 40, borderRadius: 9999, background: "url(/photos/avatar.jpg) center/cover", boxShadow: "0 0 0 2px var(--paper)" }} />
+            : <AllowanceRing><span style={{ flex: "none", width: 40, height: 40, borderRadius: 9999, background: "url(/photos/avatar.jpg) center/cover", boxShadow: "0 0 0 2px var(--paper)" }} /></AllowanceRing>}
           {expanded && <span style={{ font: "700 15px/20px var(--font-sans)", color: "rgb(77,71,69)" }}>{userName}</span>}
         </button>
       </div>

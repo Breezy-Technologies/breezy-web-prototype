@@ -74,7 +74,7 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
       <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 12, padding: "18px 18px 14px", boxShadow: "inset 0 -1px 0 rgb(245,240,238)" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           <span style={{ flex: 1, minWidth: 0, font: "400 24px/30px var(--font-sans)", letterSpacing: "-.02em", color: INK }}>
-            {loading && ready === 0 && cs.intro ? <>Finding comps<span style={{ color: MUTED }}>…</span></> : loading ? <>Estimating comps <span style={{ color: MUTED }}>{Math.min(ready, total)} of {total}</span></> : `${total} Comps to review`}
+            {loading && ready === 0 && cs.intro ? <>Finding comps<span style={{ color: MUTED }}>…</span></> : loading ? <>Estimating comps <span style={{ color: MUTED }}>{Math.min(ready, total)} of {total}</span></> : cs.manual && total === 0 ? "Pick your comps" : `${total} Comps to review`}
           </span>
           <button className="cs-x" onClick={onClose} title="Close comps" aria-label="Close comps" style={{ flex: "none", width: 36, height: 36, border: "none", borderRadius: 9999, background: "rgba(13,12,12,.06)", color: INK, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <i className="ph-bold ph-x" style={{ fontSize: 15 }} />
@@ -137,7 +137,8 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
               </div>
             </div>
           )}
-          {!loading && total === 0 && (
+          {cs.manual && <ManualPick cs={cs} />}
+          {!loading && total === 0 && !cs.manual && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "48px 16px", textAlign: "center" }}>
               <span style={{ width: 140, height: 110, background: "url('/iso/empty-search.png') center/contain no-repeat" }} />
               <span style={{ font: "400 20px/26px var(--font-sans)", color: INK }}>No comps match your filters</span>
@@ -274,6 +275,42 @@ function AiTicker({ on, radius }: { on: boolean; radius: number }) {
         <svg width="18" height="18" viewBox="0 0 24 24" style={{ flex: "none" }}><defs><linearGradient id="csSpark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="rgb(175,127,113)" /><stop offset="1" stopColor="rgb(132,98,196)" /></linearGradient></defs><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z" fill="url(#csSpark)" /></svg>
         <span key={i} className="cs-tick" style={{ font: "400 16px/22px var(--font-sans)", textAlign: "center" }}>{step}…</span>
       </span>
+    </div>
+  );
+}
+
+/** "I'll comp myself": the panel starts empty and lists the nearby candidates (closest
+ *  matches first) to add one by one; added ones become cards above. The AI can still
+ *  take over. */
+function ManualPick({ cs }: { cs: CompsSession }) {
+  const c8 = cs.candidates;
+  return (
+    <div className="cs-in" style={{ display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 20, background: "rgb(247,245,244)" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ font: "700 15px/20px var(--font-sans)", color: INK }}>{cs.total ? "Add more comps" : "Pick your comps"}</span>
+          <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>Nearby homes, closest matches first. Add the ones you'd use.</span>
+        </span>
+        <button onClick={cs.letAiPick} style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px", border: "none", borderRadius: 9999, background: INK, color: "rgb(253,252,252)", font: "700 13px/16px var(--font-sans)", cursor: "pointer", whiteSpace: "nowrap" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c.8 6.4 5.6 11.2 12 12-6.4.8-11.2 5.6-12 12-.8-6.4-5.6-11.2-12-12C6.4 11.2 11.2 6.4 12 0z" /></svg>Let AI pick
+        </button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", maxHeight: cs.total ? 260 : undefined, overflowY: "auto" }}>
+        {c8.length === 0 && <span style={{ padding: "12px 0", font: "400 14px/19px var(--font-sans)", color: MUTED }}>No more homes nearby. Widen the radius to see more.</span>}
+        {c8.map(c => (
+          <div key={c.i} onMouseEnter={() => cs.setHoverC(c.i)} onMouseLeave={() => cs.setHoverC(null)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", boxShadow: "inset 0 -.5px 0 rgba(13,12,12,.12)" }}>
+            <span style={{ flex: "none", width: 52, height: 52, borderRadius: 12, background: `url('${c.photo}') center/cover` }} />
+            <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+              <span style={{ font: "700 14px/19px var(--font-sans)", color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.addr}</span>
+              <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <span style={{ display: "inline-block", width: 8, height: 8, marginRight: 6, borderRadius: 9999, background: c.st === "S" ? SOLD : ACTIVE }} />
+                {c.st === "S" ? "Sold" : "Active"} · {shortPrice(c.price)} · {k(c.sqft)} ft² · {c.mi.toFixed(1)} mi · {c.score}% match
+              </span>
+            </span>
+            <button className="btn-soft" onClick={() => cs.add(c)} style={{ flex: "none", height: 34, padding: "0 14px", font: "700 13px/16px var(--font-sans)" }}>Add</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

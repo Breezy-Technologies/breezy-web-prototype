@@ -175,16 +175,62 @@ export function UsageChip({ access, feature, dark }: { access: Access; feature: 
 }
 
 /* ---------- Settings: Plan & usage ---------- */
+const METERS: Metered[] = ["maxBuild", "roi", "contacts"];
+const METER: Record<Metered, { title: string; icon: string; tip: string }> = {
+  maxBuild: { title: "Max Build reports", icon: "ruler", tip: "Build guidelines: what the lot allows and the Underbuilt %. Reopening a report you've unlocked is free." },
+  roi: { title: "ROI reports", icon: "chart-line-up", tip: "Upside analysis: buy, improve, sell, profit. Reopening a report you've unlocked is free." },
+  contacts: { title: "Owner contacts", icon: "address-book", tip: "The owner's phone, email and mailing address. Each owner counts once a month." },
+};
+const shortDay = (t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function UsageDetail() {
+  const { s } = useEntitlements();
+  const log = [...(s.log || [])].reverse();
+  const logged = { maxBuild: 0, roi: 0, contacts: 0 } as Record<Metered, number>;
+  for (const u of s.log || []) if (u.via === "allowance") logged[u.f]++;
+  const earlier = METERS.reduce((n, f) => n + Math.max(0, s.used[f] - logged[f]), 0);
+  const start = new Date(); start.setDate(start.getDate() - 30);
+  const credits = log.filter(u => u.via === "credit").length;
+  const cell: React.CSSProperties = { padding: "11px 0", font: "400 14px/19px var(--font-sans)", color: INK, boxShadow: "inset 0 -1px 0 rgba(13,12,12,.07)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+  const head: React.CSSProperties = { ...cell, padding: "8px 0", font: "400 13px/17px var(--font-sans)", color: MUTED };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ font: "700 16px/21px var(--font-sans)" }}>Usage detail</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, height: 34, padding: "0 12px", borderRadius: 10, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.12)", font: "400 13px/17px var(--font-sans)", color: INK }}>
+          {shortDay(start.getTime())} – {shortDay(Date.now())}, {new Date().getFullYear()}<i className="ph ph-calendar-blank" style={{ fontSize: 15, color: MUTED }} />
+        </span>
+        <span style={{ marginLeft: "auto", font: "700 14px/18px var(--font-sans)" }}>Credits used: {credits}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.1fr) minmax(0,1.6fr) 70px 82px", columnGap: 12 }}>
+        <span style={head}>Item</span><span style={head}>Property</span><span style={head}>Date</span><span style={{ ...head, textAlign: "right" }}>Paid with</span>
+        {log.map((u, i) => (
+          <div key={i} style={{ display: "contents" }}>
+            <span style={cell}>{METER[u.f].title.replace(/s$/, "")}</span>
+            <span style={{ ...cell, color: MUTED }}>{u.key.split("|")[0]}</span>
+            <span style={{ ...cell, color: MUTED }}>{shortDay(u.at)}</span>
+            <span style={{ ...cell, textAlign: "right", color: u.via === "credit" ? CLAY : INK }}>{u.via === "credit" ? "1 credit" : "Included"}</span>
+          </div>
+        ))}
+      </div>
+      {earlier > 0 && <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>{log.length ? "Plus " : ""}{earlier} included use{earlier === 1 ? "" : "s"} from earlier this month.</span>}
+      {!log.length && !earlier && <span style={{ padding: "14px 0", font: "400 14px/19px var(--font-sans)", color: MUTED }}>Nothing used yet this month. Open a Max Build or ROI report, or unlock an owner, and it shows here.</span>}
+    </div>
+  );
+}
+
 function PlanSettings({ onClose, onToast }: { onClose: () => void; onToast: Toast }) {
   const { s, planOn, left, trialLeft } = useEntitlements();
   const [step, setStep] = useState<"usage" | "cancel">("usage");
   const [buyFor, setBuyFor] = useState<Metered | null>(null);
   const paying1 = s.segment === "paying1" && s.status === "active";
   if (buyFor) return (
-    <Sheet onClose={onClose} label="Buy more" width={520}>
+    <Sheet onClose={onClose} label="Buy credits" width={560}>
       <button onClick={() => setBuyFor(null)} style={{ ...btnLink, alignSelf: "flex-start", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}><i className="ph-bold ph-arrow-left" />Plan & usage</button>
-      <span style={{ font: "300 26px/1.2 var(--font-sans)", letterSpacing: "-.4px" }}>Buy {LONG[buyFor]}</span>
-      <UpsellOptions feature={buyFor} onBought={id => { onToast(`${sku(id).label} added`, "positive"); setBuyFor(null); }} />
+      <span style={{ font: "300 26px/1.2 var(--font-sans)", letterSpacing: "-.4px" }}>Buy credits</span>
+      <div role="tablist" aria-label="Credits for" style={{ display: "flex", gap: 2, padding: 3, borderRadius: 9999, background: "rgba(18,18,18,.06)" }}>
+        {METERS.map(f => <button key={f} role="tab" aria-selected={buyFor === f} onClick={() => setBuyFor(f)} style={{ flex: 1, height: 34, border: "none", borderRadius: 9999, cursor: "pointer", font: `${buyFor === f ? 700 : 400} 13px/16px var(--font-sans)`, color: INK, background: buyFor === f ? PAPER : "none", boxShadow: buyFor === f ? "0 1px 3px rgba(30,18,12,.14)" : "none", whiteSpace: "nowrap" }}>{METER[f].title}</button>)}
+      </div>
+      <UpsellOptions key={buyFor} feature={buyFor} onBought={id => { onToast(`${sku(id).label} added`, "positive"); setBuyFor(null); }} />
     </Sheet>
   );
   if (step === "cancel") return (
@@ -205,7 +251,7 @@ function PlanSettings({ onClose, onToast }: { onClose: () => void; onToast: Toas
     </Sheet>
   );
   return (
-    <Sheet onClose={onClose} label="Plan & usage" width={560}>
+    <Sheet onClose={onClose} label="Plan & usage" width={760}>
       <span style={{ font: "300 26px/1.2 var(--font-sans)", letterSpacing: "-.4px" }}>Plan & usage</span>
       {s.unlimited && <Note icon="infinity">Unlimited (internal) is on: metering is bypassed. Team testing only; never a customer plan.</Note>}
       {!planOn ? <OfferCard onDone={() => onToast(`${P.name} started`, "positive")} /> : <>
@@ -220,28 +266,47 @@ function PlanSettings({ onClose, onToast }: { onClose: () => void; onToast: Toas
           </span>
         </div>
         {paying1 && <Note icon="gift">Payments before launch are waived. Your billing starts {PRICING.segments.paying1.billingDelayDays} days after installing Nimbus.</Note>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ font: "700 15px/20px var(--font-sans)" }}>This month</span>
-          <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>Included reports and contacts reset on {renewDate()}. Comps, the AI assistant, alerts and Inman News are unlimited.</span>
+
+        {/* Included every month: one card per metered feature, side by side (review: a
+            more dynamic layout, like a usage & billing page). */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 18, borderRadius: 22, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.09)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ font: "700 16px/21px var(--font-sans)" }}>Included every month</span>
+              <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>When the included ones run out, credits keep you going.</span>
+            </span>
+            <button onClick={() => setBuyFor("maxBuild")} style={{ ...btnPrimary, height: 42, padding: "0 18px", font: "700 14px/18px var(--font-sans)" }}><i className="ph-bold ph-plus" />Buy credits</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10 }}>
+            {METERS.map(f => {
+              const cap = PRICING.allowance[f], used = Math.min(cap, s.used[f]), out = left(f) === 0;
+              return (
+                <div key={f} style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, borderRadius: 18, background: "rgb(246,244,243)" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, font: "700 15px/20px var(--font-sans)" }}>
+                    <i className={`ph-bold ph-${METER[f].icon}`} style={{ fontSize: 17, color: CLAY }} />{METER[f].title}
+                    <i className="ph ph-question" title={METER[f].tip} style={{ marginLeft: "auto", fontSize: 16, color: MUTED, cursor: "help" }} />
+                  </span>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ font: "400 13px/17px var(--font-sans)", color: MUTED }}>Included used</span>
+                    <span style={{ font: "700 22px/28px var(--font-sans)", letterSpacing: "-.3px", color: out ? CLAY : INK }}>{used} <span style={{ fontWeight: 400, color: MUTED }}>/ {cap}</span></span>
+                    <span role="meter" aria-valuemin={0} aria-valuemax={cap} aria-valuenow={used} aria-label={`${LONG[f]} used`} style={{ height: 6, marginTop: 2, borderRadius: 9999, background: "rgba(13,12,12,.08)", overflow: "hidden" }}>
+                      <span style={{ display: "block", width: `${(used / cap) * 100}%`, height: "100%", borderRadius: 9999, background: out ? CLAY : INK, transition: "width .4s ease" }} />
+                    </span>
+                  </span>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ font: "400 13px/17px var(--font-sans)", color: MUTED }}>Purchased credits</span>
+                    <span style={{ font: "700 17px/22px var(--font-sans)" }}>{s.credits[f] || "–"}</span>
+                  </span>
+                  <button onClick={() => setBuyFor(f)} style={{ ...btnLink, alignSelf: "flex-start", marginTop: "auto" }}>Buy more</button>
+                </div>
+              );
+            })}
+          </div>
+          <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>Included reports and contacts reset on <b style={{ color: INK, fontWeight: 400 }}>{renewDate()}</b>. Comps, the AI assistant, alerts and Inman News are unlimited.</span>
         </div>
-        {(["maxBuild", "roi", "contacts"] as Metered[]).map(f => {
-          const cap = PRICING.allowance[f], used = Math.min(cap, s.used[f]);
-          return (
-            <div key={f} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 0", boxShadow: "inset 0 -1px 0 rgba(13,12,12,.08)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, font: "400 15px/20px var(--font-sans)" }}>{LONG[f][0].toUpperCase() + LONG[f].slice(1)}</span>
-                <span style={{ font: "400 14px/18px var(--font-sans)", color: left(f) ? INK : CLAY }}>{left(f)} of {cap} left</span>
-              </div>
-              <div role="meter" aria-valuemin={0} aria-valuemax={cap} aria-valuenow={used} aria-label={`${LONG[f]} used`} style={{ height: 8, borderRadius: 9999, background: "rgba(13,12,12,.07)", overflow: "hidden" }}>
-                <div style={{ width: `${(used / cap) * 100}%`, height: "100%", borderRadius: 9999, background: left(f) ? INK : CLAY, transition: "width .4s ease" }} />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, font: "400 13px/18px var(--font-sans)", color: MUTED }}>
-                <span style={{ flex: 1 }}>{s.credits[f] ? `${s.credits[f]} purchased credit${s.credits[f] === 1 ? "" : "s"}` : "No purchased credits"}</span>
-                <button onClick={() => setBuyFor(f)} style={btnLink}>Buy more</button>
-              </div>
-            </div>
-          );
-        })}
+
+        {/* Usage detail: every use this month, newest first. */}
+        <UsageDetail />
         <button onClick={() => setStep("cancel")} style={{ ...btnLink, alignSelf: "flex-start", color: MUTED, fontWeight: 400 }}>Cancel plan</button>
       </>}
     </Sheet>
@@ -354,6 +419,8 @@ export function TrialCard({ expanded }: { expanded: boolean }) {
   const head = s.status === "trial" ? "Free trial" : s.status === "expired" ? "Trial ended" : win ? "Welcome back" : "No plan";
   const sub = s.status === "trial" ? `${trialLeft} day${trialLeft === 1 ? "" : "s"} left` : win ? `${win.trialDays} days free` : `${money(P.price, P.period)}`;
   const open = () => paywall.open(planOn ? { kind: "plan" } : s.status === "none" && win ? { kind: "winback" } : { kind: "offer" });
+  // Collapsed with a trial / plan: the avatar's ring (AllowanceRing) shows what's left.
+  if (!expanded && planOn) return null;
   if (!expanded) return (
     <button onClick={open} title={`${head} · ${sub}`} className="btn-ghost" style={{ width: 40, height: 40, padding: 0, border: "none", borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: planOn ? "rgb(255,236,170)" : "rgba(147,89,75,.14)", font: "700 13px/1 var(--font-sans)", color: planOn ? INK : CLAY }}>
       {s.status === "trial" ? trialLeft : <i className="ph-bold ph-sparkle" style={{ fontSize: 17 }} />}
@@ -367,6 +434,31 @@ export function TrialCard({ expanded }: { expanded: boolean }) {
       {s.status === "trial" && <span style={{ height: 6, borderRadius: 9999, background: "rgba(13,12,12,.07)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${(s.trialDay / len) * 100}%`, borderRadius: 9999, background: trialLeft <= 3 ? CLAY : INK }} /></span>}
       <span style={{ font: "700 13px/16px var(--font-sans)", color: INK, textDecoration: "underline", textUnderlineOffset: 3 }}>{s.status === "trial" ? "See plan" : win ? "Claim offer" : `Start ${P.name}`}</span>
     </button>
+  );
+}
+
+/** Collapsed side nav: a ring round the avatar shows the monthly allowance left (Max
+ *  Build + ROI reports + owner contacts, review comment). Breezy yellow while there's
+ *  plenty, clay at a fifth or less. Hover says what's left; click opens Plan & usage.
+ *  Without a trial / plan (or with Unlimited) the avatar is drawn plain. */
+export function AllowanceRing({ children }: { children: React.ReactNode }) {
+  const { s, planOn, left, trialLeft } = useEntitlements();
+  if (!planOn || s.unlimited) return <>{children}</>;
+  const cap = METERS.reduce((n, f) => n + PRICING.allowance[f], 0);
+  const rest = METERS.reduce((n, f) => n + left(f), 0);
+  const frac = cap ? rest / cap : 0, low = frac <= 0.2;
+  const R = 20, C = 2 * Math.PI * R;
+  const tip = `${s.status === "trial" ? `Free trial · ${trialLeft} day${trialLeft === 1 ? "" : "s"} left\n` : ""}Left this month: ${left("maxBuild")} of ${PRICING.allowance.maxBuild} Max Build, ${left("roi")} of ${PRICING.allowance.roi} ROI, ${left("contacts")} of ${PRICING.allowance.contacts} contacts`;
+  return (
+    <span role="button" tabIndex={0} title={tip} aria-label={tip} onClick={e => { e.stopPropagation(); paywall.open({ kind: "plan" }); }}
+      style={{ position: "relative", flex: "none", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+      <svg width="46" height="46" viewBox="0 0 46 46" style={{ position: "absolute", left: -3, top: -3, transform: "rotate(-90deg)", overflow: "visible" }} aria-hidden>
+        <circle cx="23" cy="23" r={R} fill="none" stroke="rgba(13,12,12,.13)" strokeWidth="3" />
+        <circle cx="23" cy="23" r={R} fill="none" stroke={low ? CLAY : "rgb(255,209,41)"} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={`${C * frac} ${C}`} style={{ transition: "stroke-dasharray .5s ease, stroke .3s" }} />
+      </svg>
+      <span style={{ transform: "scale(.8)", display: "flex" }}>{children}</span>
+    </span>
   );
 }
 

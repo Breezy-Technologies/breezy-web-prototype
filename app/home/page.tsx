@@ -18,7 +18,8 @@ import { MapControls } from "@/components/home/MapControls";
 import { AreaCompsPreview } from "@/components/home/CompsFlow";
 import { FlowKind, ReportFlow } from "@/components/report/ReportFlow";
 import { frameLot } from "@/lib/map/frame";
-import { useComps, compLngLat } from "@/components/comps/useComps";
+import { useComps, compLngLat, isCompsManual, setCompsManual } from "@/components/comps/useComps";
+import { CompsChoice } from "@/components/comps/CompsChoice";
 import { CompsSide } from "@/components/comps/CompsSide";
 import { CompPins } from "@/components/comps/CompPins";
 import { CompRadius, RadiusChip } from "@/components/comps/CompRadius";
@@ -273,7 +274,7 @@ export default function HomeWeb() {
   const compCount = (F: Filters) => { if (!sel) return 0; const x = compsFor(sel, cm.radius, F); return x.sold.length + x.active.length; };
   const selKey = sel ? `${sel.id}|${sel.addr}` : "";
   // Another property (pin, parcel, saved home) leaves comps.
-  useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); }, [selKey]);
+  useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(false); }, [selKey]);
   // Frame the subject and every comp in the open map between the two panels.
   const frameComps = (l: Listing) => {
     if (!map) return;
@@ -288,10 +289,18 @@ export default function HomeWeb() {
       padding: { left: GAP + 420 + GAP + 40, right: SIDE_W + GAP * 2 + 40, top: 84, bottom: 64 }, maxZoom: 16.5, duration: 1100, essential: true,
     });
   };
+  // First Get comps on a property: ask first (CompsChoice): the AI picks, or comp by hand.
+  const [compsAsk, setCompsAsk] = useState(false);
   const openCompsMode = () => {
     if (!sel) return;
+    if (!rp.has(sel) && !compsOn) { setCompsAsk(true); return; }
+    startComps(isCompsManual(sel));
+  };
+  const startComps = (manual: boolean) => {
+    if (!sel) return;
+    setCompsAsk(false); setCompsManual(sel, manual);
     alerts.close(); setHoverId(null); fs.setDd(null); setSortOpen(false); setAreaPill(false);
-    setCompsReveal(!rp.has(sel)); setCompsOut(false); setCompsOn(true);
+    setCompsReveal(!rp.has(sel) && !manual); setCompsOut(false); setCompsOn(true);
   };
   // Create → Run comps: the property just picked opens, then slides into comps.
   useEffect(() => {
@@ -511,6 +520,7 @@ export default function HomeWeb() {
               locked={!ent.planOn} onToast={showToast} filtered={fCount} onClearFilters={fs.reset} onAddSold={() => fs.setF({ st: { "Recently sold": true }, tg: {} })} />
           </div>
         )}
+        {compsAsk && sel && <CompsChoice addr={sel.addr} onAi={() => startComps(false)} onManual={() => startComps(true)} onCancel={() => setCompsAsk(false)} />}
         {pillOn && (
           // "Search this area": centred over the visible map, just under the filter bar.
           <div style={{ position: "absolute", left: detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + GAP, right: 0, top: BAR_BOTTOM, zIndex: 2, display: "flex", justifyContent: "center", pointerEvents: "none" }}>

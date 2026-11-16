@@ -15,9 +15,18 @@ import type { Filters } from "@/lib/filters";
 import { LOTS } from "@/lib/silverlake";
 import { avg, myEstimates } from "../report/CompsReport";
 
-type Sess = { added: Comp[]; excl: Set<number>; hideExcl: boolean; byLot: boolean; radius: number };
+type Sess = { added: Comp[]; excl: Set<number>; hideExcl: boolean; byLot: boolean; radius: number; manual?: boolean };
 const store = new Map<string, Sess>();
 const keyOf = (l: Listing) => `${l.id}|${l.addr}`;
+const fresh = (): Sess => ({ added: [], excl: new Set(), hideExcl: false, byLot: false, radius: DEFAULT_RADIUS });
+/** The choice before comps open (CompsChoice): the AI picks the comps, or the agent
+ *  picks them by hand from the nearby candidates (the session starts empty). */
+export function setCompsManual(l: Listing, manual: boolean) {
+  const k = keyOf(l), s = store.get(k) ?? fresh();
+  if (manual && !s.manual) s.added = [];
+  s.manual = manual; store.set(k, s);
+}
+export const isCompsManual = (l: Listing | null) => !!(l && store.get(keyOf(l))?.manual);
 
 /** First comp after this beat, then one every STEP: the pins and cards arrive together. */
 export const REVEAL_FIRST = 900, REVEAL_STEP = 380;
@@ -35,13 +44,14 @@ export type CompsSession = ReturnType<typeof useComps>;
 export function useComps(l: Listing | null, reveal: boolean, F?: Filters) {
   const key = l ? keyOf(l) : "";
   const [, bump] = useState(0);
-  const s: Sess = key ? (store.get(key) ?? (store.set(key, { added: [], excl: new Set(), hideExcl: false, byLot: false, radius: DEFAULT_RADIUS }), store.get(key)!)) : { added: [], excl: new Set(), hideExcl: false, byLot: false, radius: DEFAULT_RADIUS };
+  const s: Sess = key ? (store.get(key) ?? (store.set(key, fresh()), store.get(key)!)) : fresh();
+  const manual = !!s.manual;
   const set = (f: (s: Sess) => void) => { if (!key) return; f(s); bump(n => n + 1); };
 
   // The search's filters (the filter bar over the subject) and the radius: changing either
   // runs the comps search again and the comps arrive again, one by one.
   const pk = s.radius + "|" + JSON.stringify(F || null);
-  const base = useMemo(() => (l ? compsFor(l, s.radius, F) : { sold: [], active: [] }), [key, pk]); // eslint-disable-line react-hooks/exhaustive-deps
+  const base = useMemo(() => (l && !manual ? compsFor(l, s.radius, F) : { sold: [] as Comp[], active: [] as Comp[] }), [key, pk, manual]); // eslint-disable-line react-hooks/exhaustive-deps
   const pool = useMemo(() => (l ? compPool(l, s.radius, F) : { sold: [], active: [] }), [key, pk]); // eslint-disable-line react-hooks/exhaustive-deps
   const sold = [...base.sold, ...s.added.filter(c => c.st === "S")];
   const active = [...base.active, ...s.added.filter(c => c.st === "L")];
@@ -70,7 +80,7 @@ export function useComps(l: Listing | null, reveal: boolean, F?: Filters) {
   const isOn = (c: Comp) => !s.excl.has(c.i);
   const toggle = (c: Comp) => set(x => { if (x.excl.has(c.i)) x.excl.delete(c.i); else x.excl.add(c.i); });
   const add = (c: Comp) => set(x => { if (!x.added.some(a => a.i === c.i)) x.added = [...x.added, c]; });
-  const candidates = [...pool.sold, ...pool.active].filter(c => !all.some(x => x.i === c.i)).slice(0, 8);
+  const candidates = [...pool.sold, ...pool.active].filter(c => !all.some(x => x.i === c.i)).slice(0, manual ? 24 : 8);
 
   // Averages over the comps that are in and included.
   const incSold = sold.filter(c => isOn(c) && isReady(c));
@@ -93,7 +103,9 @@ export function useComps(l: Listing | null, reveal: boolean, F?: Filters) {
   useEffect(() => { setHoverC(null); setFocusC(null); }, [key]);
 
   return {
-    l, key, sold, active, all, total, ready, loading, intro, isReady, isOn, toggle, add, candidates,
+    l, key, sold, active, all, total, ready, loading, intro, isReady, manual,
+    /** Hand the picking to the AI after starting by hand: the comps run with the long intro. */
+    letAiPick: () => { set(x => { x.manual = false; }); setRv({ key, n: 0, long: true }); }, isOn, toggle, add, candidates,
     hideExcl: s.hideExcl, setHideExcl: (v: boolean) => set(x => { x.hideExcl = v; }),
     byLot: s.byLot, setByLot: (v: boolean) => set(x => { x.byLot = v; }),
     radius: s.radius, setRadius: (r: number) => set(x => { x.radius = r; x.added = []; }), soldAllowed: filtersAllowSold(F),
