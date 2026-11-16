@@ -21,6 +21,10 @@ const keyOf = (l: Listing) => `${l.id}|${l.addr}`;
 
 /** First comp after this beat, then one every STEP: the pins and cards arrive together. */
 export const REVEAL_FIRST = 900, REVEAL_STEP = 380;
+/** The first Get comps on a property simulates the real search's wait, to set
+ *  expectations: the AI's steps roll in shimmering text alone (THINK), then skeleton
+ *  cards join (until LONG_FIRST), then the comps are revealed one by one as before. */
+export const THINK_MS = 2200, LONG_FIRST = 5600;
 
 export const compLngLat = (c: Comp): [number, number] => LOTS[c.i].c as [number, number];
 export const compPrice = (c: Comp) => { const d = compDetail(c); return d.sold ?? d.listed; };
@@ -45,20 +49,23 @@ export function useComps(l: Listing | null, reveal: boolean, F?: Filters) {
   const total = all.length;
 
   // Progressive arrival (no loading screen): `ready` comps are in.
-  const [rv, setRv] = useState({ key, n: reveal ? 0 : Infinity });
+  const [rv, setRv] = useState({ key, n: reveal ? 0 : Infinity, long: reveal });
   const ready = rv.key === key ? rv.n : reveal ? 0 : Infinity;
-  useEffect(() => { setRv({ key, n: reveal ? 0 : Infinity }); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const long = rv.key === key ? rv.long : reveal;
+  useEffect(() => { setRv({ key, n: reveal ? 0 : Infinity, long: reveal }); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   const firstPk = useRef(pk);
-  useEffect(() => { if (firstPk.current === pk) return; firstPk.current = pk; setRv({ key, n: 0 }); }, [pk]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (firstPk.current === pk) return; firstPk.current = pk; setRv({ key, n: 0, long: false }); }, [pk]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { firstPk.current = pk; }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!key || ready >= total) return;
-    const t = setTimeout(() => setRv(v => ({ key, n: (v.key === key ? v.n : 0) + 1 })), ready === 0 ? REVEAL_FIRST : REVEAL_STEP);
+    const t = setTimeout(() => setRv(v => ({ key, n: (v.key === key ? v.n : 0) + 1, long: v.key === key ? v.long : false })), ready === 0 ? (long ? LONG_FIRST : REVEAL_FIRST) : REVEAL_STEP);
     return () => clearTimeout(t);
-  }, [key, ready, total]);
+  }, [key, ready, total, long]);
   const order = all.map(c => c.i);
   const isReady = (c: Comp) => { const i = order.indexOf(c.i); return i >= 0 && i < ready; };
   const loading = !!key && ready < total;
+  /** This run is the first one on the property: the long, narrated loading. */
+  const intro = loading && long;
 
   const isOn = (c: Comp) => !s.excl.has(c.i);
   const toggle = (c: Comp) => set(x => { if (x.excl.has(c.i)) x.excl.delete(c.i); else x.excl.add(c.i); });
@@ -86,7 +93,7 @@ export function useComps(l: Listing | null, reveal: boolean, F?: Filters) {
   useEffect(() => { setHoverC(null); setFocusC(null); }, [key]);
 
   return {
-    l, key, sold, active, all, total, ready, loading, isReady, isOn, toggle, add, candidates,
+    l, key, sold, active, all, total, ready, loading, intro, isReady, isOn, toggle, add, candidates,
     hideExcl: s.hideExcl, setHideExcl: (v: boolean) => set(x => { x.hideExcl = v; }),
     byLot: s.byLot, setByLot: (v: boolean) => set(x => { x.byLot = v; }),
     radius: s.radius, setRadius: (r: number) => set(x => { x.radius = r; x.added = []; }), soldAllowed: filtersAllowSold(F),

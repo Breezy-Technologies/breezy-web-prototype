@@ -14,7 +14,7 @@ import { fullPrice, shortPrice } from "@/lib/fake";
 import type { Comp } from "@/lib/comps";
 import { LockVeil } from "../billing/Paywall";
 import { ACTIVE, Analytics, CompCard, GREEN, INK, MUTED, Modal, SOLD, Table } from "../report/CompsReport";
-import type { CompsSession } from "./useComps";
+import { THINK_MS, type CompsSession } from "./useComps";
 
 type View = "cards" | "table" | "analytics";
 const k = (n: number) => n.toLocaleString("en-US");
@@ -33,6 +33,16 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
   const narrow = width < 480;
   const addIcon = narrow;
   const { sold, active, total, ready, loading, isReady, isOn, hideExcl } = cs;
+  // First Get comps (cs.intro): the AI's steps roll alone in shimmering text for THINK_MS,
+  // then skeleton cards fill the panel, then the comps replace them one by one.
+  const [thinking, setThinking] = useState(false);
+  useEffect(() => {
+    if (!cs.intro || ready > 0) { setThinking(false); return; }
+    setThinking(true);
+    const t = setTimeout(() => setThinking(false), THINK_MS);
+    return () => clearTimeout(t);
+  }, [cs.key, cs.intro]); // eslint-disable-line react-hooks/exhaustive-deps
+  const skelN = cols * 2;
 
   // A pin picked on the map: show its card (switching back to cards), centred, with a brief ring.
   useEffect(() => {
@@ -64,7 +74,7 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
       <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 12, padding: "18px 18px 14px", boxShadow: "inset 0 -1px 0 rgb(245,240,238)" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           <span style={{ flex: 1, minWidth: 0, font: "400 24px/30px var(--font-sans)", letterSpacing: "-.02em", color: INK }}>
-            {loading ? <>Estimating comps <span style={{ color: MUTED }}>{Math.min(ready, total)} of {total}</span></> : `${total} Comps to review`}
+            {loading && ready === 0 && cs.intro ? <>Finding comps<span style={{ color: MUTED }}>…</span></> : loading ? <>Estimating comps <span style={{ color: MUTED }}>{Math.min(ready, total)} of {total}</span></> : `${total} Comps to review`}
           </span>
           <button className="cs-x" onClick={onClose} title="Close comps" aria-label="Close comps" style={{ flex: "none", width: 36, height: 36, border: "none", borderRadius: 9999, background: "rgba(13,12,12,.06)", color: INK, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <i className="ph-bold ph-x" style={{ fontSize: 15 }} />
@@ -114,7 +124,19 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
         )}
         {view === "table" && <div className="cs-in"><Table rows={[...shown(sold), ...shown(active)]} isOn={isOn} onToggle={cs.toggle} /></div>}
         {view === "cards" && <>
-          {loading && ready === 0 && <div className="cs-skel" style={{ height: 420, borderRadius: 24 }} />}
+          {loading && ready === 0 && !cs.intro && <div className="cs-skel" style={{ height: 420, borderRadius: 24 }} />}
+          {loading && ready === 0 && cs.intro && !thinking && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "2px 0" }}>
+                <span style={{ flex: 1, height: 1, background: "rgba(13,12,12,.1)" }} />
+                <span className="cs-skel cs-in" style={{ width: 92, height: 34, borderRadius: 9999 }} />
+                <span style={{ flex: 1, height: 1, background: "rgba(13,12,12,.1)" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},minmax(0,1fr))`, gap: 12 }}>
+                {Array.from({ length: skelN }, (_, j) => <CompSkel key={j} delay={j * 0.09} />)}
+              </div>
+            </div>
+          )}
           {!loading && total === 0 && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "48px 16px", textAlign: "center" }}>
               <span style={{ width: 140, height: 110, background: "url('/iso/empty-search.png') center/contain no-repeat" }} />
@@ -144,14 +166,16 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
                     </div>
                   );
                 })}
-                {loading && list.some(c => !isReady(c)) && list.some(isReady) && <div className="cs-skel" style={{ height: 420, borderRadius: 24 }} />}
+                {loading && list.some(c => !isReady(c)) && list.some(isReady) && (cs.intro
+                  ? Array.from({ length: Math.min(list.filter(c => !isReady(c)).length, Math.max(1, skelN - list.filter(isReady).length)) }, (_, j) => <CompSkel key={"sk" + j} />)
+                  : <div className="cs-skel" style={{ height: 420, borderRadius: 24 }} />)}
               </div>
             </div>
           ))}
         </>}
-        <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED }}>Comps are real nearby homes (address, size, beds, baths, lot, year, $/ft², distance, month sold). Prices are value estimates; list prices, dates, days on market and garages are sample data until the listings service is connected.</span>
+        {!(cs.intro && ready === 0) && <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED }}>Comps are real nearby homes (address, size, beds, baths, lot, year, $/ft², distance, month sold). Prices are value estimates; list prices, dates, days on market and garages are sample data until the listings service is connected.</span>}
       </div>
-
+      <AiTicker on={cs.intro} radius={cs.radius} />
       </div>
       {/* Main action (Figma: "Set price estimate", top right of the comps results): opens the
           export sheet, where the estimate is set and the client report customised. */}
@@ -183,6 +207,73 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/** A comp card's skeleton: the photo, the address, specs, chips and the three figure
+ *  rows, in the card's own shell, shimmering. */
+function CompSkel({ delay = 0 }: { delay?: number }) {
+  const bar = (w: number | string, h = 14, r = 7): React.CSSProperties => ({ width: w, height: h, borderRadius: r });
+  return (
+    <div className="cs-in" style={{ display: "flex", flexDirection: "column", gap: 12, padding: "6px 6px 14px", borderRadius: 24, background: "rgb(253,252,252)", boxShadow: "inset 0 0 0 1px rgb(236,231,228)", animationDelay: `${delay}s` }}>
+      <span className="cs-skel" style={{ height: 150, borderRadius: 18 }} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "0 10px" }}>
+        <span className="cs-skel" style={bar("72%", 18, 9)} />
+        <span className="cs-skel" style={bar("90%")} />
+        <div style={{ display: "flex", gap: 6 }}><span className="cs-skel" style={bar(84, 30, 15)} /><span className="cs-skel" style={bar(44, 30, 15)} /></div>
+        {[0, 1, 2].map(r => (
+          <div key={r} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 40px", gap: 12, padding: "8px 0", boxShadow: r < 2 ? "inset 0 -.5px 0 rgba(13,12,12,.08)" : "none" }}>
+            {[0, 1].map(c => <span key={c} style={{ display: "flex", flexDirection: "column", gap: 6 }}><span className="cs-skel" style={bar("60%", 10, 5)} /><span className="cs-skel" style={bar("85%", 16, 8)} /></span>)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The first Get comps on a property: what the AI is doing, one step at a time, centred
+ *  on a top-to-bottom gradient over the panel's bottom half (manages the wait). Each
+ *  step shimmers; it fades out once every comp is in. */
+const STEP_MS = 1700;
+function AiTicker({ on, radius }: { on: boolean; radius: number }) {
+  const [mounted, setMounted] = useState(on);
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (on) { setMounted(true); setI(0); return; }
+    const t = setTimeout(() => setMounted(false), 600);
+    return () => clearTimeout(t);
+  }, [on]);
+  useEffect(() => {
+    if (!on) return;
+    const t = setInterval(() => setI(n => n + 1), STEP_MS);
+    return () => clearInterval(t);
+  }, [on]);
+  if (!mounted) return null;
+  const within = radius < 1 ? `${radius} mi` : `${radius} mile${radius === 1 ? "" : "s"}`;
+  const steps = [
+    `Searching recent sales within ${within}`,
+    "Pulling listing and sale records",
+    "Matching size, beds and baths",
+    "Comparing lots and year built",
+    "Checking days on market and price changes",
+    "Ranking the closest matches",
+    "Working out the price per ft²",
+    "Estimating the home's value",
+  ];
+  // Runs through the steps once, then stays on the last ones while the cards finish.
+  const step = i < steps.length ? steps[i] : steps[steps.length - 2 + (i % 2)];
+  return (
+    <div aria-live="polite" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "50%", zIndex: 2, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
+      background: "linear-gradient(to bottom, rgba(253,252,252,0) 0%, rgba(253,252,252,.82) 38%, rgba(253,252,252,.97) 70%, rgb(253,252,252) 100%)",
+      opacity: on ? 1 : 0, transition: "opacity .5s ease" }}>
+      <style>{`@keyframes csTick{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes csTextShim{from{background-position:100% 0}to{background-position:0 0}}
+.cs-tick{background:linear-gradient(100deg,rgb(120,112,109) 0%,rgb(120,112,109) 38%,rgb(175,127,113) 46%,rgb(132,98,196) 52%,rgb(120,112,109) 60%,rgb(120,112,109) 100%) 0 0/300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:csTick .45s cubic-bezier(.2,.8,.2,1) both,csTextShim 1.6s linear infinite}`}</style>
+      <span style={{ display: "flex", alignItems: "center", gap: 10, marginTop: "18%" }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" style={{ flex: "none" }}><defs><linearGradient id="csSpark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="rgb(175,127,113)" /><stop offset="1" stopColor="rgb(132,98,196)" /></linearGradient></defs><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z" fill="url(#csSpark)" /></svg>
+        <span key={i} className="cs-tick" style={{ font: "400 16px/22px var(--font-sans)", textAlign: "center" }}>{step}…</span>
+      </span>
     </div>
   );
 }
