@@ -60,7 +60,7 @@ const FEATS: Feat[] = [
 // replaces the estimate card. The CTA runs a short estimate, then reveals the card and
 // raises a positive snackbar via `onToast`. Estimated properties stay revealed this session.
 const estimated = new Set<string>();
-export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell, onShare, onToast, comps }: { comps?: CompsSession | null; l: Listing; onClose: () => void; onGetComps: () => void; onFlow?: (k: "ub" | "roi") => void; alertN?: number; onBell?: () => void; onShare?: () => void; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
+export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell, onShare, onToast, comps, onCollapse }: { onCollapse?: () => void; comps?: CompsSession | null; l: Listing; onClose: () => void; onGetComps: () => void; onFlow?: (k: "ub" | "roi") => void; alertN?: number; onBell?: () => void; onShare?: () => void; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
   const d = useMemo(() => listingDetail(l), [l]);
   const qeKey = `${l.addr}|${l.lng.toFixed(5)},${l.lat.toFixed(5)}`;
   const [qeState, setQeState] = useState<"none" | "loading" | "ready">(() => !l.noQe || estimated.has(qeKey) ? "ready" : "none");
@@ -186,6 +186,12 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   return (
     <div style={{ position: "relative", width: 420, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 24, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgb(245,240,238),0 14px 36px rgba(40,26,20,.14)", pointerEvents: "auto", animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) backwards" }}>
       {/* In comps mode the comps panel's × closes comps; the panel itself has no close (review). */}
+      {/* Comps mode: collapse to the compact subject card (SubjectMini) instead. */}
+      {comps && onCollapse && <div style={css("position:absolute;right:20px;top:20px;z-index:10")}>
+        <button className="dt-white" onClick={onCollapse} title="Collapse" aria-label="Collapse the property" style={css("width:32px;height:32px;border:none;border-radius:9999px;background:rgb(253,252,252);cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgb(17,16,16)")}>
+          <i className="ph-bold ph-arrows-in-simple" style={{ fontSize: 15 }} />
+        </button>
+      </div>}
       {!comps && <div style={css("position:absolute;right:20px;top:20px;z-index:10;display:flex;align-items:center;gap:8px")}>
         <button className="dt-white" onClick={onClose} title="Close" style={css("width:32px;height:32px;border:none;border-radius:9999px;background:rgb(253,252,252);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
           <span style={maskIco("/ui/x.svg", 13, "rgb(17,16,16)")} />
@@ -199,7 +205,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
               </button>
             : <span style={{ flex: "none", width: 40 }} />}
           <span style={css("flex:1;min-width:0;text-align:center;font:700 16px/22px var(--font-sans);color:rgb(18,18,18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis")}>{l.addr}</span>
-          {comps ? <span style={{ flex: "none", width: 40 }} /> : <button className="dt-round" onClick={onClose} title="Close" style={css("flex:none;width:40px;height:40px;border:none;border-radius:9999px;background:rgba(13,12,12,.06);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
+          {comps ? (onCollapse ? <button className="dt-round" onClick={onCollapse} title="Collapse" aria-label="Collapse the property" style={css("flex:none;width:40px;height:40px;border:none;border-radius:9999px;background:rgba(13,12,12,.06);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}><i className="ph-bold ph-arrows-in-simple" style={{ fontSize: 16 }} /></button> : <span style={{ flex: "none", width: 40 }} />) : <button className="dt-round" onClick={onClose} title="Close" style={css("flex:none;width:40px;height:40px;border:none;border-radius:9999px;background:rgba(13,12,12,.06);color:rgb(17,16,16);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>}
         </div>

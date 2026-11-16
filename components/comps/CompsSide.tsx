@@ -23,7 +23,7 @@ const k = (n: number) => n.toLocaleString("en-US");
  *  turns Sold on in those same filters. `onClearFilters`: no comp matches the filters. */
 /** `locked` (Nimbus paywall, no active trial / plan): the comps still arrive and the first
  *  ones show, then a veil offers Agents Pro. */
-export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold, onClearFilters, filtered, locked, onToast }: { cs: CompsSession; width: number; cols: 1 | 2; out?: boolean; onClose: () => void; onEstimate: () => void; onAddSold: () => void; onClearFilters: () => void; filtered: number; locked?: boolean; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
+export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold, onClearFilters, filtered, locked, onToast }: { cs: CompsSession; width: number; cols: 1 | 2 | 3; out?: boolean; onClose: () => void; onEstimate: () => void; onAddSold: () => void; onClearFilters: () => void; filtered: number; locked?: boolean; onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void }) {
   const [view, setView] = useState<View>("cards");
   const est = cs.mine ?? (cs.homePrice > 0 ? Math.round(cs.homePrice / 1000) * 1000 : 0);
   const [adding, setAdding] = useState(false);

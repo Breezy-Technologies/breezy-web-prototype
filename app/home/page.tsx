@@ -20,6 +20,7 @@ import { FlowKind, ReportFlow } from "@/components/report/ReportFlow";
 import { frameLot } from "@/lib/map/frame";
 import { useComps, compLngLat, isCompsManual, setCompsManual } from "@/components/comps/useComps";
 import { CompsChoice } from "@/components/comps/CompsChoice";
+import { MINI_W, SubjectMini } from "@/components/comps/SubjectMini";
 import { CompsSide } from "@/components/comps/CompsSide";
 import { CompPins } from "@/components/comps/CompPins";
 import { CompRadius, RadiusChip } from "@/components/comps/CompRadius";
@@ -265,8 +266,14 @@ export default function HomeWeb() {
   const compsShift = compsOn && !compsOut;
   // The export sheet ("Set price estimate").
   const [exportOn, setExportOn] = useState(false);
-  const sideCols: 1 | 2 = winW >= 1360 ? 2 : 1;
-  const SIDE_W = sideCols === 2 ? 580 : 360;
+  // The subject collapsed to a compact card (SubjectMini, exploration 17 Nov). Starts
+  // collapsed on windows wider than 1440, where the list gets its third column.
+  const [subjMin, setSubjMin] = useState(false);
+  const subjMini = compsShift && subjMin;
+  // Comps list columns: 3 on windows wider than 1440 (17 Nov) while the subject is the
+  // compact card (or the window fits the full panel too), 2 from 1360, else 1.
+  const sideCols: 1 | 2 | 3 = winW > 1440 && (subjMin || winW >= 1860) ? 3 : winW >= 1360 ? 2 : 1;
+  const SIDE_W = sideCols === 3 ? 820 : sideCols === 2 ? 580 : 360;
   const DETAIL_X = compsShift ? GAP : GAP + COL + GAP;
   // Comps mode: the detail panel (now the subject) drops under the filter bar.
   const DETAIL_TOP = compsShift ? BAR_BOTTOM : GAP;
@@ -274,7 +281,9 @@ export default function HomeWeb() {
   const compCount = (F: Filters) => { if (!sel) return 0; const x = compsFor(sel, cm.radius, F); return x.sold.length + x.active.length; };
   const selKey = sel ? `${sel.id}|${sel.addr}` : "";
   // Another property (pin, parcel, saved home) leaves comps.
-  useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(false); }, [selKey]);
+  useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(false); setSubjMin(false); }, [selKey]);
+  // Collapsing / expanding the subject reframes the comps in the map space it leaves.
+  useEffect(() => { if (compsShift && sel && cm.key) frameComps(sel); }, [subjMin]); // eslint-disable-line react-hooks/exhaustive-deps
   // Frame the subject and every comp in the open map between the two panels.
   const frameComps = (l: Listing) => {
     if (!map) return;
@@ -286,7 +295,7 @@ export default function HomeWeb() {
     }
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], {
-      padding: { left: GAP + 420 + GAP + 40, right: SIDE_W + GAP * 2 + 40, top: 84, bottom: 64 }, maxZoom: 16.5, duration: 1100, essential: true,
+      padding: subjMin ? { left: GAP + MINI_W + GAP + 24, right: SIDE_W + GAP * 2 + 40, top: 84, bottom: 64 } : { left: GAP + 420 + GAP + 40, right: SIDE_W + GAP * 2 + 40, top: 84, bottom: 64 }, maxZoom: 16.5, duration: 1100, essential: true,
     });
   };
   // First Get comps on a property: ask first (CompsChoice): the AI picks, or comp by hand.
@@ -300,7 +309,7 @@ export default function HomeWeb() {
   };
   const startComps = (manual: boolean) => {
     if (!sel) return;
-    setCompsAsk(false); setCompsManual(sel, manual);
+    setCompsAsk(false); setCompsManual(sel, manual); setSubjMin(winW > 1440);
     alerts.close(); setHoverId(null); fs.setDd(null); setSortOpen(false); setAreaPill(false);
     setCompsReveal(!rp.has(sel) && !manual); setCompsOut(false); setCompsOn(true);
   };
@@ -511,8 +520,9 @@ export default function HomeWeb() {
         {detailOpen && (
           // The detail column steps back while the Alerts sheet sits on top of it (`dtT` / `dtF`).
           <div style={{ position: "absolute", left: DETAIL_X, top: DETAIL_TOP, bottom: GAP, zIndex: 4, transformOrigin: "50% 0", transition: "left .6s cubic-bezier(.2,.8,.2,1),top .6s cubic-bezier(.2,.8,.2,1),transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
-            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openReport(sel!, k)}
-              alertN={alerts.count(sel)} onBell={() => ent.planOn ? alerts.open(sel!) : paywall.open({ kind: "offer", feature: "alerts" })} onShare={() => shareOne(sel!)} onToast={showToast} />
+            {subjMini ? <SubjectMini l={sel!} cs={cm} onExpand={() => setSubjMin(false)} onClose={closeDetail} /> :
+            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openReport(sel!, k)} onCollapse={compsShift ? () => setSubjMin(true) : undefined}
+              alertN={alerts.count(sel)} onBell={() => ent.planOn ? alerts.open(sel!) : paywall.open({ kind: "offer", feature: "alerts" })} onShare={() => shareOne(sel!)} onToast={showToast} />}
           </div>
         )}
         {detailOpen && alerts.panel(DETAIL_X)}
