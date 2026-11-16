@@ -293,6 +293,8 @@ export default function HomeWeb() {
   const [compsAsk, setCompsAsk] = useState(false);
   const openCompsMode = () => {
     if (!sel) return;
+    // No trial / plan: Get comps stops at the press with the Agents Pro offer (review).
+    if (!ent.planOn) { paywall.open({ kind: "offer", feature: "comps" }); return; }
     if (!rp.has(sel) && !compsOn) { setCompsAsk(true); return; }
     startComps(isCompsManual(sel));
   };
