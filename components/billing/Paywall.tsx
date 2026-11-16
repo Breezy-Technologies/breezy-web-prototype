@@ -85,6 +85,88 @@ export function OfferCard({ compact, onDone, feature }: { compact?: boolean; onD
   );
 }
 
+/* ---------- Agents Pro offer, full sheet (review: two panels, like a trial paywall) ----------
+   Left on paper: what you'd start (a big title, one line, the price, one main action).
+   Right on a dark panel: what's included, one row per feature with an icon and what it
+   does; the feature that brought you here is lit. The compact OfferCard stays for the
+   lock veils, which sit inside the page. */
+const FEATURES: { f: Feature | null; icon: string; t: string; d: string }[] = [
+  { f: "comps", icon: "files", t: "Comps & notes", d: "Unlimited AI-picked comps and price estimates, with notes on any home" },
+  { f: "assistant", icon: "sparkle", t: "AI assistant", d: "Ask anything about a property, an area or the market" },
+  { f: "alerts", icon: "bell-ringing", t: "Market Radar alerts", d: "Unlimited alerts on price drops, expired and stale listings" },
+  { f: "maxBuild", icon: "ruler", t: "Max Build reports", d: `${PRICING.allowance.maxBuild} a month: what the lot allows and how underbuilt it is` },
+  { f: "roi", icon: "chart-line-up", t: "ROI reports", d: `${PRICING.allowance.roi} a month: buy, improve, sell, and the profit` },
+  { f: "contacts", icon: "address-book", t: "Owner contacts", d: `${PRICING.allowance.contacts} a month: phone, email and mailing address` },
+  { f: "news", icon: "newspaper", t: "Inman News", d: "The real-estate news agents read, included" },
+];
+const LOCKED: Record<Feature, string> = { maxBuild: "Max Build reports are", roi: "ROI reports are", contacts: "Owner contacts are", comps: "Comps are", assistant: "The AI assistant is", alerts: "Market Radar alerts are", news: "Inman News is" };
+function OfferSheet({ onClose, onDone, feature, title, kicker }: { onClose: () => void; onDone: () => void; feature?: Feature; title?: string; kicker?: string }) {
+  const s = useBilling();
+  const win = s.status === "none" ? winOffer(s.segment) : null;
+  const trialAgain = s.status === "none" && s.segment === "new2";
+  const [busy, setBusy] = useState(false);
+  const go = () => { setBusy(true); setTimeout(() => { if (win || trialAgain) billing.startTrial(); else billing.startPlan(); setBusy(false); onDone(); }, 700); };
+  const days = win ? win.trialDays : s.trialVariant;
+  const head = title ?? (win || trialAgain ? `Your ${days}-day free trial of ${P.name}` : s.status === "expired" ? `Keep going with ${P.name}` : `Start ${P.name}`);
+  const sub = win || trialAgain
+    ? `Enjoy the best of Breezy for ${days} days. During this time you'll have every ${P.name} feature.`
+    : `${s.status === "expired" ? "Your free trial has ended. " : ""}Everything you need to find, price and win listings, in one plan.`;
+  const cta = win || trialAgain ? "Start free trial" : `Start ${P.name}`;
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onClose(); } };
+    window.addEventListener("keydown", k, true);
+    return () => window.removeEventListener("keydown", k, true);
+  }, [onClose]);
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 420, background: "rgba(23,17,16,.32)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, animation: "fadeIn .2s ease both" }}>
+      <div role="dialog" aria-label={head} onClick={e => e.stopPropagation()} className="no-scrollbar"
+        style={{ position: "relative", width: 920, maxWidth: "100%", maxHeight: "calc(100vh - 32px)", overflowY: "auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", borderRadius: 28, background: PAPER, boxShadow: "0 24px 60px rgba(30,18,12,.24)", animation: "riseIn .26s cubic-bezier(.2,.8,.2,1) both" }}>
+        {/* Left: the offer */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, padding: "40px 40px 32px" }}>
+          {(kicker || feature) && (
+            <span style={{ display: "flex", alignItems: "center", gap: 8, font: "400 14px/20px var(--font-sans)", color: MUTED }}>
+              {kicker ? kicker : <><Lock size={14} color={MUTED} />{LOCKED[feature!]} part of {P.name}</>}
+            </span>
+          )}
+          <span style={{ font: "400 40px/1.08 var(--font-sans)", letterSpacing: "-1.2px", color: INK, textWrap: "balance" } as React.CSSProperties}>{head}</span>
+          <span style={{ font: "400 16px/23px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>{sub}</span>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+            <span style={{ font: "400 30px/1 var(--font-sans)", letterSpacing: "-.8px", color: INK }}>{money(P.price)}</span>
+            <span style={{ font: "400 15px/20px var(--font-sans)", color: MUTED }}>/{P.period}{win || trialAgain ? " after the trial" : ""}</span>
+            <s style={{ font: "400 15px/20px var(--font-sans)", color: "rgb(150,140,136)" }}>{money(P.was, P.period)}</s>
+            <span style={{ alignSelf: "center", height: 22, padding: "0 8px", display: "flex", alignItems: "center", borderRadius: 9999, background: "rgb(255,209,41)", font: "700 11px/14px var(--font-sans)", color: INK }}>{P.badge}</span>
+          </div>
+          <span style={{ flex: 1, minHeight: 24 }} />
+          <button onClick={go} disabled={busy} style={{ ...btnPrimary, alignSelf: "stretch", height: 52 }}>
+            {busy && <i className="ph-bold ph-circle-notch" style={{ animation: "spin .8s linear infinite" }} />}{busy ? "Starting" : cta}
+          </button>
+          <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED, textAlign: "center" }}>
+            {win ? `Card required. Then ${money(P.price, P.period)}. ` : trialAgain ? "No card needed. " : ""}{P.seats} user · cancel anytime · {P.footnote}
+          </span>
+        </div>
+        {/* Right: what's included */}
+        <div style={{ position: "relative", display: "flex", flexDirection: "column", justifyContent: "center", gap: 6, padding: "36px 32px", background: "linear-gradient(180deg,rgb(66,61,59) 0%,rgb(30,27,26) 100%)", color: PAPER }}>
+          <button onClick={onClose} aria-label="Close" style={{ position: "absolute", right: 14, top: 14, width: 36, height: 36, border: "none", borderRadius: 9999, background: "rgba(253,252,252,.1)", color: PAPER, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-x" /></button>
+          <span style={{ font: "700 12px/16px var(--font-sans)", letterSpacing: ".06em", textTransform: "uppercase", color: "rgba(253,252,252,.55)", padding: "0 12px 6px" }}>Included in {P.name}</span>
+          {FEATURES.map(x => {
+            const lit = !!feature && x.f === feature;
+            return (
+              <div key={x.t} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "10px 12px", borderRadius: 14, background: lit ? "rgba(253,252,252,.1)" : "none", boxShadow: lit ? "inset 0 0 0 1px rgba(255,209,41,.45)" : "none" }}>
+                <i className={`ph${lit ? "-bold" : ""} ph-${x.icon}`} style={{ flex: "none", marginTop: 1, fontSize: 20, color: lit ? "rgb(255,209,41)" : PAPER }} />
+                <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ font: "700 15px/20px var(--font-sans)", color: PAPER }}>{x.t}</span>
+                  <span style={{ font: "400 13px/18px var(--font-sans)", color: "rgba(253,252,252,.66)" }}>{x.d}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 /* ---------- Upsell: single vs pack ---------- */
 export function UpsellOptions({ feature, onBought, compact }: { feature: Metered; onBought: (skuId: string) => void; compact?: boolean }) {
   const groups = PRICING.upsell[feature];
@@ -330,13 +412,7 @@ function WinBack({ onClose, onToast }: { onClose: () => void; onToast: Toast }) 
       <button onClick={onClose} style={btnPrimary}>Got it</button>
     </Sheet>
   );
-  return (
-    <Sheet onClose={onClose} label="Welcome back" width={520}>
-      <span style={{ font: "700 13px/16px var(--font-sans)", letterSpacing: ".04em", textTransform: "uppercase", color: CLAY }}>Welcome back to Breezy</span>
-      <span style={{ font: "300 30px/1.15 var(--font-sans)", letterSpacing: "-.5px", paddingRight: 40 }}>{win ? `Your next ${win.trialDays} days are on us` : `Try ${P.name}`}</span>
-      <OfferCard onDone={() => { onToast(`Your ${win?.trialDays ?? s.trialVariant}-day trial has started`, "positive"); onClose(); }} />
-    </Sheet>
-  );
+  return <OfferSheet kicker="Welcome back to Breezy" title={win ? `Your next ${win.trialDays} days are on us` : `Try ${P.name}`} onClose={onClose} onDone={() => { onToast(`Your ${win?.trialDays ?? s.trialVariant}-day trial has started`, "positive"); onClose(); }} />;
 }
 
 /* ---------- Inman News (included with the plan) ---------- */
@@ -381,17 +457,13 @@ export function BillingHost({ onToast }: { onToast: Toast }) {
   if (r.kind === "plan") return <PlanSettings onClose={close} onToast={onToast} />;
   if (r.kind === "winback") return <WinBack onClose={close} onToast={onToast} />;
   if (r.kind === "news") return <News onClose={close} onToast={onToast} />;
-  if (r.kind === "offer") return (
-    <Sheet onClose={close} label={P.name} width={560}>
-      <OfferCard feature={r.feature} onDone={() => { onToast(`${P.name} started`, "positive"); close(); }} />
-    </Sheet>
-  );
+  if (r.kind === "offer") return <OfferSheet feature={r.feature} onClose={close} onDone={() => { onToast(`${P.name} started`, "positive"); close(); }} />;
   return <UpsellSheet feature={r.feature} then={r.then} onClose={close} onToast={onToast} />;
 }
 function UpsellSheet({ feature, then, onClose, onToast }: { feature: Metered; then?: () => void; onClose: () => void; onToast: Toast }) {
   const { access, s } = useEntitlements();
   const a = access(feature);
-  if (a === "plan") return <Sheet onClose={onClose} label={P.name} width={560}><OfferCard feature={feature} onDone={() => { onToast(`${P.name} started`, "positive"); onClose(); }} /></Sheet>;
+  if (a === "plan") return <OfferSheet feature={feature} onClose={onClose} onDone={() => { onToast(`${P.name} started`, "positive"); onClose(); }} />;
   return (
     <Sheet onClose={onClose} label={`Buy ${LONG[feature]}`} width={520}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, paddingRight: 40 }}>
