@@ -136,6 +136,8 @@ export function hoodStats(lat: number, lng: number): HoodStats {
 export type CompDetail = { listed: number; sold: number | null; diff: number; dom: number; listedOn: Date; soldOn: Date | null; garage: number; photos: string[]; perLot: number };
 const MON_S = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const shortDate = (d: Date) => `${MON_S[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+/** Compact numeric date for tight cells (comp cards): US / MLS order, MM/DD/YY. */
+export const numDate = (d: Date) => `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
 const detailCache = new Map<number, CompDetail>();
 export function compDetail(c: Comp): CompDetail {
   const hit = detailCache.get(c.i);

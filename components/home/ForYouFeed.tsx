@@ -6,6 +6,7 @@
 // removable chips. Cards use the larger 244px photo with the signal badge.
 // Deliberate change from the canvas (review feedback): the badge's signal chip
 // is the yellow pin accent (rgb 255,209,41 with an ink ring) instead of clay.
+import { useWheelSwipe } from "../useWheelSwipe";
 import { useEffect, useRef, useState } from "react";
 import { Listing, OPP, OppType, fullPrice } from "@/lib/fake";
 import { hashStr } from "@/lib/geo";
@@ -26,7 +27,7 @@ const GROUPS: [string, Item[]][] = [
 
 
 // Photo carousel on a feed card: drag with the mouse (or swipe on touch) to move
-// between photos (review feedback). A drag never opens the card; a click does.
+// between photos (review feedback), or scroll sideways (trackpad / tilt wheel). A drag never opens the card; a click does.
 const MAX_PHOTOS = 5;
 function PhotoStrip({ photos }: { photos: string[] }) {
   const ph = photos.slice(0, MAX_PHOTOS);
@@ -34,6 +35,7 @@ function PhotoStrip({ photos }: { photos: string[] }) {
   const [dx, setDx] = useState(0);
   const drag = useRef<{ x: number; id: number; moved: boolean } | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  useWheelSwipe(box, d => setI(n => Math.max(0, Math.min(ph.length - 1, n + d))));
   const end = (e: React.PointerEvent) => {
     const d = drag.current; if (!d) return;
     drag.current = null;

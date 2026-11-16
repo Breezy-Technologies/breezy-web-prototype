@@ -12,10 +12,11 @@
 //  - top: n Comps · Average, and Set Your Estimate.
 // Comps are real lots (lib/comps.ts); list prices, dates, days on market and
 // garages are seeded (compDetail).
-import { useEffect, useMemo, useState } from "react";
+import { useWheelSwipe } from "../useWheelSwipe";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Listing, fullPrice, shortPrice } from "@/lib/fake";
-import { type Comp, compDetail, compPool, compsFor, shortDate } from "@/lib/comps";
+import { type Comp, compDetail, compPool, compsFor, numDate, shortDate } from "@/lib/comps";
 import { config, isLiveMap } from "@/lib/config";
 import { hashStr } from "@/lib/geo";
 import { LOTS } from "@/lib/silverlake";
@@ -31,8 +32,10 @@ function Carousel({ photos, h, radius, children, onClickPhoto }: { photos: strin
   const [i, setI] = useState(0);
   const n = photos.length;
   const go = (d: number) => (e: React.MouseEvent) => { e.stopPropagation(); setI(v => (v + d + n) % n); };
+  const box = useRef<HTMLDivElement>(null);
+  useWheelSwipe(box, d => n > 1 && setI(v => (v + d + n) % n));
   return (
-    <div className="cr-photo" onClick={onClickPhoto} style={{ position: "relative", height: h, borderRadius: radius, overflow: "hidden", background: `rgb(241,231,228) url('${photos[i]}') center/cover no-repeat` }}>
+    <div ref={box} className="cr-photo" onClick={onClickPhoto} style={{ position: "relative", height: h, borderRadius: radius, overflow: "hidden", background: `rgb(241,231,228) url('${photos[i]}') center/cover no-repeat` }}>
       {n > 1 && <>
         <button className="cr-nav" onClick={go(-1)} aria-label="Previous photo" style={{ ...navBtn, left: 10 }}><i className="ph-bold ph-caret-left" /></button>
         <button className="cr-nav" onClick={go(1)} aria-label="Next photo" style={{ ...navBtn, right: 10 }}><i className="ph-bold ph-caret-right" /></button>
@@ -54,11 +57,11 @@ export function Switch({ on, onClick, label }: { on: boolean; onClick: () => voi
   );
 }
 
-function Cell({ k: label, v, strong, tone }: { k: string; v: React.ReactNode; strong?: boolean; tone?: string }) {
+function Cell({ k: label, v, strong, tone, sm }: { k: string; v: React.ReactNode; strong?: boolean; tone?: string; sm?: boolean }) {
   return (
     <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       <span style={{ font: "400 13px/16px var(--font-sans)", color: MUTED }}>{label}</span>
-      <span style={{ font: `${strong ? 700 : 400} 16px/21px var(--font-sans)`, color: tone || INK, whiteSpace: "nowrap" }}>{v}</span>
+      <span style={{ font: `${strong ? 700 : 400} ${sm ? 15 : 16}px/21px var(--font-sans)`, color: tone || INK, whiteSpace: "nowrap" }}>{v}</span>
     </span>
   );
 }
@@ -67,7 +70,7 @@ export function CompCard({ c, n, of, on, vacant, onToggle, compact }: { c: Comp;
   const d = compDetail(c);
   const [hist, setHist] = useState(false);
   const sold = c.st === "S";
-  const row: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 64px", gap: 8, padding: "10px 0", boxShadow: "inset 0 -.5px 0 rgba(13,12,12,.12)" };
+  const row: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 64px", gap: 12, padding: "10px 0", boxShadow: "inset 0 -.5px 0 rgba(13,12,12,.12)" };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "6px 6px 14px", borderRadius: 24, background: "rgb(253,252,252)", boxShadow: "inset 0 0 0 1px rgb(236,231,228),0 8px 24px rgba(30,18,12,.05)", transition: "opacity .3s", opacity: on ? 1 : 0.72 }}>
       <div style={{ filter: on ? "none" : "grayscale(1)", transition: "filter .3s" }}>
@@ -89,12 +92,12 @@ export function CompCard({ c, n, of, on, vacant, onToggle, compact }: { c: Comp;
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ ...row, alignItems: "end" }}>
-            <Cell k="listed for" v={fullPrice(d.listed)} />
-            <Cell k={sold ? "sold for" : "status"} v={sold ? fullPrice(d.sold!) : "Active"} strong />
+            <Cell sm={compact} k="listed for" v={fullPrice(d.listed)} />
+            <Cell sm={compact} k={sold ? "sold for" : "status"} v={sold ? fullPrice(d.sold!) : "Active"} strong />
             <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
               <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <i className={`ph ph-trend-${d.diff < 0 ? "down" : "up"}`} style={{ fontSize: 14, color: MUTED }} />
-                <span style={{ font: "400 15px/20px var(--font-sans)", color: d.diff > 0 ? ACTIVE : d.diff < 0 ? SOLD : MUTED }}>{d.diff > 0 ? "+" : ""}{d.diff}%</span>
+                <span style={{ font: `400 ${compact ? 14 : 15}px/20px var(--font-sans)`, color: d.diff > 0 ? ACTIVE : d.diff < 0 ? SOLD : MUTED }}>{d.diff > 0 ? "+" : ""}{d.diff}%</span>
               </span>
               <button onClick={() => setHist(h => !h)} title="Listing history" style={{ flex: "none", width: 32, height: 32, border: "none", borderRadius: 9999, background: hist ? PURPLE : INK, color: "rgb(253,252,252)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-clock-counter-clockwise" style={{ fontSize: 15 }} /></button>
             </span>
@@ -107,13 +110,13 @@ export function CompCard({ c, n, of, on, vacant, onToggle, compact }: { c: Comp;
             </div>
           )}
           <div style={row}>
-            <Cell k="price per ft²" v={c.sqft ? `$${k(c.ppsf)}` : "—"} />
-            <Cell k="per ft² lot" v={d.perLot ? `$${k(d.perLot)}` : "—"} />
-            <Cell k="DOM" v={d.dom} />
+            <Cell sm={compact} k="price per ft²" v={c.sqft ? `$${k(c.ppsf)}` : "—"} />
+            <Cell sm={compact} k="per ft² lot" v={d.perLot ? `$${k(d.perLot)}` : "—"} />
+            <Cell sm={compact} k="DOM" v={d.dom} />
           </div>
           <div style={{ ...row, boxShadow: "none" }}>
-            <Cell k="listed on" v={shortDate(d.listedOn)} />
-            <Cell k="sold on" v={d.soldOn ? shortDate(d.soldOn) : "—"} />
+            <Cell sm={compact} k="listed on" v={numDate(d.listedOn)} />
+            <Cell sm={compact} k="sold on" v={d.soldOn ? numDate(d.soldOn) : "—"} />
             <span />
           </div>
         </div>
