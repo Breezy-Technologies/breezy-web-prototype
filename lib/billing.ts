@@ -149,7 +149,7 @@ export function useEntitlements() {
 export type PaywallReq =
   | { kind: "upsell"; feature: Metered; then?: () => void }
   | { kind: "offer"; feature?: Feature }
-  | { kind: "plan" }
+  | { kind: "plan"; tab?: string }
   | { kind: "winback" }
   | { kind: "news" }
   | null;

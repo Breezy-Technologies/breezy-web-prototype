@@ -9,7 +9,11 @@ const hexThumb = (c: readonly string[]) => `linear-gradient(135deg, ${c[1]} 0%, 
 
 // Bottom-right column, bottom to top: Layers, zoom, my location, info.
 // Zoom buttons tag their camera events `bzUser` so "Search this area" treats them as user moves.
-export function MapControls({ onLocate, right = 20 }: { onLocate: () => void; right?: number }) {
+// `left` (comps mode, 17 Nov review): the column sits on the left instead, anchored to the
+// right edge of the subject card / detail panel, and its panels open to the right.
+export function MapControls({ onLocate, right = 20, left }: { onLocate: () => void; right?: number; left?: number }) {
+  const side = left != null ? { left, right: "auto" } : { right };
+  const pop = left != null ? { left: "calc(100% + 12px)" } : { right: "calc(100% + 12px)" };
   const { map, heat, setHeat, mode, setMode } = useMapCtx();
   const palettes = useHeatPrefs();
   const keyKind = heat === "ub" ? "ub" : "roi";
@@ -20,11 +24,11 @@ export function MapControls({ onLocate, right = 20 }: { onLocate: () => void; ri
   const label = { roi: "ROI heat", ub: "Underbuilt", none: "No layer" }[heat] + ({ light: "", dark: " · Dark", streets: " · Streets", satellite: " · Sat" } as const)[mode];
   const thumb = mode === "satellite" ? "url(/map/sat-bh-se.jpg) center/cover" : heat === "none" ? "url(/map/bh-se.jpg) center/cover" : hexThumb(HEAT_PALETTES[palettes[heat]].c);
   return (
-    <div style={{ position: "absolute", right, bottom: 20, transition: "right .5s cubic-bezier(.2,.8,.2,1)", zIndex: open || info ? 80 : 60, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+    <div style={{ position: "absolute", ...side, bottom: 20, transition: "right .5s cubic-bezier(.2,.8,.2,1),left .6s cubic-bezier(.2,.8,.2,1)", zIndex: open || info ? 80 : 60, display: "flex", flexDirection: "column", alignItems: left != null ? "flex-start" : "flex-end", gap: 10 }}>
       <div style={{ position: "relative" }}>
         <button style={round} title="Map key" onClick={() => setInfo(v => !v)}><i className="ph-bold ph-info" /></button>
         {info && (
-          <div style={{ position: "absolute", right: "calc(100% + 12px)", top: 0, width: 240, padding: 14, borderRadius: 18, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.18)", animation: "panelDrop .2s ease both" }}>
+          <div style={{ position: "absolute", ...pop, top: 0, width: 240, padding: 14, borderRadius: 18, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.18)", animation: "panelDrop .2s ease both" }}>
             <span style={{ font: "700 13px/18px var(--font-sans)" }}>{HEAT_LABEL[keyKind]} heat</span>
             <div style={{ display: "flex", marginTop: 8, height: 8, borderRadius: 9999, overflow: "hidden" }}>
               {keyColors.map((c, k) => <span key={k} style={{ flex: 1, background: c }} />)}
@@ -48,7 +52,7 @@ export function MapControls({ onLocate, right = 20 }: { onLocate: () => void; ri
           <span style={{ font: "400 11px/13px var(--font-sans)", color: "var(--fg-2)", whiteSpace: "nowrap" }}>{label}</span>
         </button>
         {open && (
-          <div style={{ position: "absolute", right: "calc(100% + 12px)", bottom: 0, width: 380, padding: 16, borderRadius: 20, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.18)", display: "flex", flexDirection: "column", gap: 14, animation: "panelDrop .2s ease both" }}>
+          <div style={{ position: "absolute", ...pop, bottom: 0, width: 380, padding: 16, borderRadius: 20, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.18)", display: "flex", flexDirection: "column", gap: 14, animation: "panelDrop .2s ease both" }}>
             <Group title="Data layer" opts={[["ub", "Underbuilt", hexThumb(HEAT_PALETTES[palettes.ub].c)], ["roi", "ROI", hexThumb(HEAT_PALETTES[palettes.roi].c)], ["none", "None", "url(/map/bh-se.jpg) center/cover"]]} value={heat} onPick={v => setHeat(v as any)} />
             <Group title="Map type" opts={[
               ["light", "Breezy light", "repeating-linear-gradient(35deg, transparent 0 13px, #e4e0de 13px 17px), repeating-linear-gradient(-55deg, transparent 0 9px, #e2d9d3 9px 11px), #f4f1ed"],

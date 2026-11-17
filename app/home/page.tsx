@@ -9,7 +9,6 @@ import { ResultsPanel, SortMenu } from "@/components/home/LeftPanel";
 import { AllFiltersPanel, FilterBar, FilterDropdown, useFilterState } from "@/components/home/Filters";
 import { HomeCard } from "@/components/home/HomeCard";
 import { Toast, useToast } from "@/components/home/Toast";
-import { HeatPaletteSwitcher } from "@/components/HeatPaletteSwitcher";
 import { PricePins } from "@/components/home/PricePins";
 import { HoverCard } from "@/components/home/HoverCard";
 import { ParcelLift, ParcelHit } from "@/components/home/ParcelLift";
@@ -279,10 +278,12 @@ export default function HomeWeb() {
   const subjMini = compsShift && (subjMin || setup);
   // Comps list columns: 3 on windows wider than 1440 (17 Nov) while the subject is the
   // compact card (or the window fits the full panel too), 2 from 1360, else 1.
-  const sideCols: 1 | 2 | 3 = winW > 1440 && (subjMin || winW >= 1860) ? 3 : winW >= 1360 ? 2 : 1;
-  const SIDE_W = sideCols === 3 ? 820 : sideCols === 2 ? 580 : 360;
-  // The open map between the subject and the comps panel, for the Radius / Custom switch.
-  const areaNarrow = winW - navW - (GAP + (subjMini ? MINI_W : 420) + GAP) - (sideOn ? SIDE_W + GAP * 2 : 0) < 560;
+  // 17 Nov review: ~1440 px laptops (MacBook 13) get two columns in a panel a third
+  // narrower than the three-column one, so the map keeps room; three from 1680.
+  const sideCols: 1 | 2 | 3 = winW >= 1680 && (subjMin || winW >= 1860) ? 3 : winW >= 1360 ? 2 : 1;
+  const SIDE_W = sideCols === 3 ? 820 : sideCols === 2 ? 548 : 360;
+  // Comps mode: the map controls sit on the left, anchored to the subject card / panel.
+  const SUBJ_RIGHT = GAP + (subjMini ? MINI_W : 420) + GAP;
   const DETAIL_X = compsShift ? GAP : GAP + COL + GAP;
   // Comps mode: the detail panel (now the subject) drops under the filter bar.
   const DETAIL_TOP = compsShift && !setup ? BAR_BOTTOM : GAP;
@@ -552,11 +553,11 @@ export default function HomeWeb() {
         )}
         {compsAsk === "review" && sel && <CompsReview l={sel} initial={subjectSpecs(sel)} onClose={() => setCompsAsk(null)} onConfirm={v => { setSubjectSpecs(sel, v); setCompsAsk("choice"); }} />}
         {compsAsk === "choice" && sel && <CompsChoice addr={sel.addr} onAi={() => startComps(false)} onManual={() => startComps(true)} onCancel={() => setCompsAsk(null)} />}
-        {compsShift && sel && cm.key && (
-          // Where the comps come from: Radius / Custom, at the bottom of the open map.
-          // A narrow open map (comps in three columns): icons only, raised over the Layers card.
-          <div style={{ position: "absolute", left: GAP + (subjMini ? MINI_W : 420) + GAP, right: (sideOn ? SIDE_W + GAP * 2 : 0) + (areaNarrow ? 64 : 0), bottom: areaNarrow ? 140 : GAP + 8, zIndex: 3, display: "flex", justifyContent: "center", padding: "0 12px", pointerEvents: "none" }}>
-            <AreaToggle cs={cm} compact={areaNarrow} />
+        {setup && sel && (
+          // Where the comps come from: Radius / Custom, at the bottom of the open map, only
+          // while setting up (17 Nov review: not once the comps are showing).
+          <div style={{ position: "absolute", left: SUBJ_RIGHT + 64, right: 0, bottom: GAP + 8, zIndex: 3, display: "flex", justifyContent: "center", padding: "0 12px", pointerEvents: "none" }}>
+            <AreaToggle cs={cm} />
           </div>
         )}
         {pillOn && (
@@ -574,7 +575,7 @@ export default function HomeWeb() {
         {!setup && <AllFiltersPanel fs={fs} top={compsShift ? DETAIL_TOP : view === "results" ? 88 : 76} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? "comps" : undefined}
           onApply={() => { if (view === "home" && !compsShift) { closeDetail(); setView("results"); } }} />}
         {sortOpen && view === "results" && <SortMenu value={sortBy} onPick={k => { setSortBy(k); setSortOpen(false); }} onClose={() => setSortOpen(false)} left={GAP + COL - 49} top={72} />}
-        <div style={{ pointerEvents: "auto" }}><MapControls right={sideOn ? SIDE_W + GAP * 2 + 8 : 20} onLocate={() => fit(GAP + COL + GAP)} /></div>
+        <div style={{ pointerEvents: "auto" }}><MapControls right={20} left={compsShift ? SUBJ_RIGHT + 8 : undefined} onLocate={() => fit(GAP + COL + GAP)} /></div>
         {offline && (
           <span style={{ position: "absolute", right: 120, bottom: 22, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 12px/28px var(--font-sans)", color: "var(--fg-2)", pointerEvents: "auto" }} title="Add NEXT_PUBLIC_MAPBOX_TOKEN to load live Mapbox tiles">
             Offline demo map
@@ -589,7 +590,7 @@ export default function HomeWeb() {
 
       {compsOn && cm.key && <CompPins cs={cm} />}
       {compsShift && sel && cm.key && <CompRadius at={[sel.lng, sel.lat]} miles={cm.radius} handle onChange={cm.setRadius} custom={cm.custom} area={cm.area} />}
-      {compsShift && cm.key && <AreaDraw cs={cm} />}
+      {setup && <AreaDraw cs={cm} />}
       {exportOn && sel && cm.key && <CompsExport cs={cm} l={sel} navW={navW} user={user.name} onClose={() => setExportOn(false)} onToast={(t, tone) => showToast(t, tone)}
         onSaved={() => { if (!rp.has(sel)) rp.save(sel); }} />}
       <PricePins signal={signalIds} listings={compsOn ? [] : pinListings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
@@ -610,7 +611,6 @@ export default function HomeWeb() {
       {ss.modals}
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
-      <HeatPaletteSwitcher style={{ right: sideOn ? SIDE_W + GAP * 2 + 92 : 104, bottom: 20, transition: "right .5s cubic-bezier(.2,.8,.2,1)" }} />
     </>
   );
 }

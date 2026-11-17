@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Access, type BillingState, PRESETS, billing, paywall, trialLength, useBilling, useEntitlements, usePaywallReq } from "@/lib/billing";
+import { SettingsDialog } from "./SettingsDialog";
 import { type Feature, type Metered, PRICING, type Segment, money, saving, sku } from "@/lib/pricing.config";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", CLAY = "rgb(147,89,75)", SOFT = "rgb(245,240,238)", PAPER = "rgb(253,252,252)";
@@ -19,7 +20,7 @@ const P = PRICING.plan;
 type Toast = (text: string, tone?: "positive" | "neutral" | "negative") => void;
 
 export const renewDate = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString("en-US", { month: "long", day: "numeric" }); };
-const inDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-US", { month: "long", day: "numeric" }); };
+export const inDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-US", { month: "long", day: "numeric" }); };
 const LONG: Record<Metered, string> = { maxBuild: "Max Build reports", roi: "ROI reports", contacts: "owner contacts" };
 const winOffer = (seg: Segment) => { const s = PRICING.segments[seg]; return "trialDays" in s && typeof s.trialDays === "number" && seg !== "new2" ? s : null; };
 
@@ -257,14 +258,14 @@ export function UsageChip({ access, feature, dark }: { access: Access; feature: 
 }
 
 /* ---------- Settings: Plan & usage ---------- */
-const METERS: Metered[] = ["maxBuild", "roi", "contacts"];
-const METER: Record<Metered, { title: string; icon: string; tip: string }> = {
+export const METERS: Metered[] = ["maxBuild", "roi", "contacts"];
+export const METER: Record<Metered, { title: string; icon: string; tip: string }> = {
   maxBuild: { title: "Max Build reports", icon: "ruler", tip: "Build guidelines: what the lot allows and the Underbuilt %. Reopening a report you've unlocked is free." },
   roi: { title: "ROI reports", icon: "chart-line-up", tip: "Upside analysis: buy, improve, sell, profit. Reopening a report you've unlocked is free." },
   contacts: { title: "Owner contacts", icon: "address-book", tip: "The owner's phone, email and mailing address. Each owner counts once a month." },
 };
 const shortDay = (t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-function UsageDetail() {
+export function UsageDetail() {
   const { s } = useEntitlements();
   const log = [...(s.log || [])].reverse();
   const logged = { maxBuild: 0, roi: 0, contacts: 0 } as Record<Metered, number>;
@@ -300,22 +301,23 @@ function UsageDetail() {
   );
 }
 
-function PlanSettings({ onClose, onToast }: { onClose: () => void; onToast: Toast }) {
-  const { s, planOn, left, trialLeft } = useEntitlements();
-  const [step, setStep] = useState<"usage" | "cancel">("usage");
-  const [buyFor, setBuyFor] = useState<Metered | null>(null);
-  const paying1 = s.segment === "paying1" && s.status === "active";
-  if (buyFor) return (
+/* ---------- Settings → Membership: the sheets it opens over the dialog ---------- */
+/** Buy credits: a Max Build / ROI / Owner contacts switch over the packs. */
+export function BuyCreditsSheet({ feature, onClose, onToast }: { feature: Metered; onClose: () => void; onToast: Toast }) {
+  const [buyFor, setBuyFor] = useState<Metered>(feature);
+  return (
     <Sheet onClose={onClose} label="Buy credits" width={560}>
-      <button onClick={() => setBuyFor(null)} style={{ ...btnLink, alignSelf: "flex-start", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}><i className="ph-bold ph-arrow-left" />Plan & usage</button>
       <span style={{ font: "300 26px/1.2 var(--font-sans)", letterSpacing: "-.4px" }}>Buy credits</span>
       <div role="tablist" aria-label="Credits for" style={{ display: "flex", gap: 2, padding: 3, borderRadius: 9999, background: "rgba(18,18,18,.06)" }}>
         {METERS.map(f => <button key={f} role="tab" aria-selected={buyFor === f} onClick={() => setBuyFor(f)} style={{ flex: 1, height: 34, border: "none", borderRadius: 9999, cursor: "pointer", font: `${buyFor === f ? 700 : 400} 13px/16px var(--font-sans)`, color: INK, background: buyFor === f ? PAPER : "none", boxShadow: buyFor === f ? "0 1px 3px rgba(30,18,12,.14)" : "none", whiteSpace: "nowrap" }}>{METER[f].title}</button>)}
       </div>
-      <UpsellOptions key={buyFor} feature={buyFor} onBought={id => { onToast(`${sku(id).label} added`, "positive"); setBuyFor(null); }} />
+      <UpsellOptions key={buyFor} feature={buyFor} onBought={id => { onToast(`${sku(id).label} added`, "positive"); onClose(); }} />
     </Sheet>
   );
-  if (step === "cancel") return (
+}
+/** Cancel my plan: the save offer first, then Cancel anyway. */
+export function CancelSheet({ onClose, onToast }: { onClose: () => void; onToast: Toast }) {
+  return (
     <Sheet onClose={onClose} label="Cancel plan" width={480}>
       <span style={{ font: "300 26px/1.2 var(--font-sans)", letterSpacing: "-.4px", paddingRight: 40 }}>Before you go</span>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 20, borderRadius: 20, background: "rgb(250,246,244)", boxShadow: "inset 0 0 0 1px rgb(234,215,210)" }}>
@@ -326,75 +328,14 @@ function PlanSettings({ onClose, onToast }: { onClose: () => void; onToast: Toas
           <s style={{ font: "400 15px/20px var(--font-sans)", color: "rgb(150,140,136)" }}>{money(P.price, P.period)}</s>
         </span>
         <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED }}>Keep everything in {P.name}: unlimited comps, the AI assistant, Market Radar alerts and your monthly reports.</span>
-        <button onClick={() => { billing.acceptSave(); onToast(`You're on ${money(PRICING.saveOffer.price, PRICING.saveOffer.period)}`, "positive"); setStep("usage"); }} style={btnPrimary}>Keep {P.name} for {money(PRICING.saveOffer.price, PRICING.saveOffer.period)}</button>
+        <button onClick={() => { billing.acceptSave(); onToast(`You're on ${money(PRICING.saveOffer.price, PRICING.saveOffer.period)}`, "positive"); onClose(); }} style={btnPrimary}>Keep {P.name} for {money(PRICING.saveOffer.price, PRICING.saveOffer.period)}</button>
       </div>
       <button onClick={() => { billing.cancel(); onToast("Plan cancelled", "neutral"); onClose(); }} style={{ ...btnSoft }}>Cancel anyway</button>
       <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED, textAlign: "center" }}>You keep access until {renewDate()}.</span>
     </Sheet>
   );
-  return (
-    <Sheet onClose={onClose} label="Plan & usage" width={760}>
-      <span style={{ font: "300 26px/1.2 var(--font-sans)", letterSpacing: "-.4px" }}>Plan & usage</span>
-      {s.unlimited && <Note icon="infinity">Unlimited (internal) is on: metering is bypassed. Team testing only; never a customer plan.</Note>}
-      {!planOn ? <OfferCard onDone={() => onToast(`${P.name} started`, "positive")} /> : <>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 16, borderRadius: 20, background: SOFT }}>
-          <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8, font: "700 16px/21px var(--font-sans)" }}>{P.name}
-              <span style={{ height: 22, padding: "0 8px", display: "flex", alignItems: "center", borderRadius: 9999, background: s.status === "trial" ? "rgb(255,236,170)" : "rgb(226,240,231)", font: "700 11px/14px var(--font-sans)", color: INK }}>{s.status === "trial" ? `Trial · ${trialLeft} day${trialLeft === 1 ? "" : "s"} left` : "Active"}</span>
-            </span>
-            <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED }}>
-              {s.saved ? `${money(PRICING.saveOffer.price, PRICING.saveOffer.period)} (save offer)` : money(P.price, P.period)} · {P.seats} user · {s.status === "trial" ? `First charge ${inDays(trialLeft)}` : paying1 ? `Billing starts ${inDays(PRICING.segments.paying1.billingDelayDays)}` : `Renews ${renewDate()}`}
-            </span>
-          </span>
-        </div>
-        {paying1 && <Note icon="gift">Payments before launch are waived. Your billing starts {PRICING.segments.paying1.billingDelayDays} days after installing Nimbus.</Note>}
-
-        {/* Included every month: one card per metered feature, side by side (review: a
-            more dynamic layout, like a usage & billing page). */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 18, borderRadius: 22, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.09)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", gap: 2 }}>
-              <span style={{ font: "700 16px/21px var(--font-sans)" }}>Included every month</span>
-              <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>When the included ones run out, credits keep you going.</span>
-            </span>
-            <button onClick={() => setBuyFor("maxBuild")} style={{ ...btnPrimary, height: 42, padding: "0 18px", font: "700 14px/18px var(--font-sans)" }}><i className="ph-bold ph-plus" />Buy credits</button>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10 }}>
-            {METERS.map(f => {
-              const cap = PRICING.allowance[f], used = Math.min(cap, s.used[f]), out = left(f) === 0;
-              return (
-                <div key={f} style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, borderRadius: 18, background: "rgb(246,244,243)" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 8, font: "700 15px/20px var(--font-sans)" }}>
-                    <i className={`ph-bold ph-${METER[f].icon}`} style={{ fontSize: 17, color: CLAY }} />{METER[f].title}
-                    <i className="ph ph-question" title={METER[f].tip} style={{ marginLeft: "auto", fontSize: 16, color: MUTED, cursor: "help" }} />
-                  </span>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ font: "400 13px/17px var(--font-sans)", color: MUTED }}>Included used</span>
-                    <span style={{ font: "700 22px/28px var(--font-sans)", letterSpacing: "-.3px", color: out ? CLAY : INK }}>{used} <span style={{ fontWeight: 400, color: MUTED }}>/ {cap}</span></span>
-                    <span role="meter" aria-valuemin={0} aria-valuemax={cap} aria-valuenow={used} aria-label={`${LONG[f]} used`} style={{ height: 6, marginTop: 2, borderRadius: 9999, background: "rgba(13,12,12,.08)", overflow: "hidden" }}>
-                      <span style={{ display: "block", width: `${(used / cap) * 100}%`, height: "100%", borderRadius: 9999, background: out ? CLAY : INK, transition: "width .4s ease" }} />
-                    </span>
-                  </span>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ font: "400 13px/17px var(--font-sans)", color: MUTED }}>Purchased credits</span>
-                    <span style={{ font: "700 17px/22px var(--font-sans)" }}>{s.credits[f] || "–"}</span>
-                  </span>
-                  <button onClick={() => setBuyFor(f)} style={{ ...btnLink, alignSelf: "flex-start", marginTop: "auto" }}>Buy more</button>
-                </div>
-              );
-            })}
-          </div>
-          <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>Included reports and contacts reset on <b style={{ color: INK, fontWeight: 400 }}>{renewDate()}</b>. Comps, the AI assistant, alerts and Inman News are unlimited.</span>
-        </div>
-
-        {/* Usage detail: every use this month, newest first. */}
-        <UsageDetail />
-        <button onClick={() => setStep("cancel")} style={{ ...btnLink, alignSelf: "flex-start", color: MUTED, fontWeight: 400 }}>Cancel plan</button>
-      </>}
-    </Sheet>
-  );
 }
-const Note = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
+export const Note = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
   <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 14, background: "rgb(249,246,243)", font: "400 13px/18px var(--font-sans)", color: INK }}>
     <i className={`ph-bold ph-${icon}`} style={{ flex: "none", marginTop: 1, fontSize: 16, color: CLAY }} /><span>{children}</span>
   </div>
@@ -454,7 +395,7 @@ export function BillingHost({ onToast }: { onToast: Toast }) {
   }, [s.segment, s.status, s.unlimited]);
   if (!r) return null;
   const close = () => paywall.close();
-  if (r.kind === "plan") return <PlanSettings onClose={close} onToast={onToast} />;
+  if (r.kind === "plan") return <SettingsDialog tab={r.tab} onClose={close} onToast={onToast} />;
   if (r.kind === "winback") return <WinBack onClose={close} onToast={onToast} />;
   if (r.kind === "news") return <News onClose={close} onToast={onToast} />;
   if (r.kind === "offer") return <OfferSheet feature={r.feature} onClose={close} onDone={() => { onToast(`${P.name} started`, "positive"); close(); }} />;

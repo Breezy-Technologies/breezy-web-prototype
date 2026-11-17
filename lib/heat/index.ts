@@ -131,24 +131,20 @@ export function bandLabels(kind: HeatLayer, n: number): string[] {
   return [`<${b[0]}%`, ...b.slice(1).map((v, i) => `${b[i]}–${v}%`), `${b[b.length - 1]}%+`];
 }
 
-// ---- Palette choice: shared, persisted (localStorage `bz-heat-palette`) ----
-// Exploration, like the pin colour route: the floating "Heat" switcher picks a
-// palette per layer and can override the opacity. Repaints in place.
+// ---- Palette choice ----
+// The floating "Heat" switcher (an exploration) was removed in the 17 Nov review: the
+// map uses the default palettes. A choice saved by the old switcher is ignored, so
+// every viewer sees the same map. `setHeatPrefs` still repaints for the session (console).
 export type HeatPrefs = { roi: PaletteId; ub: PaletteId; alpha: number | null };
 export const DEFAULT_PREFS: HeatPrefs = { roi: "brandDiv", ub: "brandSeq", alpha: null };
 const KEY = "bz-heat-palette";
+let session: HeatPrefs = DEFAULT_PREFS;
 
-function read(): HeatPrefs {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) || "null");
-    if (v && v.roi in HEAT_PALETTES && v.ub in HEAT_PALETTES) return { ...DEFAULT_PREFS, ...v };
-  } catch {}
-  return DEFAULT_PREFS;
-}
+function read(): HeatPrefs { return session; }
 
 export function setHeatPrefs(patch: Partial<HeatPrefs>) {
   const next = { ...read(), ...patch };
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+  session = next;
   window.dispatchEvent(new CustomEvent(KEY, { detail: next }));
 }
 
