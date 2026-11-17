@@ -1,20 +1,33 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Listing, fullPrice, shortPrice } from "@/lib/fake";
 import { css } from "@/lib/css";
 import { type Comp, compsFor } from "@/lib/comps";
+import type { SubjectSpecs } from "@/components/comps/useComps";
 
 
 // Comps pieces used by the report sheet (components/report/ReportFlow.tsx):
 // the "Review the subject property data" modal, shown over the map before the
 // sheet rises (canvas `cmReview`), and the comps result body.
-export function CompsReview({ l, onClose, onConfirm }: { l: Listing; onClose: () => void; onConfirm: () => void }) {
+export function CompsReview({ l, initial, onClose, onConfirm }: { l: Listing; initial?: SubjectSpecs; onClose: () => void; onConfirm: (v: SubjectSpecs) => void }) {
   // Review rows edit inline (`cmRows`: `rw.edit`, `rw.change`, `rw.key`, `rw.done`).
-  const [cm, setCm] = useState<[string, string][]>(() => [["Bed", String(l.beds)], ["Bath", String(l.baths)], ["Home ft²", l.sqft.toLocaleString()], ["Lot ft²", Math.round(l.lotAc * 43560).toLocaleString()]]);
+  const v0 = initial ?? { beds: l.beds, baths: l.baths, sqft: l.sqft, lotFt: Math.round(l.lotAc * 43560) };
+  const [cm, setCm] = useState<[string, string][]>(() => [["Bed", String(v0.beds)], ["Bath", String(v0.baths)], ["Home ft²", v0.sqft.toLocaleString("en-US")], ["Lot ft²", v0.lotFt.toLocaleString("en-US")]]);
+  // The confirmed figures (a field left unreadable keeps the record's value).
+  const num = (i: number, d: number) => { const x = parseFloat(cm[i][1].replace(/[^0-9.]/g, "")); return isFinite(x) && x >= 0 ? x : d; };
+  const confirm = () => onConfirm({ beds: Math.round(num(0, v0.beds)), baths: num(1, v0.baths), sqft: Math.round(num(2, v0.sqft)), lotFt: Math.round(num(3, v0.lotFt)) });
   const [editK, setEditK] = useState<string | null>(null);
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(30,22,20,.32)", display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .2s ease both" }}>
-      <div style={{ position: "relative", width: 532, padding: "56px 48px 40px", borderRadius: 28, background: "rgb(241,239,237)", textAlign: "center", animation: "riseIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
+  // Escape closes (a field being edited takes it first).
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); e.stopPropagation(); onClose(); } };
+    window.addEventListener("keydown", k, true);
+    return () => window.removeEventListener("keydown", k, true);
+  }, [onClose]);
+  // Portalled to the body: opened from the map area (pointer-events: none) as well as the report sheet.
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 400, pointerEvents: "auto", background: "rgba(30,22,20,.32)", display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .2s ease both" }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: "relative", width: 532, padding: "56px 48px 40px", borderRadius: 28, background: "rgb(241,239,237)", textAlign: "center", animation: "riseIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
         <button onClick={onClose} title="Close" className="btn-ghost" style={{ position: "absolute", right: 16, top: 16, width: 40, height: 40, background: "rgba(13,12,12,.06)" }}><i className="ph-bold ph-x" /></button>
         <span style={{ display: "block", font: "300 36px/44px var(--font-sans)", letterSpacing: "-.5px" }}>Review the subject property data</span>
         <span style={{ display: "block", marginTop: 8, font: "400 15px/20px var(--font-sans)" }}>Ensure you get accurate comps for<br />{l.addr}{l.city ? ", " + l.city : ""}</span>
@@ -33,9 +46,10 @@ export function CompsReview({ l, onClose, onConfirm }: { l: Listing; onClose: ()
             </div>
           ))}
         </div>
-        <button className="btn-dark" onClick={onConfirm}>Confirm</button>
+        <button className="btn-dark" onClick={confirm}>Confirm</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

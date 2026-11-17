@@ -18,7 +18,9 @@ import { MapControls } from "@/components/home/MapControls";
 import { AreaCompsPreview } from "@/components/home/CompsFlow";
 import { FlowKind, ReportFlow } from "@/components/report/ReportFlow";
 import { frameLot } from "@/lib/map/frame";
-import { useComps, compLngLat, isCompsManual, setCompsManual } from "@/components/comps/useComps";
+import { useComps, compLngLat, isCompsManual, setCompsManual, setSubjectSpecs, subjectSpecs, asReviewed } from "@/components/comps/useComps";
+import { AreaDraw, AreaToggle } from "@/components/comps/CompArea";
+import { CompsReview } from "@/components/home/CompsFlow";
 import { CompsChoice } from "@/components/comps/CompsChoice";
 import { MINI_W, SubjectMini } from "@/components/comps/SubjectMini";
 import { CompsSide } from "@/components/comps/CompsSide";
@@ -264,52 +266,62 @@ export default function HomeWeb() {
   // detail panel and stays above it, so editing a filter edits the comps too.
   const cm = useComps(compsOn && sel ? sel : null, compsReveal, fs.f);
   const compsShift = compsOn && !compsOut;
+  // Manual comps, still setting up: the filters hang under the compact subject card, the
+  // map shows the area (radius or a drawn shape) and there's no comps panel until
+  // "Find n comps".
+  const setup = compsShift && !!cm.key && cm.setup;
+  const sideOn = compsShift && !setup;
   // The export sheet ("Set price estimate").
   const [exportOn, setExportOn] = useState(false);
   // The subject collapsed to a compact card (SubjectMini, exploration 17 Nov). Starts
   // collapsed on windows wider than 1440, where the list gets its third column.
   const [subjMin, setSubjMin] = useState(false);
-  const subjMini = compsShift && subjMin;
+  const subjMini = compsShift && (subjMin || setup);
   // Comps list columns: 3 on windows wider than 1440 (17 Nov) while the subject is the
   // compact card (or the window fits the full panel too), 2 from 1360, else 1.
   const sideCols: 1 | 2 | 3 = winW > 1440 && (subjMin || winW >= 1860) ? 3 : winW >= 1360 ? 2 : 1;
   const SIDE_W = sideCols === 3 ? 820 : sideCols === 2 ? 580 : 360;
+  // The open map between the subject and the comps panel, for the Radius / Custom switch.
+  const areaNarrow = winW - navW - (GAP + (subjMini ? MINI_W : 420) + GAP) - (sideOn ? SIDE_W + GAP * 2 : 0) < 560;
   const DETAIL_X = compsShift ? GAP : GAP + COL + GAP;
   // Comps mode: the detail panel (now the subject) drops under the filter bar.
-  const DETAIL_TOP = compsShift ? BAR_BOTTOM : GAP;
+  const DETAIL_TOP = compsShift && !setup ? BAR_BOTTOM : GAP;
   const fCount = useMemo(() => { const d = fDims(fs.f); return (Object.keys(d) as (keyof typeof d)[]).filter(k => d[k].on && !(k === "price" && d.status.on)).length; }, [fs.f]);
-  const compCount = (F: Filters) => { if (!sel) return 0; const x = compsFor(sel, cm.radius, F); return x.sold.length + x.active.length; };
+  const compCount = (F: Filters) => { if (!sel) return 0; const x = compsFor(asReviewed(sel), cm.radius, F, cm.area); return x.sold.length + x.active.length; };
   const selKey = sel ? `${sel.id}|${sel.addr}` : "";
   // Another property (pin, parcel, saved home) leaves comps.
-  useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(false); setSubjMin(false); }, [selKey]);
+  useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(null); setSubjMin(false); }, [selKey]);
   // Collapsing / expanding the subject reframes the comps in the map space it leaves.
   useEffect(() => { if (compsShift && sel && cm.key) frameComps(sel); }, [subjMin]); // eslint-disable-line react-hooks/exhaustive-deps
   // Frame the subject and every comp in the open map between the two panels.
   const frameComps = (l: Listing) => {
     if (!map) return;
-    const pts = [[l.lng, l.lat], ...cm.all.map(compLngLat)];
+    const pts = [[l.lng, l.lat], ...cm.all.map(compLngLat), ...(cm.area || [])];
     // No comp yet (or none match): frame the radius circle instead.
-    if (!cm.all.length) {
+    if (!cm.all.length && !cm.area) {
       const dLat = cm.radius / 69.05, dLng = dLat / Math.cos(l.lat * Math.PI / 180);
       pts.push([l.lng - dLng, l.lat - dLat], [l.lng + dLng, l.lat + dLat]);
     }
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], {
-      padding: subjMin ? { left: GAP + MINI_W + GAP + 24, right: SIDE_W + GAP * 2 + 40, top: 84, bottom: 64 } : { left: GAP + 420 + GAP + 40, right: SIDE_W + GAP * 2 + 40, top: 84, bottom: 64 }, maxZoom: 16.5, duration: 1100, essential: true,
+      padding: { left: GAP + (subjMini || setup ? MINI_W + GAP + 24 : 420 + GAP + 40), right: (setup ? 0 : SIDE_W + GAP) + GAP + 40, top: setup ? 48 : 84, bottom: 96 }, maxZoom: 16.5, duration: 1100, essential: true,
     });
   };
-  // First Get comps on a property: ask first (CompsChoice): the AI picks, or comp by hand.
-  const [compsAsk, setCompsAsk] = useState(false);
+  // First Get comps on a property, as on mobile (17 Nov): review the subject's figures
+  // (CompsReview), then choose (CompsChoice): the AI picks, or set the comps up by hand.
+  const [compsAsk, setCompsAsk] = useState<null | "review" | "choice">(null);
   const openCompsMode = () => {
     if (!sel) return;
     // No trial / plan: Get comps stops at the press with the Agents Pro offer (review).
     if (!ent.planOn) { paywall.open({ kind: "offer", feature: "comps" }); return; }
-    if (!rp.has(sel) && !compsOn) { setCompsAsk(true); return; }
+    if (!rp.has(sel) && !compsOn) { setCompsAsk("review"); return; }
     startComps(isCompsManual(sel));
   };
   const startComps = (manual: boolean) => {
     if (!sel) return;
-    setCompsAsk(false); setCompsManual(sel, manual); setSubjMin(winW > 1440);
+    setCompsAsk(null); setCompsManual(sel, manual); setSubjMin(manual || winW > 1440);
+    // Manual: the filter panel opens under the subject card, on the search's filters.
+    if (manual) fs.openPanel(); else if (fs.fd) fs.closePanel();
     alerts.close(); setHoverId(null); fs.setDd(null); setSortOpen(false); setAreaPill(false);
     setCompsReveal(!rp.has(sel) && !manual); setCompsOut(false); setCompsOn(true);
   };
@@ -323,12 +335,12 @@ export default function HomeWeb() {
   // Frame once the session (and so its comps) exists.
   useEffect(() => { if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [compsOn, cm.key]); // eslint-disable-line react-hooks/exhaustive-deps
   // New filters or radius: reframe once the new comps are known.
-  const pkey = cm.radius + JSON.stringify(fs.f);
+  const pkey = cm.radius + JSON.stringify(fs.f) + JSON.stringify(cm.area) + cm.setup;
   const firstP = useRef(pkey);
   useEffect(() => { if (firstP.current === pkey) return; firstP.current = pkey; if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [pkey]); // eslint-disable-line react-hooks/exhaustive-deps
   const closeComps = () => {
     if (!compsOn || compsOut) return;
-    setCompsOut(true); cm.setHoverC(null);
+    setCompsOut(true); cm.setHoverC(null); if (fs.fd) fs.closePanel();
     if (sel) frameSel(sel);
     setTimeout(() => { setCompsOn(false); setCompsOut(false); }, 380);
   };
@@ -520,19 +532,33 @@ export default function HomeWeb() {
         {detailOpen && (
           // The detail column steps back while the Alerts sheet sits on top of it (`dtT` / `dtF`).
           <div style={{ position: "absolute", left: DETAIL_X, top: DETAIL_TOP, bottom: GAP, zIndex: 4, transformOrigin: "50% 0", transition: "left .6s cubic-bezier(.2,.8,.2,1),top .6s cubic-bezier(.2,.8,.2,1),transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: alerts.on ? "scale(.94)" : "none", filter: alerts.on ? "brightness(.955)" : "none" }}>
-            {subjMini ? <SubjectMini l={sel!} cs={cm} onExpand={() => setSubjMin(false)} onClose={closeDetail} /> :
+            {setup ? (
+              <div style={{ height: "100%", width: MINI_W, display: "flex", flexDirection: "column", gap: GAP }}>
+                <SubjectMini l={sel!} cs={cm} setup onClose={closeDetail} />
+                <AllFiltersPanel fs={fs} embedded title="Comps filters" listings={listings} count={compCount} cta={n => n === 0 ? "No comps match" : `Find ${n} comp${n === 1 ? "" : "s"}`}
+                  onApply={() => cm.find()} />
+              </div>
+            ) : subjMini ? <SubjectMini l={sel!} cs={cm} onExpand={() => setSubjMin(false)} onClose={closeDetail} /> :
             <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openReport(sel!, k)} onCollapse={compsShift ? () => setSubjMin(true) : undefined}
               alertN={alerts.count(sel)} onBell={() => ent.planOn ? alerts.open(sel!) : paywall.open({ kind: "offer", feature: "alerts" })} onShare={() => shareOne(sel!)} onToast={showToast} />}
           </div>
         )}
         {detailOpen && alerts.panel(DETAIL_X)}
-        {compsOn && sel && cm.key && (
+        {compsOn && sel && cm.key && !cm.setup && (
           <div style={{ position: "absolute", right: GAP, top: GAP, bottom: GAP, zIndex: 4 }}>
             <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} onEstimate={() => ent.planOn ? setExportOn(true) : paywall.open({ kind: "offer", feature: "comps" })}
               locked={!ent.planOn} onToast={showToast} filtered={fCount} onClearFilters={fs.reset} onAddSold={() => fs.setF({ st: { "Recently sold": true }, tg: {} })} />
           </div>
         )}
-        {compsAsk && sel && <CompsChoice addr={sel.addr} onAi={() => startComps(false)} onManual={() => startComps(true)} onCancel={() => setCompsAsk(false)} />}
+        {compsAsk === "review" && sel && <CompsReview l={sel} initial={subjectSpecs(sel)} onClose={() => setCompsAsk(null)} onConfirm={v => { setSubjectSpecs(sel, v); setCompsAsk("choice"); }} />}
+        {compsAsk === "choice" && sel && <CompsChoice addr={sel.addr} onAi={() => startComps(false)} onManual={() => startComps(true)} onCancel={() => setCompsAsk(null)} />}
+        {compsShift && sel && cm.key && (
+          // Where the comps come from: Radius / Custom, at the bottom of the open map.
+          // A narrow open map (comps in three columns): icons only, raised over the Layers card.
+          <div style={{ position: "absolute", left: GAP + (subjMini ? MINI_W : 420) + GAP, right: (sideOn ? SIDE_W + GAP * 2 : 0) + (areaNarrow ? 64 : 0), bottom: areaNarrow ? 140 : GAP + 8, zIndex: 3, display: "flex", justifyContent: "center", padding: "0 12px", pointerEvents: "none" }}>
+            <AreaToggle cs={cm} compact={areaNarrow} />
+          </div>
+        )}
         {pillOn && (
           // "Search this area": centred over the visible map, just under the filter bar.
           <div style={{ position: "absolute", left: detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + GAP, right: 0, top: BAR_BOTTOM, zIndex: 2, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
@@ -542,13 +568,13 @@ export default function HomeWeb() {
           </div>
         )}
         {/* In comps mode the bar slides left with the detail panel and sits above it, led by the comps radius. */}
-        <FilterBar fs={fs} left={compsShift ? GAP : detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} right={compsShift ? SIDE_W + GAP * 2 : 10}
-          lead={compsShift && cm.key ? <RadiusChip miles={cm.radius} onChange={cm.setRadius} /> : undefined} />
+        <FilterBar fs={fs} left={compsShift ? GAP : detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} right={compsShift ? SIDE_W + GAP * 2 : 10} hidden={setup}
+          lead={compsShift && cm.key ? <RadiusChip miles={cm.radius} custom={cm.custom} onChange={r => { if (cm.custom) cm.setCustom(false); cm.setRadius(r); }} /> : undefined} />
         <FilterDropdown fs={fs} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? ["comp", "comps"] : undefined} />
-        <AllFiltersPanel fs={fs} top={compsShift ? DETAIL_TOP : view === "results" ? 88 : 76} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? "comps" : undefined}
-          onApply={() => { if (view === "home" && !compsShift) { closeDetail(); setView("results"); } }} />
+        {!setup && <AllFiltersPanel fs={fs} top={compsShift ? DETAIL_TOP : view === "results" ? 88 : 76} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? "comps" : undefined}
+          onApply={() => { if (view === "home" && !compsShift) { closeDetail(); setView("results"); } }} />}
         {sortOpen && view === "results" && <SortMenu value={sortBy} onPick={k => { setSortBy(k); setSortOpen(false); }} onClose={() => setSortOpen(false)} left={GAP + COL - 49} top={72} />}
-        <div style={{ pointerEvents: "auto" }}><MapControls right={compsShift ? SIDE_W + GAP * 2 + 8 : 20} onLocate={() => fit(GAP + COL + GAP)} /></div>
+        <div style={{ pointerEvents: "auto" }}><MapControls right={sideOn ? SIDE_W + GAP * 2 + 8 : 20} onLocate={() => fit(GAP + COL + GAP)} /></div>
         {offline && (
           <span style={{ position: "absolute", right: 120, bottom: 22, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 12px/28px var(--font-sans)", color: "var(--fg-2)", pointerEvents: "auto" }} title="Add NEXT_PUBLIC_MAPBOX_TOKEN to load live Mapbox tiles">
             Offline demo map
@@ -562,7 +588,8 @@ export default function HomeWeb() {
       </div>
 
       {compsOn && cm.key && <CompPins cs={cm} />}
-      {compsShift && sel && cm.key && <CompRadius at={[sel.lng, sel.lat]} miles={cm.radius} handle onChange={cm.setRadius} />}
+      {compsShift && sel && cm.key && <CompRadius at={[sel.lng, sel.lat]} miles={cm.radius} handle onChange={cm.setRadius} custom={cm.custom} area={cm.area} />}
+      {compsShift && cm.key && <AreaDraw cs={cm} />}
       {exportOn && sel && cm.key && <CompsExport cs={cm} l={sel} navW={navW} user={user.name} onClose={() => setExportOn(false)} onToast={(t, tone) => showToast(t, tone)}
         onSaved={() => { if (!rp.has(sel)) rp.save(sel); }} />}
       <PricePins signal={signalIds} listings={compsOn ? [] : pinListings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
@@ -583,7 +610,7 @@ export default function HomeWeb() {
       {ss.modals}
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
-      <HeatPaletteSwitcher style={{ right: compsShift ? SIDE_W + GAP * 2 + 92 : 104, bottom: 20, transition: "right .5s cubic-bezier(.2,.8,.2,1)" }} />
+      <HeatPaletteSwitcher style={{ right: sideOn ? SIDE_W + GAP * 2 + 92 : 104, bottom: 20, transition: "right .5s cubic-bezier(.2,.8,.2,1)" }} />
     </>
   );
 }

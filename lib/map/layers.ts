@@ -105,14 +105,16 @@ export function ensureLayers(m: MbMap) {
 
 // The comps search radius, kept here so a style change (map type) redraws it.
 let compR: any = { type: "FeatureCollection", features: [] };
-/** Draw (or clear, `center` null) the comps search circle, `miles` round `center`. */
-export function setCompRadius(m: MbMap, center: [number, number] | null, miles = 1) {
-  const ring: [number, number][] = [];
-  if (center) {
+/** Draw (or clear, `center` null) the comps search circle, `miles` round `center`; or,
+ *  with `shape`, the area drawn on the map (Custom). */
+export function setCompRadius(m: MbMap, center: [number, number] | null, miles = 1, shape?: [number, number][] | null) {
+  let ring: [number, number][] = [];
+  if (shape && shape.length > 2) ring = [...shape, shape[0]];
+  else if (center) {
     const dLat = miles / 69.05, dLng = dLat / Math.cos(center[1] * Math.PI / 180);
     for (let k = 0; k <= 96; k++) { const a = (k / 96) * Math.PI * 2; ring.push([center[0] + dLng * Math.cos(a), center[1] + dLat * Math.sin(a)]); }
   }
-  compR = { type: "FeatureCollection", features: center ? [{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } }] : [] };
+  compR = { type: "FeatureCollection", features: ring.length ? [{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } }] : [] };
   (m.getSource("bz-comp-r") as GeoJSONSource | undefined)?.setData(compR);
 }
 

@@ -10,7 +10,7 @@
 // Neighbourhood: lib/data/sl-hood.json (scripts/build-hood-stats.mjs) over Pedro's
 // lots and LA County's parcels, plus Pedro's sales.
 import { cellToLatLng, gridDisk, latLngToCell } from "h3-js";
-import { hashStr, rng } from "./geo";
+import { hashStr, pointInRing, rng } from "./geo";
 import type { Listing } from "./fake";
 import type { Filters } from "./filters";
 import { lotListing } from "./fake";
@@ -63,19 +63,24 @@ function lotPasses(lt: Lot, i: number, F: Filters): boolean {
 
 const cache = new Map<string, { sold: Comp[]; active: Comp[] }>();
 /** Up to 12 sold and 6 active comps; `pool` returns the next candidates too (Add comps). */
-export function compsFor(l: Listing, radius = DEFAULT_RADIUS, F?: Filters): { sold: Comp[]; active: Comp[] } { const x = compPool(l, radius, F); return { sold: x.sold.slice(0, 12), active: x.active.slice(0, 6) }; }
-export function compPool(l: Listing, radius = DEFAULT_RADIUS, F?: Filters): { sold: Comp[]; active: Comp[] } {
-  const key = `${l.id}|${l.addr}|${radius}|${F ? JSON.stringify(F) : ""}`, hit = cache.get(key);
+/** `area`: a shape drawn on the map (Custom, lng/lat ring) replaces the radius: comps are
+ *  the homes inside it. */
+export type CompArea = [number, number][] | null;
+export function compsFor(l: Listing, radius = DEFAULT_RADIUS, F?: Filters, area?: CompArea): { sold: Comp[]; active: Comp[] } { const x = compPool(l, radius, F, area); return { sold: x.sold.slice(0, 12), active: x.active.slice(0, 6) }; }
+export function compPool(l: Listing, radius = DEFAULT_RADIUS, F?: Filters, area?: CompArea): { sold: Comp[]; active: Comp[] } {
+  const key = `${l.id}|${l.addr}|${l.sqft}|${l.beds}|${l.lotAc}|${area ? JSON.stringify(area) : radius}|${F ? JSON.stringify(F) : ""}`, hit = cache.get(key);
   if (hit) return hit;
   const at: [number, number] = [l.lng, l.lat];
   const vacant = !(l.sqft > 0), lotFt = l.lotAc * 43560;
+  // A drawn area: its farthest point from the subject sets the "near" scale, as the radius does.
+  const reach = area ? Math.max(...area.map(p => milesBetween(at, p))) : radius;
   const rank = (lt: Lot, i: number): Comp | null => {
     if (lt.apn === l.apn) return null;
     const mi = milesBetween(at, lt.c);
-    if (mi < 0.003 || mi > radius || lt.st === "O") return null;
+    if (mi < 0.003 || lt.st === "O" || (area ? !pointInRing(lt.c as [number, number], area) : mi > radius)) return null;
     if (F && !lotPasses(lt, i, F)) return null;
     const size = vacant ? 1 - Math.min(1, Math.abs(lt.lot - lotFt) / Math.max(lotFt, 1)) : 1 - Math.min(1, Math.abs(lt.sqft - l.sqft) / l.sqft);
-    const near = Math.max(0, 1 - mi / Math.max(1.5, radius)), beds = vacant ? 1 : 1 - Math.min(1, Math.abs(lt.beds - l.beds) / 4);
+    const near = Math.max(0, 1 - mi / Math.max(1.5, reach)), beds = vacant ? 1 : 1 - Math.min(1, Math.abs(lt.beds - l.beds) / 4);
     const fresh = lt.st === "S" ? 1 - Math.min(1, (lt.sm || 12) / 18) : 1;
     const score = Math.round(100 * (0.4 * size + 0.35 * near + 0.15 * beds + 0.1 * fresh));
     return { i, addr: lt.addr, price: lt.price, ppsf: lt.ppsf, sqft: lt.sqft, beds: lt.beds, baths: lt.baths, lot: lt.lot, year: lt.year, mi, score, st: lt.st as "S" | "L", sm: lt.sm, photo: lotListing(lt, i).photos[0] };

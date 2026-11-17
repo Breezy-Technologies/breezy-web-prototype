@@ -427,27 +427,30 @@ const Divider = () => <span style={css("flex:none;height:1px;background:rgba(18,
 const secHead = css("display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none");
 const secTitle = css("flex:1;font:700 14px/1.26 var(--font-sans);color:rgb(18,18,18)");
 
-export function AllFiltersPanel({ fs, top, listings, onApply, count, noun }: { fs: FilterState; top: number; listings: Listing[]; onApply: () => void; count?: (F: Filters) => number; noun?: string }) {
+/** `embedded`: laid out in its parent's flow instead of floating over the results column
+ *  (manual comps: under the compact subject card), with no close; `cta` words the main
+ *  button ("Find 14 comps"), which is disabled when nothing matches. */
+export function AllFiltersPanel({ fs, top = 0, listings, onApply, count, noun, embedded, cta, title = "Filters" }: { fs: FilterState; top?: number; listings: Listing[]; onApply: () => void; count?: (F: Filters) => number; noun?: string; embedded?: boolean; cta?: (n: number) => string; title?: string }) {
   const { f, fd, setD, panelOut, closePanel, applyPanel, reset, fCol, setFCol, stToast, toast } = fs;
   const D = fd || f;
-  const n = useMemo(() => (fd ? (count ? count(D) : listings.filter(l => homeOk(l, D)).length) : 0), [listings, D, fd]); // eslint-disable-line react-hooks/exhaustive-deps
+  const n = useMemo(() => (fd ? (count ? count(D) : listings.filter(l => homeOk(l, D)).length) : 0), [listings, D, fd, count]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!fd) return null;
   const col = fCol;
   const anyOpen = SEC_KEYS.some(k => !col[k]);
   const tog = (k: string) => () => setFCol(st => ({ ...st, [k]: !st[k] }));
   const anim = panelOut ? "bzSheetOut .2s cubic-bezier(.4,0,1,1) both" : "bzSheetIn .38s cubic-bezier(.2,.8,.2,1) backwards";
   return (
-    <div style={css("position:absolute;left:12px;top:" + top + "px;bottom:12px;z-index:9;width:388px;max-width:calc(100% - 24px);border-radius:24px;overflow:hidden;background:rgb(255,255,255);box-shadow:inset 0 0 0 1px rgba(13,12,12,.1);display:flex;flex-direction:column;pointer-events:auto;animation:" + anim)}>
+    <div style={css((embedded ? "position:relative;flex:1;min-height:0;width:100%;box-shadow:inset 0 0 0 1px rgb(245,240,238),0 14px 36px rgba(40,26,20,.14);animation:panelDrop .34s cubic-bezier(.2,.8,.2,1) .08s backwards;" : "position:absolute;left:12px;top:" + top + "px;bottom:12px;z-index:9;width:388px;max-width:calc(100% - 24px);box-shadow:inset 0 0 0 1px rgba(13,12,12,.1);animation:" + anim + ";") + "border-radius:24px;overflow:hidden;background:rgb(255,255,255);display:flex;flex-direction:column;pointer-events:auto")}>
       <div style={css("flex:none;display:flex;align-items:center;justify-content:space-between;height:83px;box-sizing:border-box;padding:20px;background:rgb(255,255,255);box-shadow:inset 0 -1px 0 rgba(13,12,12,.16)")}>
-        <span style={css("display:flex;align-items:center;height:43px;padding:0 4px;font:700 15px/20px var(--font-sans);color:rgb(18,18,18)")}>Filters</span>
+        <span style={css("display:flex;align-items:center;height:43px;padding:0 4px;font:700 15px/20px var(--font-sans);color:rgb(18,18,18)")}>{title}</span>
         <div style={css("display:flex;align-items:center;gap:4px")}>
           <button onClick={() => setFCol(anyOpen ? Object.fromEntries(SEC_KEYS.map(k => [k, true])) : {})} className="fb-ghost" style={css("display:flex;align-items:center;gap:8px;height:43px;padding:0 12px;border:none;border-radius:9999px;background:none;font:700 15px/20px var(--font-sans);color:rgb(18,18,18);cursor:pointer")}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4l5 5 5-5M7 20l5-5 5 5" /></svg>
             {anyOpen ? "Collapse all" : "Expand all"}
           </button>
-          <button onClick={closePanel} title="Close" className="fb-ghost" style={css("width:40px;height:40px;margin-right:-8px;border:none;border-radius:9999px;background:none;color:rgb(18,18,18);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
+          {!embedded && <button onClick={closePanel} title="Close" className="fb-ghost" style={css("width:40px;height:40px;margin-right:-8px;border:none;border-radius:9999px;background:none;color:rgb(18,18,18);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
+          </button>}
         </div>
       </div>
       <div style={css("flex:1;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding:24px 24px 107px;display:flex;flex-direction:column;gap:21px")}>
@@ -497,7 +500,7 @@ export function AllFiltersPanel({ fs, top, listings, onApply, count, noun }: { f
       {stToast && <InfoToast t={stToast} floating />}
       <div style={css("position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:16px;height:83px;box-sizing:border-box;padding:20px;background:rgb(255,255,255);box-shadow:inset 0 .5px 0 rgba(13,12,12,.16)")}>
         <button onClick={reset} className="fb-ghost" style={css("flex:none;height:43px;padding:0 12px;margin-left:-12px;border:none;border-radius:9999px;background:none;font:700 15px/20px var(--font-sans);color:rgb(18,18,18);cursor:pointer")}>Clear all</button>
-        <button onClick={() => { applyPanel(); onApply(); }} className="fb-dark" style={css("flex:none;height:43px;padding:0 20px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 15px/20px var(--font-sans);color:rgb(253,252,252);cursor:pointer")}>{"View " + n + " " + (noun || "properties")}</button>
+        <button disabled={!!cta && n === 0} onClick={() => { applyPanel(); onApply(); }} className="fb-dark" style={css("flex:none;height:43px;padding:0 20px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 15px/20px var(--font-sans);color:rgb(253,252,252);" + (cta && n === 0 ? "opacity:.35;cursor:default" : "cursor:pointer"))}>{cta ? cta(n) : "View " + n + " " + (noun || "properties")}</button>
       </div>
     </div>
   );

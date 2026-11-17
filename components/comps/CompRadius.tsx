@@ -14,15 +14,17 @@ import { INK } from "../report/CompsReport";
 
 const fmt = (r: number) => (r < 1 ? `${Math.round(r * 100) / 100} mi` : `${Math.round(r * 10) / 10} mi`);
 
-export function CompRadius({ at, miles, handle, onChange }: { at: [number, number]; miles: number; handle?: boolean; onChange?: (mi: number) => void }) {
+/** `custom`: Custom area mode (CompArea): draws `area` once drawn (nothing while drawing), no handle. */
+export function CompRadius({ at, miles, handle, onChange, custom, area }: { at: [number, number]; miles: number; handle?: boolean; onChange?: (mi: number) => void; custom?: boolean; area?: [number, number][] | null }) {
   const { map, ready } = useMapCtx();
   const anchor = useAnchors();
   const [drag, setDrag] = useState<number | null>(null);
   const r = drag ?? miles;
-  useEffect(() => { if (map && ready) setCompRadius(map, at, r); }, [map, ready, at[0], at[1], r]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shape = custom ? area ?? null : null;
+  useEffect(() => { if (map && ready) setCompRadius(map, custom ? null : at, r, shape); }, [map, ready, at[0], at[1], r, custom, shape]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { if (map) setCompRadius(map, null); }, [map]);
   const start = useRef(false);
-  if (!handle || !map) return null;
+  if (!handle || !map || custom) return null;
   // The handle sits on the circle's east edge.
   const dLng = (r / 69.05) / Math.cos(at[1] * Math.PI / 180);
   const pos: [number, number] = [at[0] + dLng, at[1]];
@@ -55,7 +57,7 @@ export function CompRadius({ at, miles, handle, onChange }: { at: [number, numbe
 /** The radius as the first chip of the filter bar in comps mode (the rest are the search's
  *  own filters). Opens a small dropdown with the radius steps; the circle's handle on the
  *  map does the same by dragging. */
-export function RadiusChip({ miles, onChange }: { miles: number; onChange: (mi: number) => void }) {
+export function RadiusChip({ miles, onChange, custom }: { miles: number; onChange: (mi: number) => void; custom?: boolean }) {
   const [at, setAt] = useState<{ x: number; y: number; host: Element } | null>(null);
   const label = miles < 1 ? `${miles} mi` : `${miles} mile${miles === 1 ? "" : "s"}`;
   return (
@@ -68,8 +70,8 @@ export function RadiusChip({ miles, onChange }: { miles: number; onChange: (mi: 
       }}
         style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, height: 40, padding: "10px 14px 10px 12px", boxSizing: "border-box", borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", pointerEvents: "auto", userSelect: "none",
           background: "rgb(249,249,249)", boxShadow: `inset 0 0 0 1px ${INK}`, font: "400 15px/20px var(--font-sans)", color: "rgb(17,16,16)", animation: "panelDrop .3s cubic-bezier(.2,.8,.2,1) both" }}>
-        <i className="ph-bold ph-circle-dashed" style={{ fontSize: 16, color: "rgb(147,89,75)" }} />
-        <span>Within {label}</span>
+        <i className={`ph-bold ${custom ? "ph-polygon" : "ph-circle-dashed"}`} style={{ fontSize: 16, color: "rgb(147,89,75)" }} />
+        <span>{custom ? "Custom area" : `Within ${label}`}</span>
         <svg width="16" height="16" viewBox="0 0 256 256" style={{ transition: "transform .2s", transform: at ? "rotate(180deg)" : "none" }}><path d="M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80A8 8 0 0 1 48 88h160a8 8 0 0 1 5.66 13.66z" fill="currentColor" /></svg>
       </div>
       {at && createPortal(
@@ -82,8 +84,8 @@ export function RadiusChip({ miles, onChange }: { miles: number; onChange: (mi: 
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               {RADII.map(r => (
-                <button key={r} onClick={() => { onChange(r); setAt(null); }} aria-pressed={r === miles}
-                  style={{ flex: 1, height: 40, border: "none", borderRadius: 9999, cursor: "pointer", font: "400 14px/18px var(--font-sans)", color: INK, background: r === miles ? "rgb(240,238,237)" : "rgb(253,252,252)", boxShadow: r === miles ? `inset 0 0 0 1.5px ${INK}` : "inset 0 0 0 .5px rgba(13,12,12,.24)" }}>{r}</button>
+                <button key={r} onClick={() => { onChange(r); setAt(null); }} aria-pressed={!custom && r === miles}
+                  style={{ flex: 1, height: 40, border: "none", borderRadius: 9999, cursor: "pointer", font: "400 14px/18px var(--font-sans)", color: INK, background: !custom && r === miles ? "rgb(240,238,237)" : "rgb(253,252,252)", boxShadow: !custom && r === miles ? `inset 0 0 0 1.5px ${INK}` : "inset 0 0 0 .5px rgba(13,12,12,.24)" }}>{r}</button>
               ))}
             </div>
             <span style={{ font: "400 12px/17px var(--font-sans)", color: "rgb(108,100,96)" }}>Miles round the subject. You can also drag the circle's edge on the map. The other filters are your search's.</span>
