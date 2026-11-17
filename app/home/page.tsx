@@ -278,10 +278,17 @@ export default function HomeWeb() {
   const subjMini = compsShift && (subjMin || setup);
   // Comps list columns: 3 on windows wider than 1440 (17 Nov) while the subject is the
   // compact card (or the window fits the full panel too), 2 from 1360, else 1.
-  // 17 Nov review: ~1440 px laptops (MacBook 13) get two columns in a panel a third
-  // narrower than the three-column one, so the map keeps room; three from 1680.
-  const sideCols: 1 | 2 | 3 = winW >= 1680 && (subjMin || winW >= 1860) ? 3 : winW >= 1360 ? 2 : 1;
-  const SIDE_W = sideCols === 3 ? 820 : sideCols === 2 ? 548 : 360;
+  // The comps panel's width (17 Nov review: more room for the cards, and resizable). By
+  // default about half the map area (~700 px at 1470, two wide columns); dragging its
+  // left edge sets it (kept in localStorage `bz-comps-w`, double-click resets). It never
+  // eats the subject or the map controls. Columns follow the width: 3 from 840 px, 2 from 540.
+  const [sideUser, setSideUser] = useState<number | null>(null);
+  useEffect(() => { try { const v = Number(localStorage.getItem("bz-comps-w")); if (v > 0) setSideUser(v); } catch {} }, []);
+  const mapW = winW - navW;
+  const sideMax = Math.max(360, mapW - (GAP + (subjMin ? MINI_W : 420) + GAP) - 120 - GAP);
+  const SIDE_W = Math.round(Math.min(sideMax, Math.max(360, sideUser ?? mapW * 0.5)));
+  const sideCols: 1 | 2 | 3 = SIDE_W >= 840 ? 3 : SIDE_W >= 540 ? 2 : 1;
+  const saveSideW = (w: number | null) => { setSideUser(w); try { if (w == null) localStorage.removeItem("bz-comps-w"); else localStorage.setItem("bz-comps-w", String(Math.round(w))); } catch {} };
   // Comps mode: the map controls sit on the left, anchored to the subject card / panel.
   const SUBJ_RIGHT = GAP + (subjMini ? MINI_W : 420) + GAP;
   const DETAIL_X = compsShift ? GAP : GAP + COL + GAP;
@@ -292,6 +299,9 @@ export default function HomeWeb() {
   const selKey = sel ? `${sel.id}|${sel.addr}` : "";
   // Another property (pin, parcel, saved home) leaves comps.
   useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(null); setSubjMin(false); }, [selKey]);
+  // A resized comps panel reframes the comps once the new width has rendered.
+  const [reframe, setReframe] = useState(0);
+  useEffect(() => { if (reframe && compsShift && sel && cm.key) frameComps(sel); }, [reframe]); // eslint-disable-line react-hooks/exhaustive-deps
   // Collapsing / expanding the subject reframes the comps in the map space it leaves.
   useEffect(() => { if (compsShift && sel && cm.key) frameComps(sel); }, [subjMin]); // eslint-disable-line react-hooks/exhaustive-deps
   // Frame the subject and every comp in the open map between the two panels.
@@ -547,6 +557,7 @@ export default function HomeWeb() {
         {detailOpen && alerts.panel(DETAIL_X)}
         {compsOn && sel && cm.key && !cm.setup && (
           <div style={{ position: "absolute", right: GAP, top: GAP, bottom: GAP, zIndex: 4 }}>
+            {!compsOut && <SideGrip width={SIDE_W} min={360} max={sideMax} onDrag={w => setSideUser(w)} onDone={w => { saveSideW(w); setReframe(n => n + 1); }} onReset={() => { saveSideW(null); setReframe(n => n + 1); }} />}
             <CompsSide cs={cm} width={SIDE_W} cols={sideCols} out={compsOut} onClose={closeComps} onEstimate={() => ent.planOn ? setExportOn(true) : paywall.open({ kind: "offer", feature: "comps" })}
               locked={!ent.planOn} onToast={showToast} filtered={fCount} onClearFilters={fs.reset} onAddSold={() => fs.setF({ st: { "Recently sold": true }, tg: {} })} />
           </div>
@@ -575,7 +586,7 @@ export default function HomeWeb() {
         {!setup && <AllFiltersPanel fs={fs} top={compsShift ? DETAIL_TOP : view === "results" ? 88 : 76} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? "comps" : undefined}
           onApply={() => { if (view === "home" && !compsShift) { closeDetail(); setView("results"); } }} />}
         {sortOpen && view === "results" && <SortMenu value={sortBy} onPick={k => { setSortBy(k); setSortOpen(false); }} onClose={() => setSortOpen(false)} left={GAP + COL - 49} top={72} />}
-        <div style={{ pointerEvents: "auto" }}><MapControls right={20} left={compsShift ? SUBJ_RIGHT + 8 : undefined} onLocate={() => fit(GAP + COL + GAP)} /></div>
+        <div style={{ pointerEvents: "auto" }}><MapControls right={20} left={compsShift ? (subjMini && !setup ? GAP : SUBJ_RIGHT + 8) : undefined} onLocate={() => fit(GAP + COL + GAP)} /></div>
         {offline && (
           <span style={{ position: "absolute", right: 120, bottom: 22, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 12px/28px var(--font-sans)", color: "var(--fg-2)", pointerEvents: "auto" }} title="Add NEXT_PUBLIC_MAPBOX_TOKEN to load live Mapbox tiles">
             Offline demo map
@@ -612,5 +623,25 @@ export default function HomeWeb() {
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
     </>
+  );
+}
+
+/** The comps panel's resize grip, on its left edge: drag to widen / narrow the panel
+ *  (17 Nov review), double-click for the default width. */
+function SideGrip({ width, min, max, onDrag, onDone, onReset }: { width: number; min: number; max: number; onDrag: (w: number) => void; onDone: (w: number) => void; onReset: () => void }) {
+  const drag = useRef<{ x: number; w: number } | null>(null);
+  const [on, setOn] = useState(false);
+  const at = (e: React.PointerEvent) => Math.max(min, Math.min(max, drag.current!.w + (drag.current!.x - e.clientX)));
+  return (
+    <div role="separator" aria-orientation="vertical" aria-label="Resize the comps panel" aria-valuenow={width} aria-valuemin={min} aria-valuemax={max} title="Drag to resize · double-click to reset"
+      onPointerDown={e => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); drag.current = { x: e.clientX, w: width }; setOn(true); }}
+      onPointerMove={e => { if (drag.current) onDrag(at(e)); }}
+      onPointerUp={e => { if (!drag.current) return; const w = at(e); drag.current = null; setOn(false); onDone(w); }}
+      onDoubleClick={onReset}
+      className="cs-grip"
+      style={{ position: "absolute", left: -10, top: 24, bottom: 24, width: 20, zIndex: 6, cursor: "ew-resize", pointerEvents: "auto", touchAction: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <style>{`.cs-grip>span{opacity:0;transition:opacity .16s}.cs-grip:hover>span,.cs-grip[data-on]>span{opacity:1}`}</style>
+      <span style={{ width: 5, height: 56, borderRadius: 9999, background: on ? "rgb(18,18,18)" : "rgb(160,150,146)", boxShadow: "0 0 0 2px rgba(253,252,252,.9)", ...(on ? { opacity: 1 } : {}) }} />
+    </div>
   );
 }
