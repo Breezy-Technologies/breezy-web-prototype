@@ -298,13 +298,15 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
               // 18 Nov comment: the quick estimate's composition. Icon + label left-aligned on
               // top (usage chip on the right), the value under it in larger type, blurred while locked.
               <button key={k} data-tour={k.startsWith("Max") ? "max-build" : undefined} className="dt-tile" onClick={() => onFlow?.(fk)} title={k.startsWith("Max") ? "Underbuilt analysis" : "Upside analysis"} style={css("flex:1;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:12px 12px 14px 14px;border:none;border-radius:16px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
-                <span style={css("height:24px;display:flex;align-items:center;gap:5px")}>
+                <span style={css("height:20px;display:flex;align-items:center;gap:5px;min-width:0")}>
                   <span style={maskIco(ic, 13, "rgb(129,117,111)")} />
                   <span style={css("font:700 11px/14px var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:rgb(129,117,111);white-space:nowrap")}>{k}</span>
-                  <span style={{ flex: 1 }} />
-                  <UsageChip access={a} feature={fk === "ub" ? "maxBuild" : "roi"} />
                 </span>
-                <span style={{ ...css("font:300 30px/1.1 var(--font-sans);letter-spacing:-.8px;white-space:nowrap;color:" + c), ...(hide ? { filter: "blur(9px)", userSelect: "none" } : {}) }} aria-hidden={hide || undefined}>{hide ? (fk === "ub" ? "64%" : "$1.2m") : v}</span>
+                {/* 18 Nov comment: the usage chip sits on the value row (it overflowed beside the long label) */}
+                <span style={css("display:flex;align-items:flex-end;justify-content:space-between;gap:8px;min-width:0")}>
+                  <span style={{ ...css("min-width:0;font:300 30px/1.1 var(--font-sans);letter-spacing:-.8px;white-space:nowrap;color:" + c), ...(hide ? { filter: "blur(9px)", userSelect: "none" } : {}) }} aria-hidden={hide || undefined}>{hide ? (fk === "ub" ? "64%" : "$1.2m") : v}</span>
+                  <span style={css("flex:none;margin-bottom:5px;display:flex")}><UsageChip access={a} feature={fk === "ub" ? "maxBuild" : "roi"} /></span>
+                </span>
               </button>
               );
             })}
@@ -581,10 +583,22 @@ const unlockedOwners = new Set<string>();
 // Locked owner lines: what unlocks, with a fixed dummy value blurred beside it (never the owner's data).
 const LOCKED_LINES: [string, string, string][] = [["ph-phone", "Phone", "(323) 555-0134"], ["ph-envelope-simple", "Email", "owner.name@mail.com"], ["ph-map-pin", "Mailing", "1234 Sample Ave, Los Angeles"]];
 function CreditLine({ text, used }: { text: string; used?: boolean }) {
+  // 18 Nov comment: the credit note stands out. Before unlocking it's a soft yellow strip with
+  // the coin, the cost in bold ink and the balance after it; once unlocked, a quieter line.
+  const [lead, ...rest] = text.split(" · ");
+  const coin = (s: number) => <span style={{ flex: "none", width: s, height: s, borderRadius: 9999, background: "linear-gradient(180deg,rgb(255,224,120),rgb(232,184,64))", boxShadow: "inset 0 0 0 1px rgba(150,110,20,.35)", display: "flex", alignItems: "center", justifyContent: "center", font: `700 ${s > 16 ? 11 : 9}px/1 var(--font-sans)`, color: "rgb(110,78,10)" }}>1</span>;
+  if (used) return (
+    <span style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px 0", font: "400 13px/17px var(--font-sans)", color: "rgb(98,90,89)", animation: "fadeIn .4s ease .5s both" }}>
+      {coin(16)}<b style={{ fontWeight: 700, color: INK }}>{lead}</b>{rest.length ? <span>· {rest.join(" · ")}</span> : null}
+    </span>
+  );
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 6, padding: used ? "6px 8px 0" : 0, font: "400 12px/16px var(--font-sans)", color: used ? "rgb(129,117,111)" : "rgb(98,90,89)", animation: used ? "fadeIn .4s ease .5s both" : undefined }}>
-      <span style={{ flex: "none", width: 16, height: 16, borderRadius: 9999, background: "linear-gradient(180deg,rgb(255,224,120),rgb(232,184,64))", boxShadow: "inset 0 0 0 1px rgba(150,110,20,.35)", display: "flex", alignItems: "center", justifyContent: "center", font: "700 9px/1 var(--font-sans)", color: "rgb(110,78,10)" }}>1</span>
-      {text}
+    <span style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, marginLeft: -70, padding: "10px 12px", borderRadius: 12, background: "rgb(255,246,214)", boxShadow: "inset 0 0 0 1px rgba(232,184,64,.45)", font: "400 13px/18px var(--font-sans)", color: "rgb(98,90,89)" }}>
+      {coin(22)}
+      <span style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <b style={{ font: "700 14px/19px var(--font-sans)", color: INK }}>{lead}</b>
+        {rest.length ? <span>{rest.join(" · ")}</span> : null}
+      </span>
     </span>
   );
 }
