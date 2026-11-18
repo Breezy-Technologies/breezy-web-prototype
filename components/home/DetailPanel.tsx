@@ -583,8 +583,8 @@ const unlockedOwners = new Set<string>();
 // Locked owner lines: what unlocks, with a fixed dummy value blurred beside it (never the owner's data).
 const LOCKED_LINES: [string, string, string][] = [["ph-phone", "Phone", "(323) 555-0134"], ["ph-envelope-simple", "Email", "owner.name@mail.com"], ["ph-map-pin", "Mailing", "1234 Sample Ave, Los Angeles"]];
 function CreditLine({ text, used }: { text: string; used?: boolean }) {
-  // 18 Nov comment: the credit note stands out. Before unlocking it's a soft yellow strip with
-  // the coin, the cost in bold ink and the balance after it; once unlocked, a quieter line.
+  // 18 Nov comments: the credit note stands out, without reading as a warning. Before unlocking
+  // it's a warm neutral strip (the tiles' surface) with the coin, the cost in bold ink and the balance after it; once unlocked, a quieter line.
   const [lead, ...rest] = text.split(" · ");
   const coin = (s: number) => <span style={{ flex: "none", width: s, height: s, borderRadius: 9999, background: "linear-gradient(180deg,rgb(255,224,120),rgb(232,184,64))", boxShadow: "inset 0 0 0 1px rgba(150,110,20,.35)", display: "flex", alignItems: "center", justifyContent: "center", font: `700 ${s > 16 ? 11 : 9}px/1 var(--font-sans)`, color: "rgb(110,78,10)" }}>1</span>;
   if (used) return (
@@ -593,7 +593,7 @@ function CreditLine({ text, used }: { text: string; used?: boolean }) {
     </span>
   );
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, marginLeft: -70, padding: "10px 12px", borderRadius: 12, background: "rgb(255,246,214)", boxShadow: "inset 0 0 0 1px rgba(232,184,64,.45)", font: "400 13px/18px var(--font-sans)", color: "rgb(98,90,89)" }}>
+    <span style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, marginLeft: -70, padding: "10px 12px", borderRadius: 12, background: "rgb(245,240,238)", font: "400 13px/18px var(--font-sans)", color: "rgb(98,90,89)" }}>
       {coin(22)}
       <span style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
         <b style={{ font: "700 14px/19px var(--font-sans)", color: INK }}>{lead}</b>
