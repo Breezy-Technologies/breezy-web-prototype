@@ -1,150 +1,149 @@
 "use client";
-// "Make Breezy yours" on web (18 Nov), from the mobile activation wizard:
-// - GetStartedBanner: the dark card at the top of For you (n/4 ring, "Unlock 40 owner contacts").
+// "Make Breezy yours" on web (18 Nov), from the mobile activation wizard, at web scale
+// (18 Nov review: "don't stretch the mobile screens"): desktop type sizes (12–16 px),
+// small tinted Phosphor icon tiles instead of the big isometric art, panels anchored to
+// what opened them instead of full-screen sheets.
+// - GetStartedBanner: a compact dark card at the top of For you (n/4 ring).
 // - GetStartedRow / EarnChip: the same progress inside the Create menu, "+10" on each item not yet earned.
-// - Checklist: the wizard itself (the mobile sheet as a centred dialog): four tasks, the bonus.
-// - Coach: the guided version, as on mobile: the screen dims, the next thing to press sits in a
-//   frosted ring, a big light title and one line say what to do. The page gives it the steps
-//   for the current stage (first one found on screen wins); it hides while its target is covered.
+// - Checklist: the wizard as a panel beside the side nav (a product "getting started" list).
+// - Coach: the guided version: the page dims, the next thing to press is ringed, and a small
+//   callout card with a pointer says what to do (product-tour pattern). The page gives it the
+//   steps for the current stage (first one found on screen wins); it hides while covered.
 // - EarnedToast: "+10 contact credits · 1 of 4 done · Up next: …" with Next step.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePaywallReq } from "@/lib/billing";
-import { BONUS, PER_TASK, TASKS, TOTAL, getStarted, useGetStarted, type Task } from "@/lib/getStarted";
+import { BONUS, PER_TASK, TASKS, TOTAL, getStarted, taskMeta, useGetStarted, type Task, type TaskMeta } from "@/lib/getStarted";
 
-const INK = "rgb(18,18,18)", CLAY = "rgb(147,89,75)";
-const BROWN = "linear-gradient(160deg,rgb(122,82,68) 0%,rgb(84,56,47) 55%,rgb(64,43,37) 100%)";
+const INK = "rgb(18,18,18)", CLAY = "rgb(147,89,75)", MUTED = "rgb(98,90,89)";
+const BROWN = "linear-gradient(160deg,rgb(116,78,65) 0%,rgb(78,52,44) 60%,rgb(62,42,36) 100%)";
+const POP = "inset 0 0 0 1px rgba(13,12,12,.08),0 12px 32px rgba(24,14,10,.18)";
 
 /** The n / 4 progress ring. */
-export function Ring({ n, of = TASKS.length, size = 56, dark = true }: { n: number; of?: number; size?: number; dark?: boolean }) {
-  const w = size >= 48 ? 6 : 4, r = (size - w) / 2, c = 2 * Math.PI * r, gap = of > 1 ? 6 : 0;
-  const seg = c / of;
+export function Ring({ n, of = TASKS.length, size = 36, dark = true }: { n: number; of?: number; size?: number; dark?: boolean }) {
+  const w = size >= 44 ? 4 : 3, r = (size - w) / 2, c = 2 * Math.PI * r, gap = of > 1 ? 4 : 0, seg = c / of;
   return (
     <span style={{ position: "relative", flex: "none", width: size, height: size, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <svg width={size} height={size} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
         {Array.from({ length: of }, (_, i) => (
-          <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={w} strokeLinecap="butt"
-            stroke={i < n ? (dark ? "rgb(253,252,252)" : CLAY) : dark ? "rgba(253,252,252,.22)" : "rgba(147,89,75,.18)"}
+          <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={w}
+            stroke={i < n ? (dark ? "rgb(253,252,252)" : CLAY) : dark ? "rgba(253,252,252,.24)" : "rgba(147,89,75,.18)"}
             strokeDasharray={`${seg - gap} ${c - seg + gap}`} strokeDashoffset={-i * seg - gap / 2} style={{ transition: "stroke .4s" }} />
         ))}
       </svg>
-      <span style={{ font: `700 ${size >= 48 ? 15 : 11}px/1 var(--font-sans)`, color: dark ? "rgb(253,252,252)" : INK }}>{n}/{of}</span>
+      <span style={{ font: `700 ${size >= 44 ? 13 : 10}px/1 var(--font-sans)`, color: dark ? "rgb(253,252,252)" : INK }}>{n}/{of}</span>
     </span>
   );
 }
 
-const Sparkle = ({ size = 12, color = "currentColor" }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ flex: "none", display: "block" }}><path d="M10 2c.6 4.8 3.2 7.4 8 8-4.8.6-7.4 3.2-8 8-.6-4.8-3.2-7.4-8-8 4.8-.6 7.4-3.2 8-8z" /><path d="M19 14c.3 2.2 1.3 3.2 3.5 3.5-2.2.3-3.2 1.3-3.5 3.5-.3-2.2-1.3-3.2-3.5-3.5 2.2-.3 3.2-1.3 3.5-3.5z" /></svg>
+/** A task's icon in its tinted tile. */
+export function TaskIcon({ t, size = 32, done }: { t: Pick<TaskMeta, "icon" | "color" | "tint">; size?: number; done?: boolean }) {
+  return (
+    <span style={{ position: "relative", flex: "none", width: size, height: size, borderRadius: size * 0.3, background: done ? "rgb(241,238,236)" : t.tint, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <i className={`ph ${t.icon}`} style={{ fontSize: size * 0.56, color: done ? "rgb(160,152,148)" : t.color }} />
+    </span>
+  );
+}
+
+const Sparkle = ({ size = 10 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={{ flex: "none", display: "block" }}><path d="M10 2c.6 4.8 3.2 7.4 8 8-4.8.6-7.4 3.2-8 8-.6-4.8-3.2-7.4-8-8 4.8-.6 7.4-3.2 8-8z" /><path d="M19 14c.3 2.2 1.3 3.2 3.5 3.5-2.2.3-3.2 1.3-3.5 3.5-.3-2.2-1.3-3.2-3.5-3.5 2.2-.3 3.2-1.3 3.5-3.5z" /></svg>
 );
 
-/** "+10 credits" (or "Earned"). */
-export function EarnChip({ credits = PER_TASK, short, done }: { credits?: number; short?: boolean; done?: boolean }) {
-  if (done) return <span style={{ font: "400 13px/16px var(--font-sans)", color: "rgb(129,117,111)" }}>Earned</span>;
+/** "+10" credits chip. */
+export function EarnChip({ credits = PER_TASK }: { credits?: number }) {
   return (
-    <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 4, height: 22, padding: "0 8px", borderRadius: 9999, background: "rgb(253,252,252)", boxShadow: "inset 0 0 0 1px rgba(147,89,75,.14)", font: "400 12px/16px var(--font-sans)", color: CLAY, whiteSpace: "nowrap" }}>
-      <Sparkle size={11} />+{credits}{short ? "" : " credits"}
+    <span title={`Earn ${credits} owner-contact credits`} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 3, height: 20, padding: "0 7px", borderRadius: 9999, background: "rgba(147,89,75,.09)", font: "700 11px/14px var(--font-sans)", color: CLAY, whiteSpace: "nowrap" }}>
+      <Sparkle />+{credits}
     </span>
   );
 }
 
-/** The dark card at the top of For you (mobile's "Make Breezy yours" card). */
+/** The card at the top of For you. */
 export function GetStartedBanner() {
   const gs = useGetStarted();
   if (gs.all) return null;
   const left = TOTAL - gs.n * PER_TASK;
   return (
-    <button onClick={() => getStarted.show()} style={{ flex: "none", position: "relative", display: "flex", alignItems: "center", gap: 16, width: "100%", padding: "16px 16px 16px 18px", border: "none", borderRadius: 20, background: BROWN, boxShadow: "inset 0 1px 0 rgba(255,255,255,.08),0 6px 18px rgba(64,43,37,.22)", cursor: "pointer", textAlign: "left", overflow: "hidden", animation: "panelDrop .3s cubic-bezier(.2,.8,.2,1) both" }}>
-      <Arches style={{ position: "absolute", right: -18, top: -6, width: 120, height: 110, opacity: .07 }} />
-      <Ring n={gs.n} size={52} />
-      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ font: "700 16px/21px var(--font-sans)", color: "rgb(253,252,252)" }}>Make Breezy yours</span>
-        <span style={{ font: "400 14px/19px var(--font-sans)", color: "rgba(253,252,252,.82)" }}>{gs.n ? `${left} more owner contacts to earn` : `Unlock ${TOTAL} owner contacts`}</span>
+    <button data-gs-open="" onClick={() => getStarted.show(!gs.open)} style={{ flex: "none", display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 10px 10px 12px", border: "none", borderRadius: 16, background: BROWN, boxShadow: "inset 0 1px 0 rgba(255,255,255,.08)", cursor: "pointer", textAlign: "left", animation: "panelDrop .3s cubic-bezier(.2,.8,.2,1) both" }}>
+      <Ring n={gs.n} />
+      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <span style={{ font: "700 14px/18px var(--font-sans)", color: "rgb(253,252,252)" }}>Make Breezy yours</span>
+        <span style={{ font: "400 12px/16px var(--font-sans)", color: "rgba(253,252,252,.75)" }}>{gs.n ? `${left} more owner contacts to earn` : `Unlock ${TOTAL} owner contacts`}</span>
       </span>
-      <span style={{ flex: "none", height: 36, padding: "0 16px", borderRadius: 9999, display: "flex", alignItems: "center", background: "rgba(253,252,252,.16)", boxShadow: "inset 0 0 0 1px rgba(253,252,252,.22)", font: "700 14px/18px var(--font-sans)", color: "rgb(253,252,252)", whiteSpace: "nowrap" }}>{gs.n ? "Continue" : "Let's go"}</span>
+      <span style={{ flex: "none", height: 32, padding: "0 14px", borderRadius: 9999, display: "flex", alignItems: "center", background: "rgb(253,252,252)", font: "700 13px/16px var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>{gs.n ? "Continue" : "Let's go"}</span>
     </button>
   );
 }
 
-/** Progress row at the top of the Create menu / flyout. */
+/** Progress row at the top of the Create menu / flyout / launcher. */
 export function GetStartedRow({ onOpen }: { onOpen: () => void }) {
   const gs = useGetStarted();
   if (gs.all) return null;
   return (
-    <button onClick={onOpen} className="btn-ghost" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "10px 10px", borderRadius: 14, border: "none", background: "rgb(248,242,239)", cursor: "pointer", textAlign: "left" }}>
-      <Ring n={gs.n} size={40} dark={false} />
-      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-        <span style={{ font: "700 14px/18px var(--font-sans)", color: INK }}>Make Breezy yours</span>
-        <span style={{ font: "400 13px/17px var(--font-sans)", color: "rgb(98,90,89)" }}>Earn up to {TOTAL + BONUS} owner contacts</span>
+    <button data-gs-open="" onClick={onOpen} className="btn-ghost" style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 12, border: "none", background: "rgb(248,243,241)", cursor: "pointer", textAlign: "left" }}>
+      <Ring n={gs.n} size={32} dark={false} />
+      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <span style={{ font: "700 13px/17px var(--font-sans)", color: INK }}>Make Breezy yours</span>
+        <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>Earn up to {TOTAL + BONUS} owner contacts</span>
       </span>
-      <i className="ph ph-arrow-circle-right" style={{ fontSize: 22, color: INK }} />
+      <i className="ph ph-caret-right" style={{ fontSize: 14, color: MUTED }} />
     </button>
   );
 }
 
-function Arches({ style }: { style?: React.CSSProperties }) {
-  return (
-    <span aria-hidden style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 4, ...style }}>
-      <span style={{ width: "46%", height: "100%", borderRadius: "999px 999px 0 0", background: "rgb(253,252,252)" }} />
-      <span style={{ width: "46%", height: "100%", borderRadius: "999px 999px 0 0", background: "rgb(253,252,252)" }} />
-    </span>
-  );
-}
-
-/** The wizard: the mobile sheet as a centred dialog. */
-export function Checklist({ onStart }: { onStart: (t: Task) => void }) {
+/** The wizard: a panel beside the side nav, like a product's "getting started" list. */
+export function Checklist({ left, onStart }: { left: number; onStart: (t: Task) => void }) {
   const gs = useGetStarted();
   useEffect(() => {
     if (!gs.open) return;
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") getStarted.show(false); };
-    window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
+    const out = (e: MouseEvent) => { const t = e.target as HTMLElement; if (!t.closest("[data-gs],[data-gs-open]")) getStarted.show(false); };
+    window.addEventListener("keydown", k); window.addEventListener("mousedown", out);
+    return () => { window.removeEventListener("keydown", k); window.removeEventListener("mousedown", out); };
   }, [gs.open]);
   if (!gs.open) return null;
-  const left = TOTAL - gs.n * PER_TASK;
-  const sub = gs.all ? `All done. You earned ${TOTAL + BONUS} contact credits.` : gs.n ? `Nice work. ${left} more contact credits to earn.` : `Do ${TASKS.length} quick things and earn up to ${TOTAL} contact credits.`;
+  const sub = gs.all ? `All done. You earned ${TOTAL + BONUS} owner contacts.` : gs.n ? `${gs.n} of ${TASKS.length} done · ${TOTAL - gs.n * PER_TASK} more contacts to earn` : `Do ${TASKS.length} quick things and earn up to ${TOTAL + BONUS} owner contacts.`;
   return (
-    <div onClick={() => getStarted.show(false)} style={{ position: "fixed", inset: 0, zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(13,12,12,.5)", animation: "fadeIn .2s ease both" }}>
-      <div role="dialog" aria-modal aria-label="Make Breezy yours" onClick={e => e.stopPropagation()} className="no-scrollbar"
-        style={{ position: "relative", width: 560, maxWidth: "100%", maxHeight: "calc(100vh - 48px)", overflowY: "auto", boxSizing: "border-box", padding: "24px 28px 28px", borderRadius: 32, background: "rgb(253,252,252)", boxShadow: "0 24px 64px rgba(24,14,10,.3)", animation: "bzModalIn2 .32s cubic-bezier(.2,.8,.2,1) both" }}>
-        <button onClick={() => getStarted.show(false)} title="Close" aria-label="Close" style={{ position: "absolute", left: 20, top: 20, zIndex: 1, width: 44, height: 44, border: "none", borderRadius: 9999, background: "rgb(253,252,252)", boxShadow: "0 2px 10px rgba(30,18,12,.14)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph ph-x" style={{ fontSize: 20, color: INK }} /></button>
-        <div style={{ height: 150, margin: "44px 8px 0", borderRadius: 28, background: BROWN, display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden" }}>
-          <Arches style={{ width: 104, height: 84, marginBottom: 32, opacity: .2 }} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, margin: "24px 0 24px", textAlign: "center" }}>
-          <span style={{ font: "300 34px/40px var(--font-sans)", letterSpacing: "-.6px", color: INK }}>Make Breezy yours</span>
-          <span style={{ font: "400 17px/24px var(--font-sans)", color: "rgb(77,71,69)", maxWidth: 420, textWrap: "pretty" } as React.CSSProperties}>{sub}</span>
-          <span style={{ display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 16px", borderRadius: 9999, background: "rgb(245,240,238)", font: "400 15px/20px var(--font-sans)", color: INK }}>
-            <i className="ph ph-address-book" style={{ fontSize: 18, color: CLAY }} /><b style={{ fontWeight: 700 }}>1 credit</b> = 1 owner&apos;s contact details
-          </span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {TASKS.map((t, i) => {
-            const done = gs.isDone(t.k);
-            return <TaskRow key={t.k} art={t.art} title={t.title} desc={t.desc} done={done} i={i} onClick={done ? undefined : () => onStart(t.k)} />;
-          })}
-          <TaskRow art="/iso/card-stale.png" title="Bonus" desc={gs.all ? "Every step done" : `Unlock by completing all ${TASKS.length}`} credits={BONUS} done={gs.all} i={TASKS.length} muted={!gs.all} />
-        </div>
+    <div data-gs="" role="dialog" aria-label="Make Breezy yours"
+      style={{ position: "fixed", left, top: 72, zIndex: 700, width: 360, maxHeight: "calc(100vh - 88px)", overflowY: "auto", boxSizing: "border-box", borderRadius: 20, background: "var(--paper)", boxShadow: POP, animation: "panelDrop .22s cubic-bezier(.2,.8,.2,1) both" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "16px 12px 12px 16px" }}>
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ font: "700 16px/22px var(--font-sans)", color: INK }}>Make Breezy yours</span>
+          <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>{sub}</span>
+        </span>
+        <button onClick={() => getStarted.show(false)} title="Close" aria-label="Close" className="btn-ghost" style={{ flex: "none", width: 28, height: 28, padding: 0, border: "none", borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><i className="ph-bold ph-x" style={{ fontSize: 13, color: INK }} /></button>
+      </div>
+      {/* one segment per task */}
+      <div style={{ display: "flex", gap: 4, padding: "0 16px 8px" }}>
+        {TASKS.map(t => <span key={t.k} style={{ flex: 1, height: 4, borderRadius: 9999, background: gs.isDone(t.k) ? CLAY : "rgb(238,232,229)", transition: "background .4s" }} />)}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", padding: "4px 8px" }}>
+        {TASKS.map((t, i) => {
+          const done = gs.isDone(t.k);
+          return (
+            <button key={t.k} onClick={done ? undefined : () => onStart(t.k)} disabled={done} className={done ? undefined : "btn-ghost"}
+              style={{ display: "flex", alignItems: "center", gap: 12, height: "auto", padding: 8, border: "none", borderRadius: 12, background: "none", cursor: done ? "default" : "pointer", textAlign: "left", animation: `riseIn .3s cubic-bezier(.2,.8,.2,1) ${40 + i * 40}ms both` }}>
+              <TaskIcon t={t} done={done} />
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                <span style={{ font: "700 14px/18px var(--font-sans)", color: done ? "rgb(140,132,128)" : INK, textDecoration: done ? "line-through" : "none", textDecorationColor: "rgba(140,132,128,.6)" }}>{t.title}</span>
+                <span style={{ font: "400 12px/16px var(--font-sans)", color: done ? "rgb(160,152,148)" : MUTED }}>{t.desc}</span>
+              </span>
+              {done
+                ? <span title="Earned" style={{ flex: "none", width: 20, height: 20, borderRadius: 9999, background: CLAY, display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-check" style={{ fontSize: 11, color: "#fff" }} /></span>
+                : <EarnChip />}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ margin: "4px 16px 0", height: 1, background: "rgba(13,12,12,.07)" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+        <TaskIcon t={{ icon: "ph-gift", color: CLAY, tint: "rgb(246,238,235)" }} size={28} />
+        <span style={{ flex: 1, font: "400 13px/18px var(--font-sans)", color: MUTED }}>{gs.all ? "Bonus earned" : `Bonus for finishing all ${TASKS.length}`}</span>
+        <EarnChip credits={BONUS} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px 14px", background: "rgb(249,247,246)", font: "400 12px/16px var(--font-sans)", color: MUTED }}>
+        <i className="ph ph-info" style={{ fontSize: 14 }} />1 credit = 1 owner&apos;s contact details
       </div>
     </div>
-  );
-}
-
-function TaskRow({ art, title, desc, done, credits = PER_TASK, onClick, i, muted }: { art: string; title: string; desc: string; done: boolean; credits?: number; onClick?: () => void; i: number; muted?: boolean }) {
-  return (
-    <button onClick={onClick} disabled={!onClick} className={onClick ? "gs-row" : undefined}
-      style={{ display: "flex", alignItems: "center", gap: 16, padding: 16, border: "none", borderRadius: 22, background: "rgb(245,240,238)", cursor: onClick ? "pointer" : "default", textAlign: "left", animation: `riseIn .36s cubic-bezier(.2,.8,.2,1) ${80 + i * 50}ms both`, transition: "background .16s" }}>
-      <style>{`.gs-row:hover{background:rgb(239,231,228)!important}`}</style>
-      <span style={{ position: "relative", flex: "none", width: 72, height: 72, borderRadius: 14, background: `rgb(241,231,228) url(${art}) center/cover no-repeat`, boxShadow: "inset 0 0 0 1px rgba(147,89,75,.14)", filter: muted ? "grayscale(.6) opacity(.8)" : "none" }}>
-        {done && <span style={{ position: "absolute", right: -8, bottom: -8, width: 28, height: 28, borderRadius: 9999, background: "rgb(160,104,88)", boxShadow: "0 0 0 2px rgb(245,240,238)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-check" style={{ fontSize: 14, color: "#fff" }} /></span>}
-      </span>
-      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ font: "700 17px/22px var(--font-sans)", color: done ? "rgb(129,117,111)" : INK }}>{title}</span>
-          <EarnChip credits={credits} done={done} />
-        </span>
-        <span style={{ font: "400 15px/20px var(--font-sans)", color: "rgb(77,71,69)" }}>{desc}</span>
-      </span>
-      <i className="ph ph-arrow-circle-right" style={{ flex: "none", fontSize: 26, color: onClick ? INK : "rgb(190,182,178)" }} />
-    </button>
   );
 }
 
@@ -168,9 +167,13 @@ function find(steps: CoachStep[]): { s: CoachStep; el: HTMLElement } | null {
   return null;
 }
 
-export function Coach({ steps, paused, onExit }: { steps: CoachStep[] | null; paused?: boolean; onExit: () => void }) {
+const CARD_W = 300, GAP = 14;
+
+export function Coach({ steps, task, paused, onExit }: { steps: CoachStep[] | null; task?: Task; paused?: boolean; onExit: () => void }) {
   const pw = usePaywallReq();
   const [cur, setCur] = useState<{ s: CoachStep; box: Box } | null>(null);
+  const [cardH, setCardH] = useState(140);
+  const card = useRef<HTMLDivElement>(null);
   const live = !!steps && steps.length > 0 && !paused && !pw;
   const stepsRef = useRef(steps);
   stepsRef.current = steps;
@@ -182,8 +185,7 @@ export function Coach({ steps, paused, onExit }: { steps: CoachStep[] | null; pa
       let next: { s: CoachStep; box: Box } | null = null;
       if (f) {
         const r = f.el.getBoundingClientRect(), br = parseFloat(getComputedStyle(f.el).borderTopLeftRadius) || 0;
-        const H = window.innerHeight;
-        next = { s: f.s, box: { x: r.left, y: r.top, w: r.width, h: Math.min(r.bottom, H - 12) - r.top, r: Math.min(br, r.height / 2) } };
+        next = { s: f.s, box: { x: r.left, y: r.top, w: r.width, h: Math.min(r.bottom, window.innerHeight - 12) - r.top, r: Math.min(br, r.height / 2) } };
       }
       const key = next ? `${next.s.sel}|${next.s.title}|${Math.round(next.box.x)},${Math.round(next.box.y)},${Math.round(next.box.w)},${Math.round(next.box.h)}` : "";
       if (key !== last) { last = key; setCur(next); }
@@ -193,6 +195,7 @@ export function Coach({ steps, paused, onExit }: { steps: CoachStep[] | null; pa
     const t = setTimeout(() => { raf = requestAnimationFrame(tick); }, 260);
     return () => { clearTimeout(t); cancelAnimationFrame(raf); };
   }, [live]);
+  useLayoutEffect(() => { if (card.current && Math.abs(card.current.offsetHeight - cardH) > 1) setCardH(card.current.offsetHeight); });
   useEffect(() => {
     if (!cur) return;
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") onExit(); };
@@ -200,42 +203,53 @@ export function Coach({ steps, paused, onExit }: { steps: CoachStep[] | null; pa
     return () => window.removeEventListener("keydown", k);
   }, [!!cur]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!cur) return null;
-  const P = 6, R = 8; // hole padding, ring width
+  const P = 4; // hole padding
   const b = { x: cur.box.x - P, y: cur.box.y - P, w: cur.box.w + 2 * P, h: cur.box.h + 2 * P, r: cur.box.r + P };
   const W = window.innerWidth, H = window.innerHeight;
-  // Text: right of a target in the left part of the screen (nav, feed, results); else
-  // above it (as on mobile), or below when there's no room above.
-  const side = b.x + b.w < W * 0.42 && b.x + b.w + 40 + 360 < W && (b.h > 60 || b.x < 60);
-  const textW = side ? Math.min(440, W - (b.x + b.w + R + 40) - 24) : Math.min(520, W - 48);
-  const tx = side ? b.x + b.w + R + 40 : Math.max(24, Math.min(W - textW - 24, b.x + b.w / 2 - textW / 2));
-  const above = b.y - R > 190;
-  const block: React.CSSProperties = side
-    ? { left: tx, top: Math.max(24, Math.min(H - 220, b.y + b.h / 2 - 70)), width: textW, textAlign: "left", alignItems: "flex-start" }
-    : above ? { left: tx, bottom: H - (b.y - R - 28), width: textW, textAlign: "center", alignItems: "center" }
-      : { left: tx, top: b.y + b.h + R + 28, width: textW, textAlign: "center", alignItems: "center" };
+  // Callout placement: right of a target in the left half of the screen, else below,
+  // above, then left. The pointer faces the target's middle.
+  const fits = { right: b.x + b.w + GAP + CARD_W < W - 16, below: b.y + b.h + GAP + cardH < H - 16, above: b.y - GAP - cardH > 16, left: b.x - GAP - CARD_W > 16 };
+  const side: "right" | "below" | "above" | "left" = fits.right && b.x + b.w / 2 < W * 0.5 ? "right" : fits.below ? "below" : fits.above ? "above" : fits.right ? "right" : "left";
+  const clampX = (x: number) => Math.max(16, Math.min(W - CARD_W - 16, x)), clampY = (y: number) => Math.max(16, Math.min(H - cardH - 16, y));
+  const pos = side === "right" ? { left: b.x + b.w + GAP, top: clampY(b.y + b.h / 2 - cardH / 2) }
+    : side === "left" ? { left: b.x - GAP - CARD_W, top: clampY(b.y + b.h / 2 - cardH / 2) }
+    : side === "below" ? { left: clampX(b.x + b.w / 2 - CARD_W / 2), top: b.y + b.h + GAP }
+    : { left: clampX(b.x + b.w / 2 - CARD_W / 2), top: b.y - GAP - cardH };
+  const arrow: React.CSSProperties = side === "right" || side === "left"
+    ? { top: Math.max(14, Math.min(cardH - 26, b.y + b.h / 2 - pos.top - 6)), [side === "right" ? "left" : "right"]: -6 }
+    : { left: Math.max(14, Math.min(CARD_W - 26, b.x + b.w / 2 - pos.left - 6)), [side === "below" ? "top" : "bottom"]: -6 };
+  const meta = task ? taskMeta(task) : null;
   const stop = (e: React.SyntheticEvent) => { e.stopPropagation(); };
-  const shield = (s: React.CSSProperties) => <div onMouseDown={stop} onPointerDown={stop} onClick={stop} style={{ position: "fixed", pointerEvents: "auto", backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)", transition: "all .38s cubic-bezier(.2,.8,.2,1)", ...s }} />;
+  const shield = (s: React.CSSProperties) => <div onMouseDown={stop} onPointerDown={stop} onClick={stop} style={{ position: "fixed", pointerEvents: "auto", ...s }} />;
   return (
     <div data-coach="" style={{ position: "fixed", inset: 0, zIndex: 900, pointerEvents: "none" }}>
-      {/* Dim with a hole: one rounded box with a giant shadow, so it glides between targets. */}
-      <div style={{ position: "fixed", left: b.x, top: b.y, width: b.w, height: b.h, borderRadius: b.r, boxShadow: "0 0 0 300vmax rgba(18,15,14,.74)", transition: "all .38s cubic-bezier(.2,.8,.2,1)", animation: "fadeIn .3s ease both" }} />
-      {/* The frosted ring round the target. */}
-      <div style={{ position: "fixed", left: b.x - R, top: b.y - R, width: b.w + 2 * R, height: b.h + 2 * R, boxSizing: "border-box", borderRadius: b.r + R, border: `${R}px solid rgba(253,252,252,.22)`, boxShadow: "inset 0 0 0 1.5px rgba(253,252,252,.9),0 0 0 1px rgba(253,252,252,.35),0 10px 30px rgba(0,0,0,.25)", transition: "all .38s cubic-bezier(.2,.8,.2,1)", animation: "fadeIn .3s ease both" }} />
-      {/* Clicks only reach the target. */}
-      {shield({ left: 0, top: 0, right: 0, height: Math.max(0, b.y - R) })}
-      {shield({ left: 0, top: b.y + b.h + R, right: 0, bottom: 0 })}
-      {shield({ left: 0, top: b.y - R, width: Math.max(0, b.x - R), height: b.h + 2 * R })}
-      {shield({ left: b.x + b.w + R, top: b.y - R, right: 0, height: b.h + 2 * R })}
-      <div key={cur.s.title} style={{ position: "fixed", display: "flex", flexDirection: "column", gap: 10, ...block, animation: "stepIn .4s cubic-bezier(.2,.8,.2,1) both" }}>
-        <span style={{ font: "300 36px/42px var(--font-sans)", letterSpacing: "-.6px", color: "rgb(253,252,252)", textWrap: "balance" } as React.CSSProperties}>{cur.s.title}</span>
-        <span style={{ font: "400 18px/26px var(--font-sans)", color: "rgba(253,252,252,.92)", textWrap: "pretty" } as React.CSSProperties}>{cur.s.sub}</span>
-        {cur.s.next && (
-          <button onClick={cur.s.onNext} style={{ marginTop: 8, height: 44, padding: "0 22px", border: "none", borderRadius: 9999, background: "rgb(253,252,252)", font: "700 15px/20px var(--font-sans)", color: INK, cursor: "pointer", pointerEvents: "auto" }}>{cur.s.next}</button>
+      {/* Dim with a hole (a white ring + soft halo round it): one rounded box with a giant
+          shadow, so it glides between targets. */}
+      <div style={{ position: "fixed", left: b.x, top: b.y, width: b.w, height: b.h, borderRadius: b.r, boxShadow: "0 0 0 2px rgb(253,252,252),0 0 0 7px rgba(253,252,252,.22),0 0 0 300vmax rgba(18,15,14,.52)", transition: "all .32s cubic-bezier(.2,.8,.2,1)", animation: "fadeIn .25s ease both" }} />
+      {/* Clicks only reach the target (and the callout). */}
+      {shield({ left: 0, top: 0, right: 0, height: Math.max(0, b.y) })}
+      {shield({ left: 0, top: b.y + b.h, right: 0, bottom: 0 })}
+      {shield({ left: 0, top: b.y, width: Math.max(0, b.x), height: b.h })}
+      {shield({ left: b.x + b.w, top: b.y, right: 0, height: b.h })}
+      <div ref={card} role="dialog" aria-live="polite"
+        style={{ position: "fixed", ...pos, width: CARD_W, boxSizing: "border-box", padding: 16, borderRadius: 16, background: "rgb(253,252,252)", boxShadow: "0 12px 32px rgba(0,0,0,.24)", pointerEvents: "auto", transition: "left .32s cubic-bezier(.2,.8,.2,1),top .32s cubic-bezier(.2,.8,.2,1)", animation: "fadeIn .25s ease both" }}>
+        <span aria-hidden style={{ position: "absolute", width: 12, height: 12, background: "rgb(253,252,252)", transform: "rotate(45deg)", borderRadius: 2, transition: "all .32s cubic-bezier(.2,.8,.2,1)", ...arrow }} />
+        {meta && (
+          <span style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <TaskIcon t={meta} size={22} />
+            <span style={{ flex: 1, minWidth: 0, font: "700 12px/16px var(--font-sans)", color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta.title}</span>
+            <EarnChip />
+          </span>
         )}
+        <span key={cur.s.title} style={{ position: "relative", display: "block", animation: "stepIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
+          <span style={{ display: "block", font: "700 15px/20px var(--font-sans)", color: INK }}>{cur.s.title}</span>
+          <span style={{ display: "block", marginTop: 4, font: "400 13px/19px var(--font-sans)", color: "rgb(77,71,69)", textWrap: "pretty" } as React.CSSProperties}>{cur.s.sub}</span>
+        </span>
+        <span style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 14 }}>
+          <button onClick={onExit} className="btn-ghost" style={{ height: 28, padding: "0 8px", margin: "0 0 0 -8px", border: "none", borderRadius: 8, background: "none", font: "400 13px/16px var(--font-sans)", color: MUTED, cursor: "pointer" }}>Exit guide</button>
+          {cur.s.next && <button onClick={cur.s.onNext} className="btn-dark" style={{ height: 32, padding: "0 14px", fontSize: 13 }}>{cur.s.next}</button>}
+        </span>
       </div>
-      <button onClick={onExit} style={{ position: "fixed", right: 24, top: 20, display: "flex", alignItems: "center", gap: 8, height: 36, padding: "0 14px", border: "none", borderRadius: 9999, background: "rgba(253,252,252,.14)", boxShadow: "inset 0 0 0 1px rgba(253,252,252,.24)", font: "400 14px/18px var(--font-sans)", color: "rgb(253,252,252)", cursor: "pointer", pointerEvents: "auto", animation: "fadeIn .3s ease both" }}>
-        Exit guide<span style={{ padding: "1px 6px", borderRadius: 6, background: "rgba(253,252,252,.16)", font: "700 11px/14px var(--font-sans)" }}>Esc</span>
-      </button>
     </div>
   );
 }
@@ -252,19 +266,15 @@ export function EarnedToast({ onNext }: { onNext: (t: Task) => void }) {
   if (!last) return null;
   const bonus = last.task === "bonus";
   return (
-    <div key={last.at} role="status" style={{ position: "fixed", left: "50%", bottom: 24, zIndex: 950, display: "flex", alignItems: "center", gap: 16, width: 560, maxWidth: "calc(100vw - 48px)", boxSizing: "border-box", padding: "16px 16px 16px 20px", borderRadius: 24, background: INK, boxShadow: "0 16px 40px rgba(18,15,14,.32)", animation: "bzToastIn .34s cubic-bezier(.2,.8,.2,1) both", transform: "translateX(-50%)" }}>
-      <Ring n={gs.n} size={56} />
-      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ font: "700 17px/22px var(--font-sans)", color: "rgb(253,252,252)" }}>+{last.credits} contact credits{bonus ? ", bonus included" : ""}</span>
-        <span style={{ font: "400 14px/19px var(--font-sans)", color: "rgba(253,252,252,.66)" }}>
+    <div key={last.at} role="status" style={{ position: "fixed", left: "50%", bottom: 24, zIndex: 950, display: "flex", alignItems: "center", gap: 12, width: 440, maxWidth: "calc(100vw - 48px)", boxSizing: "border-box", padding: "10px 10px 10px 12px", borderRadius: 16, background: INK, boxShadow: "0 12px 32px rgba(18,15,14,.3)", animation: "bzToastIn .3s cubic-bezier(.2,.8,.2,1) both", transform: "translateX(-50%)" }}>
+      <Ring n={gs.n} />
+      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <span style={{ font: "700 14px/18px var(--font-sans)", color: "rgb(253,252,252)" }}>+{last.credits} contact credits{bonus ? ", bonus included" : ""}</span>
+        <span style={{ font: "400 12px/16px var(--font-sans)", color: "rgba(253,252,252,.66)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {bonus ? `All ${TASKS.length} done · ${TOTAL + BONUS} contact credits earned` : `${gs.n} of ${TASKS.length} done${gs.next ? ` · Up next: ${gs.next.title}` : ""}`}
         </span>
       </span>
-      {gs.next ? (
-        <button onClick={() => { getStarted.dismissToast(); onNext(gs.next!.k); }} style={{ flex: "none", height: 44, padding: "0 20px", border: "none", borderRadius: 9999, background: "rgb(253,252,252)", font: "700 15px/20px var(--font-sans)", color: INK, cursor: "pointer", whiteSpace: "nowrap" }}>Next step</button>
-      ) : (
-        <button onClick={() => getStarted.dismissToast()} style={{ flex: "none", height: 44, padding: "0 20px", border: "none", borderRadius: 9999, background: "rgb(253,252,252)", font: "700 15px/20px var(--font-sans)", color: INK, cursor: "pointer" }}>Done</button>
-      )}
+      <button onClick={() => { getStarted.dismissToast(); if (gs.next) onNext(gs.next.k); }} style={{ flex: "none", height: 32, padding: "0 14px", border: "none", borderRadius: 9999, background: "rgb(253,252,252)", font: "700 13px/16px var(--font-sans)", color: INK, cursor: "pointer", whiteSpace: "nowrap" }}>{gs.next ? "Next step" : "Done"}</button>
     </div>
   );
 }

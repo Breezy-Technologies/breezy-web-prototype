@@ -330,11 +330,15 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                   <CopyLine text={l.owner.phone} reveal={reveal} delay={0} verified={isVerified(l.owner.phone, 0.7)} /><CopyLine text={l.owner.email} reveal={reveal} delay={160} verified={isVerified(l.owner.email, 0.55)} /><CopyLine text={l.owner.mail} muted reveal={reveal} delay={320} verified={isVerified(l.owner.mail, 0.8)} />
                   {cAcc !== "unlimited" && <CreditLine text={`Contact unlocked · ${ent.left("contacts")} of ${PRICING.allowance.contacts} left this month${ent.s.credits.contacts ? ` · ${ent.s.credits.contacts} credits` : ""}`} used />}
                 </div>
-              // Locked: the lines keep their shape, masked, so it's clear what unlocks.
+              // Locked (18 Nov comment): the owner's details are only fetched on Contact owner
+              // (each lookup is paid), so nothing real shows before: what unlocks is named, and
+              // a fixed placeholder sits blurred beside it. Same for every property; no fetch.
               : <div style={css("padding-left:70px;display:flex;flex-direction:column;gap:6px")}>
-                  {[mask(l.owner.phone, "phone"), mask(l.owner.email, "email"), "Mailing address"].map(t => (
-                    <span key={t} style={css("display:flex;align-items:center;gap:8px;height:22px;font:400 14px/20px var(--font-sans);color:rgb(129,117,111)")}>
-                      <i className="ph-bold ph-lock-simple" style={{ fontSize: 13, color: "rgb(147,89,75)" }} />{t}
+                  {LOCKED_LINES.map(([ic, label, dummy]) => (
+                    <span key={label} style={css("display:flex;align-items:center;gap:8px;height:22px;font:400 14px/20px var(--font-sans);color:rgb(129,117,111)")}>
+                      <i className={`ph ${ic}`} style={{ flex: "none", fontSize: 15, color: "rgb(147,89,75)" }} />
+                      <span style={{ flex: "none", width: 64 }}>{label}</span>
+                      <span aria-hidden style={{ filter: "blur(4.5px)", userSelect: "none", pointerEvents: "none", color: INK, opacity: .7, whiteSpace: "nowrap" }}>{dummy}</span>
                     </span>
                   ))}
                   <CreditLine text={cAcc === "allowance" ? `Uses 1 contact · ${ent.left("contacts")} of ${PRICING.allowance.contacts} left this month`
@@ -572,8 +576,8 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
    credit and how many remain, without a confirmation step. Fake balance for the
    session; each owner is charged once. */
 const unlockedOwners = new Set<string>();
-// "(•••) •••-4821", "j•••@gmail.com": enough to show what unlocks, not the value.
-const mask = (v: string, k: "phone" | "email") => k === "phone" ? `(•••) •••-${v.replace(/\D/g, "").slice(-4)}` : `${v[0]}•••@${v.split("@")[1] ?? "•••"}`;
+// Locked owner lines: what unlocks, with a fixed dummy value blurred beside it (never the owner's data).
+const LOCKED_LINES: [string, string, string][] = [["ph-phone", "Phone", "(323) 555-0134"], ["ph-envelope-simple", "Email", "owner.name@mail.com"], ["ph-map-pin", "Mailing", "1234 Sample Ave, Los Angeles"]];
 function CreditLine({ text, used }: { text: string; used?: boolean }) {
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 6, padding: used ? "6px 8px 0" : 0, font: "400 12px/16px var(--font-sans)", color: used ? "rgb(129,117,111)" : "rgb(98,90,89)", animation: used ? "fadeIn .4s ease .5s both" : undefined }}>

@@ -210,7 +210,7 @@ export function SearchBar({ prompt, value, areas, searching, onSearching, onComm
   };
   return (
     <div style={css("display:flex;flex-direction:column;gap:8px")}>
-      <div style={css(FIELD)}>
+      <div data-tour="search-field" style={css(FIELD)}>
         <div onClick={() => input.current?.focus()} style={css("flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 4px")}>
           {chips.map(c => (
             <span key={c.label} style={css("flex:none;max-width:100%;box-sizing:border-box;display:flex;align-items:center;gap:6px;height:32px;padding:0 4px 0 10px;border-radius:9999px;background:rgb(255,255,255);box-shadow:inset 0 0 0 1px rgba(18,18,18,.24);font:400 14px/18px var(--font-sans);color:rgb(18,18,18);white-space:nowrap;animation:fadeIn .2s ease both")}>
@@ -308,9 +308,9 @@ export function SearchBar({ prompt, value, areas, searching, onSearching, onComm
               <div style={css("height:32px;display:flex;align-items:center;padding:8px 24px")}>
                 <span style={css("flex:1;font:400 12px/16px var(--font-sans);color:rgb(77,71,69)")}>{res && res.q === q && !res.list.length ? "No matches" : fresh ? "Results suggested" : "Searching…"}</span>
               </div>
-              <div style={css("display:flex;flex-direction:column;gap:4px;padding:12px")}>
+              <div data-tour="search-results" style={css("display:flex;flex-direction:column;gap:4px;padding:12px")}>
                 {list.map(r => (
-                  <div key={r.id} onClick={() => pickPlace(r)} className="hover-row" style={css("display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 8px 4px 12px;border-radius:12px;cursor:pointer")}>
+                  <div key={r.id} data-kind={r.kind} onClick={() => pickPlace(r)} className="hover-row" style={css("display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 8px 4px 12px;border-radius:12px;cursor:pointer")}>
                     <span style={icon(isCity(r))} />
                     <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center")}>
                       <span style={css("font:400 14px/18px var(--font-sans);color:rgb(18,18,18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis")}>{hl(r.label)}</span>

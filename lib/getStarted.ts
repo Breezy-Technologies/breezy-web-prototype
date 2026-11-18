@@ -17,12 +17,16 @@ export type Stage =
   | "run"                        // comps: Get comps → review → Run comps
   | "contact";                   // contact: Contact owner
 
-export const TASKS: { k: Task; title: string; desc: string; art: string; create?: string }[] = [
-  { k: "buyer", title: "Set up a buyer search", desc: "Get notified about new matches for your clients", art: "/iso/alerts.png", create: "Buyer search" },
-  { k: "contact", title: "Contact an owner", desc: "Reveal the owner's phone, email and mailing address", art: "/iso/card-exp.png" },
-  { k: "comps", title: "Run your first comp", desc: "Price a home in under a minute", art: "/iso/comps.png", create: "Comps" },
-  { k: "underbuilt", title: "Find underbuilt lots", desc: "Spot lots with room to build more", art: "/iso/build.png", create: "Underbuilt" },
+export type TaskMeta = { k: Task; title: string; desc: string; icon: string; color: string; tint: string; create?: string };
+// Icons and colours follow the signal pin families (lib/pinColors.ts): alerts blue,
+// owner green, comps purple, underbuilt yellow.
+export const TASKS: TaskMeta[] = [
+  { k: "buyer", title: "Set up a buyer search", desc: "Get alerted to new matches for a client", icon: "ph-bell-simple-ringing", color: "rgb(44,136,181)", tint: "rgb(230,241,247)", create: "Buyer search" },
+  { k: "contact", title: "Contact an owner", desc: "Reveal an owner's phone, email and address", icon: "ph-address-book", color: "rgb(70,155,112)", tint: "rgb(229,243,236)" },
+  { k: "comps", title: "Run your first comp", desc: "Price a home in under a minute", icon: "ph-files", color: "rgb(105,76,113)", tint: "rgb(242,235,244)", create: "Comps" },
+  { k: "underbuilt", title: "Find underbuilt lots", desc: "Spot lots with room to build more", icon: "ph-hammer", color: "rgb(173,116,10)", tint: "rgb(250,242,224)", create: "Underbuilt" },
 ];
+export const taskMeta = (k: Task) => TASKS.find(t => t.k === k)!;
 export const PER_TASK = 10, BONUS = 5, TOTAL = TASKS.length * PER_TASK;
 export const taskOf = (createKey: string) => TASKS.find(t => t.create === createKey)?.k;
 

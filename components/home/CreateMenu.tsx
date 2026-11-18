@@ -168,7 +168,7 @@ function Launcher({ locked, onPick, onClose }: { locked: (k: string) => boolean;
 // "Make Breezy yours" (18 Nov): items not yet earned carry "+10"; the row opens the wizard.
 function Earn({ k }: { k: string }) {
   const gs = useGetStarted(), t = taskOf(k);
-  return t && !gs.isDone(t) ? <span style={{ marginLeft: "auto" }}><EarnChip short /></span> : null;
+  return t && !gs.isDone(t) ? <span style={{ marginLeft: "auto" }}><EarnChip /></span> : null;
 }
 function StartedRow({ onPick, pad = 0 }: { onPick: (k: string) => void; pad?: number }) {
   const gs = useGetStarted();

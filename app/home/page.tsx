@@ -204,7 +204,8 @@ export default function HomeWeb() {
   // coverage there's no property data: neutral "No property found" toast (sprint item).
   const pickAddress = (p: Place) => {
     sv.setActive(null);
-    compsNext.current = intentRef.current === "comps"; setIntent(null);
+    // Guided comps (18 Nov review): the property opens on its own; the guide then points at Get comps.
+    compsNext.current = intentRef.current === "comps" && getStarted.get().tour?.task !== "comps"; setIntent(null);
     getStarted.step("comps", "run", ["search", "create"]);
     const [lng, lat] = p.center;
     const l = isCovered(p) ? listingAt("addr:" + p.id, p.center, p.label.split(", ").slice(1, 2).join("")) : null;
@@ -503,9 +504,17 @@ export default function HomeWeb() {
       case "create": {
         const [k, label] = ITEM[tour.task]!;
         return [
-          { sel: `[data-tour="create-${k}"]`, title: T, sub: `Pick ${label}.` },
-          { sel: `[data-tour="create"]`, title: T, sub: "Everything you start in Breezy begins here, under Create." },
+          { sel: `[data-tour="create-${k}"]`, title: `Pick ${label}`, sub: ({ buyer: "You'll pick the area next, then your client's criteria.", comps: "You'll pick the property next, then Breezy finds its comps.", underbuilt: "You'll pick an area next, and see its lots with room to build." } as Record<string, string>)[tour.task] },
+          { sel: `[data-tour="create"]`, title: "Start from Create", sub: "Every search and report you make in Breezy starts here." },
         ];
+      }
+      case "search": {
+        // The search step (18 Nov review): the field first, then the suggestions once typed.
+        const q = { buyer: ["Where is your buyer looking?", "Search the neighbourhood, city or ZIP your client wants.", "Pick the area", "Choose one; you can add more areas after."],
+          underbuilt: ["Where should we look?", "Search a neighbourhood, city or ZIP.", "Pick the area", "We'll show its lots with room to build."],
+          comps: ["Enter the address", "Type the address of the home you want to price.", "Select the property", "Pick its address to open the property."] } as Record<string, string[]>;
+        const [t1, s1, t2, s2] = q[tour.task] || q.buyer;
+        return [{ sel: `[data-tour="search-results"]`, title: t2, sub: s2 }, { sel: `[data-tour="search-field"]`, title: t1, sub: s1 }];
       }
       case "filters": return [{ sel: `[data-tour="all-filters"]`, title: "Add your client's criteria", sub: "Set their budget, beds and must-haves.", next: "Next", onNext: () => getStarted.step("buyer", "save") }];
       case "save": return [{ sel: `[data-tour="save-search"]`, title: "Save this search", sub: "Get alerted the moment new matches come up." }];
@@ -517,14 +526,14 @@ export default function HomeWeb() {
         ];
       case "maxbuild": return [{ sel: `[data-tour="max-build"]`, title: "See its Max build", sub: "How much more the zoning lets you build on this lot.", next: "Done", onNext: () => getStarted.complete("underbuilt") }];
       case "run": return [
-        { sel: `[data-tour="comps-go"]`, title: "Run comps", sub: "Breezy finds and scores the closest matches." },
-        { sel: `[data-tour="get-comps"]`, title: "Get comps", sub: "Price this home against nearby sales." },
+        { sel: `[data-tour="comps-go"]`, title: "Let AI pick the comps", sub: "Breezy finds and scores the closest matches. The guide ends once your comps are in." },
+        { sel: `[data-tour="get-comps"]`, title: "Get comps", sub: "Price this home against recent sales nearby. Breezy checks its details with you, then finds the comps." },
       ];
       case "contact": return [{ sel: `[data-tour="contact-owner"]`, title: "Contact the owner", sub: "Reveal their phone, email and mailing address, before other agents call. Uses 1 contact." }];
       default: return null;
     }
   })();
-  const coachPaused = searching || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || exportOn || gs.open || !!areaComps;
+  const coachPaused = (searching && tour?.stage !== "search") || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || exportOn || gs.open || !!areaComps;
 
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
@@ -699,8 +708,8 @@ export default function HomeWeb() {
       {ss.modals}
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
-      <Coach steps={coachSteps} paused={coachPaused} onExit={getStarted.end} />
-      <Checklist onStart={startTask} />
+      <Coach steps={coachSteps} task={tour?.task} paused={coachPaused} onExit={getStarted.end} />
+      <Checklist left={navW + 12} onStart={startTask} />
       <EarnedToast onNext={startTask} />
     </>
   );
