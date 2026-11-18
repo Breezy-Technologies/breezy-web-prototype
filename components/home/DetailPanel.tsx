@@ -151,7 +151,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
   };
 
   const stats: [string, string, number][] = [[String(l.beds), "Bed", 56], [String(l.baths), "Bath", 64], [l.sqft.toLocaleString("en-US"), "ft² Home", 72], [String(l.lotAc), "/ac Lot", 72], ["$" + d.hoa, "/mo HOA", 72]];
-  const tiles: [string, string, string, string][] = [[`${maxBuild}%`, "Max\nbuild", "rgb(147,89,75)", "/ui/act-target.svg"], [profit > 0 ? shortPrice(profit) : "None", "Profit\npotential", "rgb(13,87,57)", "/ui/act-chart.svg"]];
+  const tiles: [string, string, string, string][] = [[`${maxBuild}%`, "Max build", "rgb(147,89,75)", "/ui/act-target.svg"], [profit > 0 ? shortPrice(profit) : "None", "Profit potential", "rgb(13,87,57)", "/ui/act-chart.svg"]];
   const typeImg = (F_TYPES.find(([k]) => k === l.ptype) || F_TYPES[0])[1];
 
   type SpecRow = { k: string; label: string; value: string; sub?: string; img?: string; ai?: string };
@@ -295,14 +295,16 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
               const fk = k.startsWith("Max") ? "ub" : "roi", a = tileAcc[fk];
               const hide = ent.s.lockStyle === "tile" && (a === "locked" || a === "plan" || a === "credit");
               return (
-              <button key={k} data-tour={k.startsWith("Max") ? "max-build" : undefined} className="dt-tile" onClick={() => onFlow?.(fk)} title={k.startsWith("Max") ? "Underbuilt analysis" : "Upside analysis"} style={css("flex:1;min-width:0;height:88px;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;padding:8px;border:none;border-radius:8px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
-                <span style={css("align-self:stretch;height:24px;display:flex;align-items:center;gap:4px")}>
-                  <span style={maskIco(ic, 16, c)} />
-                  <span style={{ ...css("font:400 16px/1.48 var(--font-sans);white-space:nowrap;color:" + c), ...(hide ? { filter: "blur(6px)", userSelect: "none" } : {}) }}>{hide ? (fk === "ub" ? "00%" : "$0.0m") : v}</span>
+              // 18 Nov comment: the quick estimate's composition. Icon + label left-aligned on
+              // top (usage chip on the right), the value under it in larger type, blurred while locked.
+              <button key={k} data-tour={k.startsWith("Max") ? "max-build" : undefined} className="dt-tile" onClick={() => onFlow?.(fk)} title={k.startsWith("Max") ? "Underbuilt analysis" : "Upside analysis"} style={css("flex:1;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:12px 12px 14px 14px;border:none;border-radius:16px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
+                <span style={css("height:24px;display:flex;align-items:center;gap:5px")}>
+                  <span style={maskIco(ic, 13, "rgb(129,117,111)")} />
+                  <span style={css("font:700 11px/14px var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:rgb(129,117,111);white-space:nowrap")}>{k}</span>
                   <span style={{ flex: 1 }} />
                   <UsageChip access={a} feature={fk === "ub" ? "maxBuild" : "roi"} />
                 </span>
-                <span style={css("flex:1;align-self:stretch;font:400 12px/1.48 var(--font-sans);letter-spacing:.25px;color:rgb(73,67,65);text-align:left;white-space:pre-line")}>{k}</span>
+                <span style={{ ...css("font:300 30px/1.1 var(--font-sans);letter-spacing:-.8px;white-space:nowrap;color:" + c), ...(hide ? { filter: "blur(9px)", userSelect: "none" } : {}) }} aria-hidden={hide || undefined}>{hide ? (fk === "ub" ? "64%" : "$1.2m") : v}</span>
               </button>
               );
             })}

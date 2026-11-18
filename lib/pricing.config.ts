@@ -71,6 +71,9 @@ export const PRICING = {
     neverTrial1: { label: "Breezy 1.0, never activated trial", trialDays: 30, card: true },
     paying1: { label: "Breezy 1.0, paying", billingDelayDays: 14, card: false },
   },
+  /** Trial-end reminders (the trial timeline in the offer sheet): an email and an in-app
+   *  notice this many days before the trial ends, then a last email the day before. */
+  trialReminders: { firstDaysBefore: 3, lastDaysBefore: 1 },
   /** Shown before a cancel is confirmed. */
   saveOffer: { price: usd(9.9), period: "month" as const },
 } as const;

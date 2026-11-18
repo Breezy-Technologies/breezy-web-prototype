@@ -31,7 +31,7 @@ import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
 import { AreaReport, ReportsSheet, useReports } from "@/components/home/Reports";
-import { Listing, OppType, listingAt } from "@/lib/fake";
+import { Listing, OppType, listingForAddress } from "@/lib/fake";
 import { Filters, SortKey, fDims, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, hashStr, pointInRings, ringBBox } from "@/lib/geo";
@@ -202,13 +202,14 @@ export default function HomeWeb() {
   };
   // An address suggestion opens that property on its own (`_openSolo`). Outside
   // coverage there's no property data: neutral "No property found" toast (sprint item).
-  const pickAddress = (p: Place) => {
+  const pickAddress = async (p: Place) => {
     sv.setActive(null);
     // Guided comps (18 Nov review): the property opens on its own; the guide then points at Get comps.
     compsNext.current = intentRef.current === "comps" && getStarted.get().tour?.task !== "comps"; setIntent(null);
     getStarted.step("comps", "run", ["search", "create"]);
     const [lng, lat] = p.center;
-    const l = isCovered(p) ? listingAt("addr:" + p.id, p.center, p.label.split(", ").slice(1, 2).join("")) : null;
+    // The parcel matching the address (house number + street), not just the nearest lot.
+    const l = isCovered(p) ? await listingForAddress("addr:" + p.id, p.name || p.label, p.center, p.label.split(", ").slice(1, 2).join("")) : null;
     if (!l) { compsNext.current = false; return showToast("No property found", "info"); }
     // A real lot keeps its own spot and address; a generated home takes the searched ones.
     openSavedProp(l.apn ? l : { ...l, lng, lat, addr: p.name });
@@ -537,15 +538,15 @@ export default function HomeWeb() {
 
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
-    { label: "Make Breezy yours: reset", icon: "ph-sparkle", run: () => { getStarted.reset(); getStarted.show(); } },
-    { label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } },
-    { label: "Snackbar: neutral", icon: "ph-info", run: () => showToast("No property found", "neutral") },
-    { label: "Snackbar: positive", icon: "ph-check-circle", run: () => showToast("Search saved", "positive") },
-    { label: "Snackbar: negative", icon: "ph-warning-circle", run: () => showToast("Couldn't save search. Try again.", "negative") },
-    { label: "Search: failed to load", icon: "ph-plugs", run: () => { closeDetail(); previewSearchState("failed"); } },
-    { label: "Search: timed out", icon: "ph-timer", run: () => { closeDetail(); previewSearchState("timeout"); } },
-    { label: "Clear recent searches", icon: "ph-clock-counter-clockwise", run: () => { closeDetail(); previewSearchState("empty"); } },
-    { label: "Property with no estimate", icon: "ph-lightning-slash", run: () => {
+    { group: "Onboarding & activation", label: "Make Breezy yours: reset", icon: "ph-sparkle", run: () => { getStarted.reset(); getStarted.show(); } },
+    { group: "Onboarding & activation", label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } },
+    { group: "Snackbars", label: "Snackbar: neutral", icon: "ph-info", run: () => showToast("No property found", "neutral") },
+    { group: "Snackbars", label: "Snackbar: positive", icon: "ph-check-circle", run: () => showToast("Search saved", "positive") },
+    { group: "Snackbars", label: "Snackbar: negative", icon: "ph-warning-circle", run: () => showToast("Couldn't save search. Try again.", "negative") },
+    { group: "Search states", label: "Search: failed to load", icon: "ph-plugs", run: () => { closeDetail(); previewSearchState("failed"); } },
+    { group: "Search states", label: "Search: timed out", icon: "ph-timer", run: () => { closeDetail(); previewSearchState("timeout"); } },
+    { group: "Search states", label: "Clear recent searches", icon: "ph-clock-counter-clockwise", run: () => { closeDetail(); previewSearchState("empty"); } },
+    { group: "Property", label: "Property with no estimate", icon: "ph-lightning-slash", run: () => {
       setSearching(false);
       const l = listings.find(x => x.noQe);
       if (l) return openListing(l.id);

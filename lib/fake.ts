@@ -12,12 +12,14 @@ const HEAT_BOX: BBox = (() => { const [x, y] = HEAT_AREA.center, dx = HEAT_AREA.
 
 export type OppType = "ub" | "drop" | "exp" | "roi" | "wd" | "stale";
 
+// `ic`: the same Phosphor icon as the signal's map marker (public/pins, RadarPin), so the
+// feed, filters and legends match the map (18 Nov comment).
 export const OPP: Record<OppType, { ic: string; lb: string; pl: string; col: string; why: string[] }> = {
-  ub: { ic: "hammer", lb: "Underbuilt", pl: "Underbuilt lots", col: "175,127,113", why: ["58% underbuilt · 4,280 ft² left to build", "42% underbuilt · 2,900 ft² left to build", "71% underbuilt · room for a second unit"] },
-  drop: { ic: "arrow-down", lb: "Price drop", pl: "Price drops", col: "174,106,91", why: ["10% price drop · $2.45m → $2.2m", "12% price drop in 2 weeks", "8% price drop · the second cut"] },
+  ub: { ic: "target", lb: "Underbuilt", pl: "Underbuilt lots", col: "175,127,113", why: ["58% underbuilt · 4,280 ft² left to build", "42% underbuilt · 2,900 ft² left to build", "71% underbuilt · room for a second unit"] },
+  drop: { ic: "trend-down", lb: "Price drop", pl: "Price drops", col: "174,106,91", why: ["10% price drop · $2.45m → $2.2m", "12% price drop in 2 weeks", "8% price drop · the second cut"] },
   exp: { ic: "hourglass-low", lb: "Just expired", pl: "Just expired", col: "191,160,151", why: ["Expired 9 days ago · not relisted", "Expired 3 days ago after 140 days", "Expired 6 days ago · no new agent"] },
-  roi: { ic: "trend-up", lb: "High ROI", pl: "High ROI", col: "147,89,75", why: ["59% ROI: 42% underbuilt, room to add value", "$1.8m profit after buying and rebuilding", "44% ROI: $44 back for every $100 spent"] },
-  wd: { ic: "sign-out", lb: "Withdrawn", pl: "Withdrawn", col: "160,120,108", why: ["Withdrawn 14 days ago after 94 days", "Withdrawn yesterday · no new agent"] },
+  roi: { ic: "chart-bar", lb: "High ROI", pl: "High ROI", col: "147,89,75", why: ["59% ROI: 42% underbuilt, room to add value", "$1.8m profit after buying and rebuilding", "44% ROI: $44 back for every $100 spent"] },
+  wd: { ic: "arrow-u-down-left", lb: "Withdrawn", pl: "Withdrawn", col: "160,120,108", why: ["Withdrawn 14 days ago after 94 days", "Withdrawn yesterday · no new agent"] },
   stale: { ic: "clock-countdown", lb: "Stale listing", pl: "Stale listings", col: "171,162,157", why: ["On market 170 days · 2 price drops", "On market 212 days · still active"] },
 };
 export const OPP_TYPES = Object.keys(OPP) as OppType[];
@@ -173,6 +175,41 @@ export function listingAt(key: string, p: LngLat, cityLabel = ""): Listing | und
   const hit = lotAt(p);
   if (hit) return lotListing(hit.l, hit.i);
   return makeListings(key, p, [p[0] - 5e-4, p[1] - 5e-4, p[0] + 5e-4, p[1] + 5e-4], null, 1, cityLabel)[0];
+}
+
+/* The property for a searched address (18 Nov review: "open the matching parcel").
+   The geocoded point often lands in the street, so the nearest lot was often a
+   neighbour. Match the address itself first (house number + street name): Pedro's
+   lots, then the county parcels in the heat circle (public/data/sl-parcels.json,
+   loaded once on demand; the map's parcel layer uses the same file), then the parcel
+   whose outline holds the point, and only then the old nearest-lot / generated home. */
+const DIRS = new Set(["n", "s", "e", "w", "north", "south", "east", "west"]);
+function addrKey(a: string): string | null {
+  const t = a.toLowerCase().replace(/[.,#]/g, " ").split(/\s+/).filter(Boolean);
+  const num = t[0] && /^\d+[a-z]?$/.test(t[0]) ? t[0] : null;
+  if (!num) return null;
+  const street = t.slice(1).find(w => !DIRS.has(w));
+  return street ? `${num} ${street}` : null;
+}
+type CountyFeature = { id: number; properties: CountyProps; geometry: { type: string; coordinates: any } };
+let countyFC: Promise<CountyFeature[]> | null = null;
+const countyFeatures = () => countyFC ??= fetch("/data/sl-parcels.json").then(r => r.json()).then(j => j.features as CountyFeature[]).catch(() => { countyFC = null; return []; });
+const outerRing = (g: CountyFeature["geometry"]): [number, number][] => (g.type === "MultiPolygon" ? g.coordinates[0][0] : g.coordinates[0]) || [];
+const ringMid = (r: [number, number][]): LngLat => { let x = 0, y = 0; r.forEach(p => { x += p[0]; y += p[1]; }); return [x / (r.length || 1), y / (r.length || 1)]; };
+const near = (a: LngLat, b: LngLat, m: number) => Math.hypot((a[0] - b[0]) * metersPerDegLng(b[1]), (a[1] - b[1]) * metersPerDegLat) < m;
+export async function listingForAddress(key: string, label: string, p: LngLat, cityLabel = ""): Promise<Listing | undefined> {
+  const k = addrKey(label);
+  if (k) {
+    const i = LOTS.findIndex(l => near(l.c, p, 400) && addrKey(l.addr) === k);
+    if (i >= 0) return lotListing(LOTS[i], i);
+  }
+  if (inBox(p, HEAT_BOX)) {
+    const fs = await countyFeatures();
+    const hit = (k && fs.find(f => f.properties.a && addrKey(f.properties.a) === k && near(ringMid(outerRing(f.geometry)), p, 400)))
+      || fs.find(f => f.properties.s && pointInRings(p, [outerRing(f.geometry)]));
+    if (hit) { const r = outerRing(hit.geometry); return countyListing(hit.id, hit.properties, ringMid(r), r); }
+  }
+  return listingAt(key, p, cityLabel);
 }
 
 // Each lot has a fixed rank, so any search over the same streets shows the same homes.

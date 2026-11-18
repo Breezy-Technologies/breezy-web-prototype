@@ -3,7 +3,7 @@
 // (18 Nov review: "don't stretch the mobile screens"): desktop type sizes (12–16 px),
 // small tinted Phosphor icon tiles instead of the big isometric art, panels anchored to
 // what opened them instead of full-screen sheets.
-// - GetStartedBanner: a compact dark card at the top of For you (n/4 ring).
+// - GetStartedBanner: a compact dark card (no longer placed: the entry is the nav's Getting started row).
 // - GetStartedRow / EarnChip: the same progress inside the Create menu, "+10" on each item not yet earned.
 // - Checklist: the wizard as a panel beside the side nav (a product "getting started" list).
 // - Coach: the guided version: the page dims, the next thing to press is ringed, and a small
@@ -19,8 +19,8 @@ const BROWN = "linear-gradient(160deg,rgb(116,78,65) 0%,rgb(78,52,44) 60%,rgb(62
 const POP = "inset 0 0 0 1px rgba(13,12,12,.08),0 12px 32px rgba(24,14,10,.18)";
 
 /** The n / 4 progress ring. */
-export function Ring({ n, of = TASKS.length, size = 36, dark = true }: { n: number; of?: number; size?: number; dark?: boolean }) {
-  const w = size >= 44 ? 4 : 3, r = (size - w) / 2, c = 2 * Math.PI * r, gap = of > 1 ? 4 : 0, seg = c / of;
+export function Ring({ n, of = TASKS.length, size = 36, dark = true, label = true }: { n: number; of?: number; size?: number; dark?: boolean; label?: boolean }) {
+  const w = size >= 44 ? 4 : size < 28 ? 2.5 : 3, r = (size - w) / 2, c = 2 * Math.PI * r, gap = of > 1 ? 4 : 0, seg = c / of;
   return (
     <span style={{ position: "relative", flex: "none", width: size, height: size, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <svg width={size} height={size} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
@@ -30,7 +30,7 @@ export function Ring({ n, of = TASKS.length, size = 36, dark = true }: { n: numb
             strokeDasharray={`${seg - gap} ${c - seg + gap}`} strokeDashoffset={-i * seg - gap / 2} style={{ transition: "stroke .4s" }} />
         ))}
       </svg>
-      <span style={{ font: `700 ${size >= 44 ? 13 : 10}px/1 var(--font-sans)`, color: dark ? "rgb(253,252,252)" : INK }}>{n}/{of}</span>
+      {label && <span style={{ font: `700 ${size >= 44 ? 13 : 10}px/1 var(--font-sans)`, color: dark ? "rgb(253,252,252)" : INK }}>{n}/{of}</span>}
     </span>
   );
 }
@@ -101,10 +101,13 @@ export function Checklist({ left, onStart }: { left: number; onStart: (t: Task) 
     return () => { window.removeEventListener("keydown", k); window.removeEventListener("mousedown", out); };
   }, [gs.open]);
   if (!gs.open) return null;
+  // Beside the nav's Getting started row (its top), or under Create when it isn't there.
+  const anchor = typeof document !== "undefined" ? document.querySelector("[data-tour=getting-started]")?.getBoundingClientRect() : null;
+  const top = Math.max(12, Math.min(anchor ? anchor.top - 8 : 72, window.innerHeight - 560));
   const sub = gs.all ? `All done. You earned ${TOTAL + BONUS} owner contacts.` : gs.n ? `${gs.n} of ${TASKS.length} done · ${TOTAL - gs.n * PER_TASK} more contacts to earn` : `Do ${TASKS.length} quick things and earn up to ${TOTAL + BONUS} owner contacts.`;
   return (
     <div data-gs="" role="dialog" aria-label="Make Breezy yours"
-      style={{ position: "fixed", left, top: 72, zIndex: 700, width: 360, maxHeight: "calc(100vh - 88px)", overflowY: "auto", boxSizing: "border-box", borderRadius: 20, background: "var(--paper)", boxShadow: POP, animation: "panelDrop .22s cubic-bezier(.2,.8,.2,1) both" }}>
+      style={{ position: "fixed", left, top, zIndex: 700, width: 360, maxHeight: `calc(100vh - ${top + 16}px)`, overflowY: "auto", boxSizing: "border-box", borderRadius: 20, background: "var(--paper)", boxShadow: POP, animation: "panelDrop .22s cubic-bezier(.2,.8,.2,1) both" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "16px 12px 12px 16px" }}>
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ font: "700 16px/22px var(--font-sans)", color: INK }}>Make Breezy yours</span>

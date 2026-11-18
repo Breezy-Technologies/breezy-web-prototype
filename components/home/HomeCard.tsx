@@ -12,7 +12,6 @@ import { ALERT_DEFS, AlertSet, CLIENT_PHOTOS, SavedProp, SavedSearch, forTxt, in
 import { PickedFooter } from "./Saved";
 import { ForYouFeed } from "./ForYouFeed";
 import { ColsToggle } from "./LeftPanel";
-import { GetStartedBanner } from "./GetStarted";
 import { NewTag, UnreadDot } from "../Unread";
 import { userLocationLabel } from "@/lib/places";
 
@@ -251,7 +250,6 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
           </div>
           <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: tab === "For you" ? "0 16px 16px" : "0 24px" }}>
             {tab === "For you" && <>
-              <GetStartedBanner />
               {forYouList}
             </>}
             {tab === "Searches" && <>
@@ -302,7 +300,7 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
             <Tabs tab={fullTab} onPick={setFullTab} bellS={bellS} bellP={bellP} />
           </div>
           <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: "0 24px 24px", animation: "hcListIn .5s cubic-bezier(.2,.8,.2,1) .08s both" }}>
-            {fullTab === "For you" && <><GetStartedBanner />{forYouList}</>}
+            {fullTab === "For you" && forYouList}
             {fullTab === "Searches" && searchList(searches, true)}
             {fullTab === "Properties" && propList(props, true)}
           </div>

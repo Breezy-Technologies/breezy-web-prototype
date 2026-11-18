@@ -131,13 +131,14 @@ function OfferSheet({ onClose, onDone, feature, title, kicker }: { onClose: () =
           )}
           <span style={{ font: "400 40px/1.08 var(--font-sans)", letterSpacing: "-1.2px", color: INK, textWrap: "balance" } as React.CSSProperties}>{head}</span>
           <span style={{ font: "400 16px/23px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>{sub}</span>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+          {(win || trialAgain) && <TrialTimeline days={days} card={!!win} back={!!win} />}
+          {!(win || trialAgain) && <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
             <span style={{ font: "400 30px/1 var(--font-sans)", letterSpacing: "-.8px", color: INK }}>{money(P.price)}</span>
             <span style={{ font: "400 15px/20px var(--font-sans)", color: MUTED }}>/{P.period}{win || trialAgain ? " after the trial" : ""}</span>
             <s style={{ font: "400 15px/20px var(--font-sans)", color: "rgb(150,140,136)" }}>{money(P.was, P.period)}</s>
             <span style={{ alignSelf: "center", height: 22, padding: "0 8px", display: "flex", alignItems: "center", borderRadius: 9999, background: "rgb(255,209,41)", font: "700 11px/14px var(--font-sans)", color: INK }}>{P.badge}</span>
-          </div>
-          <span style={{ flex: 1, minHeight: 24 }} />
+          </div>}
+          <span style={{ flex: 1, minHeight: 8 }} />
           <button onClick={go} disabled={busy} style={{ ...btnPrimary, alignSelf: "stretch", height: 52 }}>
             {busy && <i className="ph-bold ph-circle-notch" style={{ animation: "spin .8s linear infinite" }} />}{busy ? "Starting" : cta}
           </button>
@@ -165,6 +166,50 @@ function OfferSheet({ onClose, onDone, feature, title, kicker }: { onClose: () =
       </div>
     </div>,
     document.body,
+  );
+}
+
+/* ---------- Trial timeline (18 Nov review, after the NYT trial screen) ----------
+   On every "Start free trial" path: what happens and when, so the end of the trial
+   and the first charge are never a surprise. Today (full access) → a reminder email
+   and in-app notice (PRICING.trialReminders) → the last email → the day it ends, with
+   the price. Without a card (new 2.0 users) nothing is charged until one is added. */
+function TrialTimeline({ days, card, back }: { days: number; card: boolean; back: boolean }) {
+  const R = PRICING.trialReminders, A = PRICING.allowance;
+  const at = (d: number) => new Date(Date.now() + d * 864e5).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const steps: { t: string; d: React.ReactNode; done?: boolean; now?: boolean; icon?: string }[] = [
+    { t: back ? "Welcome back" : "Account created", d: back ? "Your saved searches, properties and reports are still here." : "Your Breezy account is ready.", done: true },
+    { t: "Today", d: `Every ${P.name} feature for ${days} days, free: unlimited comps, ${A.maxBuild} Max Build and ${A.roi} ROI reports, ${A.contacts} owner contacts.`, now: true },
+    { t: `${at(days - R.firstDaysBefore)} · ${R.firstDaysBefore} days before`, d: "We email you and show a notice in Breezy that your trial ends soon, with what you've used.", icon: "ph-envelope-simple" },
+    { t: `${at(days - R.lastDaysBefore)} · the day before`, d: card ? `A last email with the date and amount of your first charge.` : "A last email. Add a card to keep going; nothing changes until you do.", icon: "ph-bell-simple" },
+    { t: `${at(days)} · trial ends`, icon: "ph-credit-card", d: <>
+        <s style={{ color: "rgb(150,140,136)" }}>{money(P.was)}</s> <b style={{ fontWeight: 700, color: INK }}>{money(P.price, P.period)}</b>{" "}
+        {card ? "billed monthly from today. Cancel before this date and you won't be charged." : "once you add a card. No card, no charge: your account stays, the Pro features lock."}
+      </> },
+  ];
+  return (
+    <div style={{ position: "relative", marginTop: 10, padding: "22px 20px 6px", borderRadius: 16, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.14)" }}>
+      <span style={{ position: "absolute", left: "50%", top: 0, transform: "translate(-50%,-50%)", height: 24, padding: "0 10px", display: "flex", alignItems: "center", borderRadius: 9999, background: PAPER, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.6)", font: "700 11px/14px var(--font-sans)", letterSpacing: ".06em", textTransform: "uppercase", color: INK, whiteSpace: "nowrap" }}>{P.badge}</span>
+      {steps.map((x, i) => {
+        const last = i === steps.length - 1;
+        return (
+          <div key={x.t} style={{ display: "flex", gap: 12 }}>
+            {/* the rail: a filled check, then rings; solid up to today, thin after */}
+            <span style={{ flex: "none", width: 18, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <span style={{ flex: "none", width: 18, height: 18, marginTop: 1, borderRadius: 9999, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center",
+                background: x.done ? INK : PAPER, boxShadow: `inset 0 0 0 ${x.done ? 0 : x.now ? 2.5 : 1.5}px ${x.now ? INK : "rgb(120,112,108)"}` }}>
+                {x.done && <i className="ph-bold ph-check" style={{ fontSize: 10, color: PAPER }} />}
+              </span>
+              {!last && <span style={{ flex: 1, width: i < 1 ? 2 : 1, margin: "4px 0", background: i < 1 ? INK : "rgb(170,162,158)" }} />}
+            </span>
+            <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2, paddingBottom: last ? 14 : 16 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, font: "700 14px/18px var(--font-sans)", color: INK }}>{x.icon && <i className={`ph ${x.icon}`} style={{ fontSize: 14, color: MUTED }} />}{x.t}</span>
+              <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>{x.d}</span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

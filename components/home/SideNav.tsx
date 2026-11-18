@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { billing, useEntitlements } from "@/lib/billing";
 import { AllowanceRing, BillingDevPanel, TrialCard } from "../billing/Paywall";
 import { CreateButton, CreateStyle } from "./CreateMenu";
+import { Ring } from "./GetStarted";
+import { getStarted, useGetStarted } from "@/lib/getStarted";
 
 const MAIN: [string, string][] = [["Map", "/nav/map-iso.png"], ["Comps", "/nav/comps-iso.png"], ["Underbuilt", "/nav/radar.png"], ["AI Notes", "/nav/ai-notes-new.svg"], ["Assistant", "/nav/assistant.png"], ["Inman News", "ph-newspaper"]];
 // Plan-gated places (Nimbus pricing): a small lock shows on them while no trial / plan is active.
@@ -61,7 +63,8 @@ function PlaceRow({ k, ic, on, expanded, onPick, light, locked }: { k: string; i
   );
 }
 
-export type DevAction = { label: string; icon: string; run: () => void };
+/** A Dev menu action; `group` is its category (the menu lists categories, each opening a submenu). */
+export type DevAction = { label: string; icon: string; run: () => void; group?: string };
 
 export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, dev = [] }: { expanded: boolean; onToggle: () => void; active?: string; onPick?: (k: string) => void; userName: string; dev?: DevAction[] }) {
   const [navStyle, setNavStyle] = useNavStyle();
@@ -69,10 +72,10 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
   const lockOf = (k: string) => !planOn && GATED.has(k);
   const [planDev, setPlanDev] = useState(false);
   const devAll: DevAction[] = [
-    { label: "Plan state…", icon: "ph-credit-card", run: () => setPlanDev(true) },
-    { label: `Unlimited (internal): ${bill.unlimited ? "on" : "off"}`, icon: "ph-infinity", run: () => billing.set({ unlimited: !bill.unlimited }) },
     ...dev,
-    ...NAV_STYLES.map(([k, label, icon]) => ({ label: `Side nav: ${label}${k === navStyle ? " ✓" : ""}`, icon, run: () => setNavStyle(k) }))];
+    { group: "Plan & billing", label: "Plan state…", icon: "ph-credit-card", run: () => setPlanDev(true) },
+    { group: "Plan & billing", label: `Unlimited (internal): ${bill.unlimited ? "on" : "off"}`, icon: "ph-infinity", run: () => billing.set({ unlimited: !bill.unlimited }) },
+    ...NAV_STYLES.map(([k, label, icon]) => ({ group: "Side nav", label: `${label}${k === navStyle ? " ✓" : ""}`, icon, run: () => setNavStyle(k) }))];
   return (
     <nav style={{ position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 80, width: expanded ? NAV_W.expanded : NAV_W.collapsed, display: "flex", flexDirection: "column", background: "var(--nav-bg)", overflow: "hidden", transition: "width .45s cubic-bezier(.2,.8,.2,1)" }}>
       <div style={{ flex: "none", height: 72, display: "flex", alignItems: "center", gap: 6, padding: "0 8px", whiteSpace: "nowrap" }}>
@@ -87,10 +90,12 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
           <div style={{ padding: "2px 0 10px" }}>
             <CreateButton variant={navStyle.slice(7) as CreateStyle} expanded={expanded} navW={expanded ? NAV_W.expanded : NAV_W.collapsed} locked={lockOf} onPick={k => onPick?.(k)} />
           </div>
+          <GettingStartedRow expanded={expanded} />
           {PLACES.map(([k, ic]) => <PlaceRow key={k} k={k} ic={ic} on={k === active} expanded={expanded} onPick={onPick} light locked={lockOf(k)} />)}
         </div>
       ) : navStyle === "actions" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: 8 }}>
+          <GettingStartedRow expanded={expanded} />
           {ACTIONS.map(([k, label, ic]) => (
             // An action: a plain row with a verb, like Claude's "New chat". No selected state.
             <button key={k} data-tour={"create-" + k} title={label} onClick={() => onPick?.(k)} className="btn-ghost"
@@ -144,23 +149,54 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
   );
 }
 
-// Developer menu: a footer button that opens a small popover beside the nav.
-// Prototype-only tools (e.g. restarting onboarding) live here.
+/* "Getting started" (18 Nov review, like Mixpanel / June's sidebars): the Make Breezy
+   yours entry lives in the nav, under Create, until every task is done: a progress ring
+   and the count; collapsed, just the ring. It opens the checklist beside the nav. A
+   hairline separates it from the places. */
+function GettingStartedRow({ expanded }: { expanded: boolean }) {
+  const gs = useGetStarted();
+  if (gs.all) return null;
+  return (
+    <>
+      <button data-gs-open="" data-tour="getting-started" title="Getting started" onClick={() => getStarted.show(!gs.open)} className={gs.open ? "" : "btn-ghost"}
+        style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", background: gs.open ? "rgba(13,12,12,.07)" : undefined }}>
+        <span style={{ flex: "none", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}><Ring n={gs.n} size={24} dark={false} label={false} /></span>
+        {expanded && <>
+          <span style={{ flex: 1, textAlign: "left", font: "400 15px/20px var(--font-sans)", color: "var(--ink)" }}>Getting started</span>
+          <span style={{ font: "400 13px/16px var(--font-sans)", color: "rgb(129,117,111)", marginRight: 4 }}>{gs.n}/4</span>
+        </>}
+      </button>
+      <span style={{ height: 1, margin: "8px 6px", background: "rgba(13,12,12,.1)" }} />
+    </>
+  );
+}
+
+// Developer menu: a footer button that opens a small popover beside the nav. Actions are
+// grouped by category (18 Nov review): the popover lists the categories, and hovering
+// (or clicking) one opens its actions in a submenu beside it.
 function DevMenu({ actions, expanded }: { actions: DevAction[]; expanded: boolean }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ left: 0, bottom: 0 });
+  const [cat, setCat] = useState<{ g: string; top: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setCat(null); return; }
     const close = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest("[data-devmenu]")) setOpen(false); };
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("mousedown", close); window.addEventListener("keydown", esc);
+    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("keydown", esc); };
   }, [open]);
   const toggle = () => {
     const r = btn.current?.getBoundingClientRect();
     if (r) setPos({ left: (expanded ? 239 : 56) + 8, bottom: window.innerHeight - r.bottom });
     setOpen(o => !o);
   };
+  const groups: string[] = [];
+  actions.forEach(a => { const g = a.group || "Other"; if (!groups.includes(g)) groups.push(g); });
+  const ICON: Record<string, string> = { "Onboarding & activation": "ph-rocket-launch", "Plan & billing": "ph-credit-card", "Search states": "ph-magnifying-glass", Snackbars: "ph-chat-centered-text", Property: "ph-house-line", "Side nav": "ph-sidebar-simple", Other: "ph-dots-three" };
+  const panel: React.CSSProperties = { position: "fixed", zIndex: 200, display: "flex", flexDirection: "column", padding: 6, borderRadius: 14, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.12),0 12px 32px rgba(24,14,10,.16)" };
+  const row: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, height: 34, padding: "0 10px", border: "none", borderRadius: 8, font: "400 13px/16px var(--font-sans)", color: "var(--ink)", cursor: "pointer", textAlign: "left", whiteSpace: "nowrap" };
+  const items = cat ? actions.filter(a => (a.group || "Other") === cat.g) : [];
   return (
     <div data-devmenu="">
       <button ref={btn} title="Developer" onClick={toggle} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", height: 40, padding: 0, border: "none", whiteSpace: "nowrap" }}>
@@ -170,11 +206,26 @@ function DevMenu({ actions, expanded }: { actions: DevAction[]; expanded: boolea
         {expanded && <span style={{ font: "700 15px/20px var(--font-sans)", color: "rgb(77,71,69)" }}>Developer</span>}
       </button>
       {open && (
-        <div style={{ position: "fixed", left: pos.left, bottom: pos.bottom, zIndex: 200, width: 220, display: "flex", flexDirection: "column", padding: 6, borderRadius: 16, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.12),0 12px 32px rgba(24,14,10,.16)", animation: "panelDrop .2s cubic-bezier(.2,.8,.2,1) both" }}>
-          <span style={{ padding: "6px 10px 4px", font: "700 12px/16px var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)" }}>Developer</span>
-          {actions.map(a => (
-            <button key={a.label} onClick={() => { setOpen(false); a.run(); }} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 10, height: 40, padding: "0 10px", border: "none", borderRadius: 10, font: "400 14px/18px var(--font-sans)", color: "var(--ink)", cursor: "pointer", textAlign: "left", whiteSpace: "nowrap" }}>
-              <i className={`ph-bold ${a.icon}`} style={{ fontSize: 16 }} />{a.label}
+        <div style={{ ...panel, left: pos.left, bottom: pos.bottom, width: 236, animation: "panelDrop .2s cubic-bezier(.2,.8,.2,1) both" }}>
+          <span style={{ padding: "6px 10px 4px", font: "700 11px/14px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: "rgb(129,117,111)" }}>Developer</span>
+          {groups.map(g => (
+            <button key={g} className={cat?.g === g ? "" : "btn-ghost"}
+              onMouseEnter={e => setCat({ g, top: (e.currentTarget as HTMLElement).getBoundingClientRect().top - 6 })}
+              onClick={e => setCat({ g, top: (e.currentTarget as HTMLElement).getBoundingClientRect().top - 6 })}
+              style={{ ...row, background: cat?.g === g ? "rgba(13,12,12,.06)" : undefined }}>
+              <i className={`ph ${ICON[g] || "ph-dots-three"}`} style={{ fontSize: 16 }} />
+              <span style={{ flex: 1 }}>{g}</span>
+              <span style={{ font: "400 12px/16px var(--font-sans)", color: "rgb(129,117,111)" }}>{actions.filter(a => (a.group || "Other") === g).length}</span>
+              <i className="ph-bold ph-caret-right" style={{ fontSize: 11, color: "rgb(129,117,111)" }} />
+            </button>
+          ))}
+        </div>
+      )}
+      {open && cat && (
+        <div key={cat.g} style={{ ...panel, left: pos.left + 236 + 6, top: Math.min(cat.top, window.innerHeight - 16 - (items.length * 34 + 12)), minWidth: 220, animation: "fadeIn .12s ease both" }}>
+          {items.map(a => (
+            <button key={a.label} onClick={() => { setOpen(false); a.run(); }} className="btn-ghost" style={row}>
+              <i className={`ph-bold ${a.icon}`} style={{ fontSize: 15 }} />{a.label}
             </button>
           ))}
         </div>

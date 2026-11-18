@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { getStarted, taskOf, useGetStarted } from "@/lib/getStarted";
-import { EarnChip, GetStartedRow } from "./GetStarted";
+import { taskOf, useGetStarted } from "@/lib/getStarted";
+import { EarnChip } from "./GetStarted";
 
 /* New navigation exploration (14 Nov, agents' feedback: "where do I create something?").
    One constant primary Create action at the top of the side nav, like Drive's "New",
@@ -93,7 +93,6 @@ function MenuPop({ left, top, locked, onPick }: { left: number; top: number; loc
   const groups = ["Search", "Reports"] as const;
   return (
     <div data-create="" style={{ position: "fixed", left, top, zIndex: 200, width: 340, padding: 6, borderRadius: 18, background: "var(--paper)", boxShadow: POP_SHADOW, animation: "panelDrop .2s cubic-bezier(.2,.8,.2,1) both" }}>
-      <StartedRow onPick={onPick} />
       {groups.map((g, gi) => (
         <div key={g}>
           {gi > 0 && <span style={{ display: "block", height: 1, margin: "6px 10px", background: "rgba(13,12,12,.08)" }} />}
@@ -123,7 +122,6 @@ function FlyoutPanel({ left, top, locked, onPick }: { left: number; top: number;
         <span style={{ font: "700 20px/26px var(--font-sans)", color: "var(--ink)" }}>Create</span>
         <span style={{ display: "flex", alignItems: "center", gap: 6, font: "400 13px/17px var(--font-sans)", color: "rgb(98,90,89)" }}>Open anytime with <Kbd>C</Kbd></span>
       </div>
-      <StartedRow onPick={onPick} pad={14} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
         {CREATE_ITEMS.map((i, n) => (
           <button key={i.k} data-tour={"create-" + i.k} onClick={() => onPick(i.k)} className="create-card" style={{ display: "flex", flexDirection: "column", padding: 0, border: "none", borderRadius: 18, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.1)", cursor: "pointer", textAlign: "left", overflow: "hidden", animation: `riseIn .35s cubic-bezier(.2,.8,.2,1) ${n * 50}ms both` }}>
@@ -150,7 +148,6 @@ function Launcher({ locked, onPick, onClose }: { locked: (k: string) => boolean;
         <button onClick={onClose} title="Close" className="btn-ghost" style={{ position: "absolute", right: 16, top: 16, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-x" style={{ fontSize: 18 }} /></button>
         <div style={{ textAlign: "center", font: "700 30px/38px var(--font-sans)", color: "var(--ink)", letterSpacing: "-.4px" }}>What do you want to start?</div>
         <div style={{ textAlign: "center", marginTop: 6, font: "400 15px/20px var(--font-sans)", color: "rgb(98,90,89)" }}>Pick one. You can always come back here with <Kbd>C</Kbd></div>
-        <div style={{ marginTop: 20 }}><StartedRow onPick={onPick} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginTop: 20 }}>
           {CREATE_ITEMS.map((i, n) => (
             <button key={i.k} data-tour={"create-" + i.k} onClick={() => onPick(i.k)} className="create-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "20px 16px 18px", border: "none", borderRadius: 22, background: i.tint, cursor: "pointer", animation: `riseIn .4s cubic-bezier(.2,.8,.2,1) ${80 + n * 60}ms both` }}>
@@ -165,13 +162,8 @@ function Launcher({ locked, onPick, onClose }: { locked: (k: string) => boolean;
   );
 }
 
-// "Make Breezy yours" (18 Nov): items not yet earned carry "+10"; the row opens the wizard.
+// "Make Breezy yours" (18 Nov): items not yet earned carry "+10" (the wizard opens from the nav's Getting started).
 function Earn({ k }: { k: string }) {
   const gs = useGetStarted(), t = taskOf(k);
   return t && !gs.isDone(t) ? <span style={{ marginLeft: "auto" }}><EarnChip /></span> : null;
-}
-function StartedRow({ onPick, pad = 0 }: { onPick: (k: string) => void; pad?: number }) {
-  const gs = useGetStarted();
-  if (gs.all) return null;
-  return <div style={{ marginBottom: pad || 6 }}><GetStartedRow onOpen={() => { onPick(""); getStarted.show(); }} /></div>;
 }
