@@ -93,7 +93,7 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
         <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: 8 }}>
           {ACTIONS.map(([k, label, ic]) => (
             // An action: a plain row with a verb, like Claude's "New chat". No selected state.
-            <button key={k} title={label} onClick={() => onPick?.(k)} className="btn-ghost"
+            <button key={k} data-tour={"create-" + k} title={label} onClick={() => onPick?.(k)} className="btn-ghost"
               style={{ display: "flex", alignItems: "center", gap: 12, height: 40, padding: "0 6px", border: "none", borderRadius: 12, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden" }}>
               <NavIcon k={k} ic={ic} locked={lockOf(k)} />
               {expanded && <span style={{ font: "400 15px/20px var(--font-sans)", color: "var(--ink)" }}>{label}</span>}

@@ -37,6 +37,8 @@ import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlac
 import { BBox, LngLat, hashStr, pointInRings, ringBBox } from "@/lib/geo";
 import { accessNow, paywall, reportKey, spend, useEntitlements } from "@/lib/billing";
 import { BillingHost } from "@/components/billing/Paywall";
+import { getStarted, taskOf, useGetStarted, type Task } from "@/lib/getStarted";
+import { Checklist, Coach, CoachStep, EarnedToast } from "@/components/home/GetStarted";
 
 const GAP = 12;
 // Results column width per layout (1 / 2 / 3 columns of cards); Home and 1 column stay 388.
@@ -175,7 +177,7 @@ export default function HomeWeb() {
   const setBuyer = (on: boolean) => setIntent(on ? "buyer" : null);
   const INTENT_PROMPT: Record<string, string> = { buyer: "Where is your buyer looking?", underbuilt: "Where should we look for underbuilt lots?", comps: "Which property do you want comps for?" };
   const afterBuyerSearch = (was: Intent) => {
-    if (was === "buyer") setTimeout(() => openSheet(), 450);
+    if (was === "buyer" && getStarted.get().tour?.task !== "buyer") setTimeout(() => openSheet(), 450);
     if (was === "underbuilt") { setHeat("ub"); fs.setF({ ...fs.f, ub: Math.max(fs.f.ub || 0, 40) }); showToast("Showing lots with 40%+ build potential", "positive"); }
   };
   // Comps intent: once the picked property is open, go straight into comps.
@@ -186,6 +188,8 @@ export default function HomeWeb() {
   // geolocation), then they go to `chooseAreas` together (outlines + listings for all).
   const commitAreas = async (list: Area[]) => {
     let wasBuyer = intentRef.current; setIntent(null);
+    // Make Breezy yours: the guide moves on to the results' next step.
+    getStarted.step("buyer", "filters", ["search", "create"]); getStarted.step("underbuilt", "pick", ["search", "create"]);
     sv.setActive(null); closeDetail(); setSearching(false); setView("results"); setUnsup(null); setAreaPill(false);
     const ps = await Promise.all(list.map(a => resolveArea(a, place.center)));
     const ok = ps.filter((p): p is Place => !!p);
@@ -201,6 +205,7 @@ export default function HomeWeb() {
   const pickAddress = (p: Place) => {
     sv.setActive(null);
     compsNext.current = intentRef.current === "comps"; setIntent(null);
+    getStarted.step("comps", "run", ["search", "create"]);
     const [lng, lat] = p.center;
     const l = isCovered(p) ? listingAt("addr:" + p.id, p.center, p.label.split(", ").slice(1, 2).join("")) : null;
     if (!l) { compsNext.current = false; return showToast("No property found", "info"); }
@@ -239,7 +244,7 @@ export default function HomeWeb() {
   const shareOne = (l: Listing) => { setShareL(l); sh.shareProp(l.id); };
   const shareItems = sh.only != null ? (shareL ? [shareL] : []) : picked.map(p => p.l);
   // A comps report that has already been run reopens on its result (sprint item).
-  const openFlow = (l: Listing, kind: FlowKind) => { setCompsCached(rp.has(l)); setFlow({ l, kind }); };
+  const openFlow = (l: Listing, kind: FlowKind) => { setCompsCached(rp.has(l)); setFlow({ l, kind }); if (kind === "ub") getStarted.complete("underbuilt"); };
   // Paywall, "Locked tile" lock style (Dev menu): a locked Max build / Profit potential tile
   // opens the upsell (or a credit confirmation) over the map instead of a veiled report.
   const ent = useEntitlements();
@@ -369,6 +374,7 @@ export default function HomeWeb() {
     if (!wasLoading.current || !sel || !compsOn) return;
     wasLoading.current = false;
     if (!rp.has(sel)) { rp.save(sel); showToast("Report saved to Reports"); }
+    getStarted.complete("comps");
   }, [cm.loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- "Search this area" (Expedia-style pill, top centre of the map under the filter bar) ----
@@ -453,8 +459,76 @@ export default function HomeWeb() {
   const layerOn = depth > 0;
   const pillOn = areaPill && !compsOn && !detailOpen && !searching && !flow && !areaComps && !layerOn && !savedOpen;
   const layerBack = () => { if (fs.fd) fs.closePanel(); if (ss.open) ss.requestClose(); if (savedOpen) closeSaved(); if (rp.open) rp.close(); };
+  // ---- Make Breezy yours (18 Nov): the mobile activation wizard, on web ----
+  // Four tasks worth 10 contact credits each (lib/getStarted.ts). Each is earned whenever
+  // it's done; the guided version dims the screen round the next thing to press (Coach).
+  const gs = useGetStarted();
+  const tour = gs.tour;
+  // Earned: a new saved search, an owner contacted (comps and Max build: see openFlow / the comps save).
+  const nSearches = sv.searches.length, prevSearches = useRef(nSearches);
+  useEffect(() => { if (nSearches > prevSearches.current) getStarted.complete("buyer"); prevSearches.current = nSearches; }, [nSearches]);
+  const nContacts = (ent.s.log || []).filter(u => u.f === "contacts").length, prevContacts = useRef(nContacts);
+  useEffect(() => { if (nContacts > prevContacts.current) getStarted.complete("contact"); prevContacts.current = nContacts; }, [nContacts]);
+  // The stage follows the app: a search closed without a pick goes back to Create; opening /
+  // closing a property moves the underbuilt and contact guides on / back.
+  useEffect(() => {
+    if (searching || tour?.stage !== "search") return;
+    const t = setTimeout(() => { const g = getStarted.get().tour; if (g?.stage === "search") getStarted.step(g.task, "create"); }, 120);
+    return () => clearTimeout(t);
+  }, [searching, tour?.stage]);
+  useEffect(() => {
+    if (sel) { getStarted.step("underbuilt", "maxbuild", ["pick"]); getStarted.step("contact", "contact", ["pick"]); }
+    else { getStarted.step("underbuilt", "pick", ["maxbuild"]); getStarted.step("contact", "pick", ["contact"]); }
+  }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Buyer criteria: once the All filters panel has been opened and closed, on to Save search.
+  const fdWas = useRef(false);
+  useEffect(() => {
+    if (fs.fd) { fdWas.current = true; return; }
+    if (fdWas.current) { fdWas.current = false; getStarted.step("buyer", "save", ["filters"]); }
+  }, [fs.fd]);
+  // Start a task from the wizard or the "Next step" toast.
+  const startTask = (t: Task) => {
+    getStarted.show(false); setSearching(false); setIntent(null); if (rp.open) rp.close();
+    if (t === "contact") { if (compsOn) closeDetail(); getStarted.go("contact", sel && !compsOn ? "contact" : "pick"); return; }
+    if (t === "comps" && sel && !compsOn) { getStarted.go("comps", "run"); return; }
+    if (t !== "comps") closeDetail();
+    getStarted.go(t, "create");
+  };
+  const TITLE: Record<Task, string> = { buyer: "Set up a buyer search", contact: "Contact an owner", comps: "Run your first comp", underbuilt: "Find underbuilt lots" };
+  const ITEM: Partial<Record<Task, [string, string]>> = { buyer: ["Buyer search", "Buyer search"], comps: ["Comps", "Comps report"], underbuilt: ["Underbuilt", "Underbuilt search"] };
+  const coachSteps: CoachStep[] | null = (() => {
+    if (!tour) return null;
+    const T = TITLE[tour.task];
+    switch (tour.stage) {
+      case "create": {
+        const [k, label] = ITEM[tour.task]!;
+        return [
+          { sel: `[data-tour="create-${k}"]`, title: T, sub: `Pick ${label}.` },
+          { sel: `[data-tour="create"]`, title: T, sub: "Everything you start in Breezy begins here, under Create." },
+        ];
+      }
+      case "filters": return [{ sel: `[data-tour="all-filters"]`, title: "Add your client's criteria", sub: "Set their budget, beds and must-haves.", next: "Next", onNext: () => getStarted.step("buyer", "save") }];
+      case "save": return [{ sel: `[data-tour="save-search"]`, title: "Save this search", sub: "Get alerted the moment new matches come up." }];
+      case "pick":
+        if (tour.task === "underbuilt") return [{ sel: `[data-tour-card]`, title: "Pick a lot with room to build", sub: "The Underbuilt heat is on, and only lots with 40%+ build potential show. Open one." }];
+        return [
+          { sel: `[data-tour-card="exp"]`, title: T, sub: "Open this expired listing to see who owns it." },
+          { sel: `[data-tour-card]`, title: T, sub: "Open this listing to see who owns it." },
+        ];
+      case "maxbuild": return [{ sel: `[data-tour="max-build"]`, title: "See its Max build", sub: "How much more the zoning lets you build on this lot.", next: "Done", onNext: () => getStarted.complete("underbuilt") }];
+      case "run": return [
+        { sel: `[data-tour="comps-go"]`, title: "Run comps", sub: "Breezy finds and scores the closest matches." },
+        { sel: `[data-tour="get-comps"]`, title: "Get comps", sub: "Price this home against nearby sales." },
+      ];
+      case "contact": return [{ sel: `[data-tour="contact-owner"]`, title: "Contact the owner", sub: "Reveal their phone, email and mailing address, before other agents call. Uses 1 contact." }];
+      default: return null;
+    }
+  })();
+  const coachPaused = searching || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || exportOn || gs.open || !!areaComps;
+
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
+    { label: "Make Breezy yours: reset", icon: "ph-sparkle", run: () => { getStarted.reset(); getStarted.show(); } },
     { label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } },
     { label: "Snackbar: neutral", icon: "ph-info", run: () => showToast("No property found", "neutral") },
     { label: "Snackbar: positive", icon: "ph-check-circle", run: () => showToast("Search saved", "positive") },
@@ -475,6 +549,9 @@ export default function HomeWeb() {
       <SideNav expanded={navX} onToggle={() => setNavX(v => !v)} userName={user.name.split(" ")[0]}
         dev={devActions}
         onPick={k => {
+        // Make Breezy yours: a Create item not yet earned runs its guided version.
+        const gt = taskOf(k);
+        if (gt) { if (!gs.isDone(gt) && !(gt === "comps" && !ent.planOn)) getStarted.go(gt, "search"); else getStarted.end(); }
         if (k === "Map") { closeDetail(); setView("home"); setSearching(false); if (rp.open) rp.close(); }
         // New buyer search: open location search; once an area is picked, offer Save search.
         if (k === "Buyer search") { if (rp.open) rp.close(); setBuyer(true); sv.setActive(null); closeDetail(); setSearching(true); }
@@ -615,13 +692,16 @@ export default function HomeWeb() {
         frameSel(p.listing, p.ring, [p.cx, p.cy]);
       }} />
       {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached} onClose={() => setFlow(null)}
-        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); }} onShare={() => shareOne(flow.l)} onToast={showToast}
+        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); getStarted.complete("comps"); }} onShare={() => shareOne(flow.l)} onToast={showToast}
         onComps={sel && sel.id === flow.l.id ? openCompsMode : undefined} />}
       {areaComps && <AreaCompsPreview key={areaComps.title + areaComps.comps.length} {...areaComps} saved={rp.hasArea(areaComps)} onClose={() => setAreaComps(null)}
         onSave={() => { rp.saveArea(areaComps); showToast("Report saved to Reports"); }} />}
       {ss.modals}
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
+      <Coach steps={coachSteps} paused={coachPaused} onExit={getStarted.end} />
+      <Checklist onStart={startTask} />
+      <EarnedToast onNext={startTask} />
     </>
   );
 }

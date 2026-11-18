@@ -40,7 +40,7 @@ export function CompsChoice({ addr, onAi, onManual, onCancel }: { addr: string; 
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
           <button onClick={() => go(onManual)} className="btn-soft" style={{ width: 200, height: 48, padding: "0 20px", border: "none", borderRadius: 9999, background: "rgb(245,240,238)", font: "700 15px/20px var(--font-sans)", color: "rgb(17,16,16)", cursor: "pointer", whiteSpace: "nowrap" }}>I&apos;ll comp myself</button>
-          <button onClick={() => go(onAi)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
+          <button data-tour="comps-go" onClick={() => go(onAi)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
             style={{ position: "relative", width: 200, height: 48, overflow: "hidden", border: "none", borderRadius: 9999, background: "rgb(18,18,18)", font: "700 15px/20px var(--font-sans)", color: "rgb(253,252,252)", cursor: "pointer", whiteSpace: "nowrap" }}>
             {/* auto-run countdown fill */}
             <span style={{ position: "absolute", inset: 0, transformOrigin: "0 50%", background: "linear-gradient(89.442deg,rgb(84,55,157) 0.06%,rgb(142,67,158) 97.94%)", animation: `ccFill ${AUTO_MS}ms linear both`, animationPlayState: paused ? "paused" : "running" }} />

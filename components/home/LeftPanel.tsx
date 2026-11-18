@@ -15,7 +15,7 @@ const card: React.CSSProperties = { display: "flex", flexDirection: "column", ov
 export function ListingCard({ l, onOpen, onHover, fresh = l.isNew, dense }: { l: Listing; onOpen: () => void; onHover: (on: boolean) => void; fresh?: boolean; dense?: boolean }) {
   const sv = useSaved();
   return (
-    <div onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} style={{ display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }}>
+    <div data-tour-card={l.opp} onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} style={{ display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }}>
       <div style={{ position: "relative", height: dense ? 180 : 210, borderRadius: dense ? 18 : 20, background: `rgb(241,231,228) url(${l.photos[0]}) center/cover no-repeat` }}>
         <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 13px/28px var(--font-sans)" }}>
           {l.status}
@@ -97,7 +97,7 @@ export function ResultsPanel({ title, meta, listings, seen, onOpen, onHover, com
       </div>
       {!compact && picked.length === 0 && listings.length > 0 && !unsupported && (
         <div style={css("flex:none;display:flex;gap:12px;padding:16px;background:rgb(253,252,252);box-shadow:inset 0 1px 0 rgb(245,240,238)")}>
-          <button onClick={onFooterSearch} className={onCreateComps ? "fb-grey" : "fb-dark"} style={css("flex:1;min-width:0;height:48px;border:none;border-radius:9999px;" + (onCreateComps ? "background:rgb(233,233,233);color:rgb(17,16,16);" : "background:rgb(17,16,16);color:rgb(249,249,249);") + "font:700 15px/20px var(--font-sans);cursor:pointer;white-space:nowrap")}>{active ? "Manage search" : "Save search"}</button>
+          <button data-tour="save-search" onClick={onFooterSearch} className={onCreateComps ? "fb-grey" : "fb-dark"} style={css("flex:1;min-width:0;height:48px;border:none;border-radius:9999px;" + (onCreateComps ? "background:rgb(233,233,233);color:rgb(17,16,16);" : "background:rgb(17,16,16);color:rgb(249,249,249);") + "font:700 15px/20px var(--font-sans);cursor:pointer;white-space:nowrap")}>{active ? "Manage search" : "Save search"}</button>
           {onCreateComps && (
             <button onClick={onCreateComps} className="fb-dark" style={css("flex:1;min-width:0;height:48px;display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:9999px;background:rgb(17,16,16);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap;animation:fadeIn .2s ease both")}>
               <i className="ph-fill ph-sparkle" style={{ fontSize: 16 }} />Create comps

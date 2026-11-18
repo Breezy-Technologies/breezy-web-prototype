@@ -63,7 +63,7 @@ function PhotoStrip({ photos }: { photos: string[] }) {
 function FeedCard({ l, seen, dense, onOpen, onHover }: { l: Listing; seen: boolean; dense?: boolean; onOpen: () => void; onHover: (on: boolean) => void }) {
   const sv = useSaved();
   return (
-    <div onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} className="fy-card"
+    <div data-tour-card={l.opp} onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} className="fy-card"
       style={{ flex: "none", display: "flex", flexDirection: "column", gap: 12, margin: "0 -8px", padding: "8px 8px 14px", borderRadius: 24, cursor: "pointer", transition: "background .16s" }}>
       <div style={{ position: "relative", flex: "none", height: dense ? 200 : 244, borderRadius: 20, overflow: "hidden", background: "rgb(241,231,228)" }}>
         <PhotoStrip photos={l.photos} />

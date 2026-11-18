@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { getStarted, taskOf, useGetStarted } from "@/lib/getStarted";
+import { EarnChip, GetStartedRow } from "./GetStarted";
 
 /* New navigation exploration (14 Nov, agents' feedback: "where do I create something?").
    One constant primary Create action at the top of the side nav, like Drive's "New",
@@ -58,13 +60,13 @@ export function CreateButton({ variant, expanded, navW, locked, onPick }: { vari
   // The trigger. "menu" is a labelled pill (a circle when collapsed); "flyout" and
   // "launcher" are a round "+" with the label under it, like Canva / QuickBooks.
   const trigger = variant === "menu" ? (
-    <button ref={btn} data-create="" onClick={toggle} title="Create (C)" className="btn-dark"
+    <button ref={btn} data-create="" data-tour="create" onClick={toggle} title="Create (C)" className="btn-dark"
       style={{ width: expanded ? "100%" : 40, height: expanded ? 48 : 40, padding: expanded ? "0 14px 0 12px" : 0, justifyContent: expanded ? "flex-start" : "center", gap: 10, whiteSpace: "nowrap", overflow: "hidden", background: open ? "rgb(45,40,38)" : undefined, boxShadow: "0 1px 2px rgba(30,18,12,.2),0 6px 16px rgba(30,18,12,.14)" }}>
       <i className="ph-bold ph-plus" style={{ fontSize: 18, flex: "none", transition: "transform .25s", transform: open ? "rotate(45deg)" : "none" }} />
       {expanded && <><span style={{ flex: 1, textAlign: "left" }}>Create</span><Kbd dark>C</Kbd></>}
     </button>
   ) : (
-    <button ref={btn} data-create="" onClick={toggle} title="Create (C)" className="btn-ghost"
+    <button ref={btn} data-create="" data-tour="create" onClick={toggle} title="Create (C)" className="btn-ghost"
       style={{ display: "flex", flexDirection: expanded ? "row" : "column", alignItems: "center", gap: expanded ? 12 : 3, width: "100%", height: expanded ? 52 : 62, padding: expanded ? "0 6px" : "4px 0", borderRadius: 14, whiteSpace: "nowrap", background: open ? "rgba(13,12,12,.06)" : undefined }}>
       <span style={{ flex: "none", width: 40, height: 40, borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(160deg,rgb(196,150,136),rgb(147,89,75))", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25),0 0 0 1px rgba(147,89,75,.4),0 4px 12px rgba(147,89,75,.35)" }}>
         <i className="ph-bold ph-plus" style={{ fontSize: 20, color: "#fff", transition: "transform .25s", transform: open ? "rotate(45deg)" : "none" }} />
@@ -90,18 +92,19 @@ const POP_SHADOW = "inset 0 0 0 1px rgba(13,12,12,.1),0 12px 32px rgba(24,14,10,
 function MenuPop({ left, top, locked, onPick }: { left: number; top: number; locked: (k: string) => boolean; onPick: (k: string) => void }) {
   const groups = ["Search", "Reports"] as const;
   return (
-    <div data-create="" style={{ position: "fixed", left, top, zIndex: 200, width: 320, padding: 6, borderRadius: 18, background: "var(--paper)", boxShadow: POP_SHADOW, animation: "panelDrop .2s cubic-bezier(.2,.8,.2,1) both" }}>
+    <div data-create="" style={{ position: "fixed", left, top, zIndex: 200, width: 340, padding: 6, borderRadius: 18, background: "var(--paper)", boxShadow: POP_SHADOW, animation: "panelDrop .2s cubic-bezier(.2,.8,.2,1) both" }}>
+      <StartedRow onPick={onPick} />
       {groups.map((g, gi) => (
         <div key={g}>
           {gi > 0 && <span style={{ display: "block", height: 1, margin: "6px 10px", background: "rgba(13,12,12,.08)" }} />}
           <span style={{ display: "block", padding: "8px 10px 4px", font: "700 12px/16px var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)" }}>{g === "Search" ? "New search" : "New report"}</span>
           {CREATE_ITEMS.filter(i => i.group === g).map(i => (
-            <button key={i.k} onClick={() => onPick(i.k)} className="btn-ghost" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", borderRadius: 12, textAlign: "left" }}>
+            <button key={i.k} data-tour={"create-" + i.k} onClick={() => onPick(i.k)} className="btn-ghost" style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", borderRadius: 12, textAlign: "left" }}>
               <span style={{ flex: "none", width: 40, height: 40, borderRadius: 12, background: i.tint, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ width: 28, height: 28, background: `url(${i.icon}) center/contain no-repeat` }} />
               </span>
               <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 6, font: "700 15px/20px var(--font-sans)", color: "var(--ink)" }}>{i.title}{locked(i.k) && <Lock />}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6, font: "700 15px/20px var(--font-sans)", color: "var(--ink)" }}>{i.title}{locked(i.k) && <Lock />}<Earn k={i.k} /></span>
                 <span style={{ font: "400 13px/17px var(--font-sans)", color: "rgb(98,90,89)" }}>{i.desc}</span>
               </span>
             </button>
@@ -120,15 +123,16 @@ function FlyoutPanel({ left, top, locked, onPick }: { left: number; top: number;
         <span style={{ font: "700 20px/26px var(--font-sans)", color: "var(--ink)" }}>Create</span>
         <span style={{ display: "flex", alignItems: "center", gap: 6, font: "400 13px/17px var(--font-sans)", color: "rgb(98,90,89)" }}>Open anytime with <Kbd>C</Kbd></span>
       </div>
+      <StartedRow onPick={onPick} pad={14} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
         {CREATE_ITEMS.map((i, n) => (
-          <button key={i.k} onClick={() => onPick(i.k)} className="create-card" style={{ display: "flex", flexDirection: "column", padding: 0, border: "none", borderRadius: 18, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.1)", cursor: "pointer", textAlign: "left", overflow: "hidden", animation: `riseIn .35s cubic-bezier(.2,.8,.2,1) ${n * 50}ms both` }}>
+          <button key={i.k} data-tour={"create-" + i.k} onClick={() => onPick(i.k)} className="create-card" style={{ display: "flex", flexDirection: "column", padding: 0, border: "none", borderRadius: 18, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.1)", cursor: "pointer", textAlign: "left", overflow: "hidden", animation: `riseIn .35s cubic-bezier(.2,.8,.2,1) ${n * 50}ms both` }}>
             <span style={{ position: "relative", height: 116, background: i.tint, display: "block" }}>
               <span className="create-art" style={{ position: "absolute", inset: "12px 20px 4px", background: `url(${i.art}) center/contain no-repeat` }} />
               <span style={{ position: "absolute", left: 10, top: 10, height: 22, padding: "0 8px", borderRadius: 9999, background: "rgba(253,252,252,.85)", display: "flex", alignItems: "center", font: "700 11px/14px var(--font-sans)", color: "rgb(77,71,69)" }}>{i.group === "Search" ? "Search" : "Report"}</span>
             </span>
             <span style={{ display: "flex", flexDirection: "column", gap: 4, padding: "12px 14px 14px" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 6, font: "700 15px/20px var(--font-sans)", color: "var(--ink)" }}>{i.title}{locked(i.k) && <Lock />}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, font: "700 15px/20px var(--font-sans)", color: "var(--ink)" }}>{i.title}{locked(i.k) && <Lock />}<Earn k={i.k} /></span>
               <span style={{ font: "400 13px/17px var(--font-sans)", color: "rgb(98,90,89)" }}>{i.desc}</span>
             </span>
           </button>
@@ -146,11 +150,12 @@ function Launcher({ locked, onPick, onClose }: { locked: (k: string) => boolean;
         <button onClick={onClose} title="Close" className="btn-ghost" style={{ position: "absolute", right: 16, top: 16, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-x" style={{ fontSize: 18 }} /></button>
         <div style={{ textAlign: "center", font: "700 30px/38px var(--font-sans)", color: "var(--ink)", letterSpacing: "-.4px" }}>What do you want to start?</div>
         <div style={{ textAlign: "center", marginTop: 6, font: "400 15px/20px var(--font-sans)", color: "rgb(98,90,89)" }}>Pick one. You can always come back here with <Kbd>C</Kbd></div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginTop: 28 }}>
+        <div style={{ marginTop: 20 }}><StartedRow onPick={onPick} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginTop: 20 }}>
           {CREATE_ITEMS.map((i, n) => (
-            <button key={i.k} onClick={() => onPick(i.k)} className="create-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "20px 16px 18px", border: "none", borderRadius: 22, background: i.tint, cursor: "pointer", animation: `riseIn .4s cubic-bezier(.2,.8,.2,1) ${80 + n * 60}ms both` }}>
+            <button key={i.k} data-tour={"create-" + i.k} onClick={() => onPick(i.k)} className="create-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "20px 16px 18px", border: "none", borderRadius: 22, background: i.tint, cursor: "pointer", animation: `riseIn .4s cubic-bezier(.2,.8,.2,1) ${80 + n * 60}ms both` }}>
               <span className="create-art" style={{ width: 132, height: 110, background: `url(${i.art}) center/contain no-repeat` }} />
-              <span style={{ display: "flex", alignItems: "center", gap: 6, font: "700 16px/20px var(--font-sans)", color: "var(--ink)" }}>{i.title}{locked(i.k) && <Lock />}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, font: "700 16px/20px var(--font-sans)", color: "var(--ink)" }}>{i.title}{locked(i.k) && <Lock />}<Earn k={i.k} /></span>
               <span style={{ font: "400 13px/17px var(--font-sans)", color: "rgb(98,90,89)", textAlign: "center" }}>{i.desc}</span>
             </button>
           ))}
@@ -158,4 +163,15 @@ function Launcher({ locked, onPick, onClose }: { locked: (k: string) => boolean;
       </div>
     </div>
   );
+}
+
+// "Make Breezy yours" (18 Nov): items not yet earned carry "+10"; the row opens the wizard.
+function Earn({ k }: { k: string }) {
+  const gs = useGetStarted(), t = taskOf(k);
+  return t && !gs.isDone(t) ? <span style={{ marginLeft: "auto" }}><EarnChip short /></span> : null;
+}
+function StartedRow({ onPick, pad = 0 }: { onPick: (k: string) => void; pad?: number }) {
+  const gs = useGetStarted();
+  if (gs.all) return null;
+  return <div style={{ marginBottom: pad || 6 }}><GetStartedRow onOpen={() => { onPick(""); getStarted.show(); }} /></div>;
 }

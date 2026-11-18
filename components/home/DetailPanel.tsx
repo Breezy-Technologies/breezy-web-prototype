@@ -281,7 +281,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                 <span style={css("font:300 36px/1.1 var(--font-sans);letter-spacing:-1px;color:rgb(18,18,18);white-space:nowrap")}>~{shortPrice(l.qe.value)}</span>
                 <span style={css("font:400 12px/16px var(--font-sans);color:rgb(98,90,89);white-space:nowrap;overflow:hidden;text-overflow:ellipsis")}>{shortPrice(l.qe.lo)} – {shortPrice(l.qe.hi)} · from 6 nearby sales</span>
               </span>
-              <button className="fb-dark dt-press" onClick={onGetComps} title="Full AI analysis + write-up" style={css("flex:none;display:flex;align-items:center;gap:6px;height:40px;padding:0 16px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 14px/18px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap")}>
+              <button data-tour="get-comps" className="fb-dark dt-press" onClick={onGetComps} title="Full AI analysis + write-up" style={css("flex:none;display:flex;align-items:center;gap:6px;height:40px;padding:0 16px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 14px/18px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap")}>
                 <span style={maskIco("/ui/act-files.svg", 15, "currentColor")} />Get comps
               </button>
             </div>
@@ -295,7 +295,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
               const fk = k.startsWith("Max") ? "ub" : "roi", a = tileAcc[fk];
               const hide = ent.s.lockStyle === "tile" && (a === "locked" || a === "plan" || a === "credit");
               return (
-              <button key={k} className="dt-tile" onClick={() => onFlow?.(fk)} title={k.startsWith("Max") ? "Underbuilt analysis" : "Upside analysis"} style={css("flex:1;min-width:0;height:88px;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;padding:8px;border:none;border-radius:8px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
+              <button key={k} data-tour={k.startsWith("Max") ? "max-build" : undefined} className="dt-tile" onClick={() => onFlow?.(fk)} title={k.startsWith("Max") ? "Underbuilt analysis" : "Upside analysis"} style={css("flex:1;min-width:0;height:88px;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;padding:8px;border:none;border-radius:8px;cursor:pointer;text-align:left;transition:box-shadow .3s ease,background .3s ease;background:rgb(245,240,238);box-shadow:none")}>
                 <span style={css("align-self:stretch;height:24px;display:flex;align-items:center;gap:4px")}>
                   <span style={maskIco(ic, 16, c)} />
                   <span style={{ ...css("font:400 16px/1.48 var(--font-sans);white-space:nowrap;color:" + c), ...(hide ? { filter: "blur(6px)", userSelect: "none" } : {}) }}>{hide ? (fk === "ub" ? "00%" : "$0.0m") : v}</span>
@@ -552,7 +552,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>Email owner
           </a>
         ) : (
-          <button className="btn-dark" style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap" }} onClick={contactOwner}>
+          <button data-tour="contact-owner" className="btn-dark" style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap" }} onClick={contactOwner}>
             {cAcc === "locked" || cAcc === "plan"
               ? <i className="ph-bold ph-lock-simple" style={{ fontSize: 16 }} />
               : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>}

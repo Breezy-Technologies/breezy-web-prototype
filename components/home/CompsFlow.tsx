@@ -46,7 +46,7 @@ export function CompsReview({ l, initial, onClose, onConfirm }: { l: Listing; in
             </div>
           ))}
         </div>
-        <button className="btn-dark" onClick={confirm}>Confirm</button>
+        <button data-tour="comps-confirm" className="btn-dark" onClick={confirm}>Confirm</button>
       </div>
     </div>,
     document.body,
