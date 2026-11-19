@@ -58,6 +58,8 @@ export default function HomeWeb() {
   const { place, rings, listings, picks, user, choosePlace, chooseAreas, areas, onboarded, restartOnboarding } = useApp();
   const [navX, setNavX] = useState(false);
   const [view, setView] = useState<"home" | "results">("home");
+  // Dev menu preview of saved searches / properties returning nothing or failing (BREEZY-7759).
+  const [savedPreview, setSavedPreview] = useState<"empty" | "error" | null>(null);
   // Multi-column results: the user's choice (persisted), capped by what the window fits.
   const [winW, setWinW] = useState(0);
   useEffect(() => { const f = () => setWinW(window.innerWidth); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
@@ -574,6 +576,9 @@ export default function HomeWeb() {
     { group: "Search states", label: "Search: failed to load", icon: "ph-plugs", run: () => { closeDetail(); previewSearchState("failed"); } },
     { group: "Search states", label: "Search: timed out", icon: "ph-timer", run: () => { closeDetail(); previewSearchState("timeout"); } },
     { group: "Search states", label: "Clear recent searches", icon: "ph-clock-counter-clockwise", run: () => { closeDetail(); previewSearchState("empty"); } },
+    { group: "Saved data", label: "Saved: nothing saved", icon: "ph-tray", run: () => { closeDetail(); setSearching(false); setView("home"); setSavedPreview("empty"); } },
+    { group: "Saved data", label: "Saved: failed to load", icon: "ph-cloud-x", run: () => { closeDetail(); setSearching(false); setView("home"); setSavedPreview("error"); } },
+    { group: "Saved data", label: "Saved: back to normal", icon: "ph-arrow-counter-clockwise", run: () => setSavedPreview(null) },
     { group: "Property", label: "Property with no estimate", icon: "ph-lightning-slash", run: () => {
       setSearching(false);
       const l = listings.find(x => x.noQe);
@@ -630,7 +635,8 @@ export default function HomeWeb() {
             ? <HomeCard name={user.name} area={place.label} forYou={forYou} seen={seen} onOpen={openListing} onHover={setHoverId} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
                 picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} cols={cols} maxCols={maxCols} onCols={pickCols}
-                onOpenSaved={() => { setSavedOut(false); setSavedOpen(true); }} />
+                onOpenSaved={() => { setSavedOut(false); setSavedOpen(true); }}
+                savedState={savedPreview} onSavedRetry={() => setTimeout(() => setSavedPreview(null), 900)} />
             : (
               // The results column steps back (scale + dim) while a sheet sits on top of it.
               <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: depth > 1 ? "scale(.88)" : depth ? "scale(.94)" : "none", filter: depth > 1 ? "brightness(.93)" : depth ? "brightness(.955)" : "none" }}>

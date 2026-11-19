@@ -193,7 +193,7 @@ function DevMenu({ actions, expanded }: { actions: DevAction[]; expanded: boolea
   };
   const groups: string[] = [];
   actions.forEach(a => { const g = a.group || "Other"; if (!groups.includes(g)) groups.push(g); });
-  const ICON: Record<string, string> = { "Onboarding & activation": "ph-rocket-launch", "Plan & billing": "ph-credit-card", "Search states": "ph-magnifying-glass", Snackbars: "ph-chat-centered-text", Property: "ph-house-line", "Side nav": "ph-sidebar-simple", Other: "ph-dots-three" };
+  const ICON: Record<string, string> = { "Onboarding & activation": "ph-rocket-launch", "Plan & billing": "ph-credit-card", "Search states": "ph-magnifying-glass", Snackbars: "ph-chat-centered-text", Property: "ph-house-line", "Saved data": "ph-bookmark-simple", "Side nav": "ph-sidebar-simple", Other: "ph-dots-three" };
   const panel: React.CSSProperties = { position: "fixed", zIndex: 200, display: "flex", flexDirection: "column", padding: 6, borderRadius: 14, background: "var(--paper)", boxShadow: "inset 0 0 0 1px rgba(13,12,12,.12),0 12px 32px rgba(24,14,10,.16)" };
   const row: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, height: 34, padding: "0 10px", border: "none", borderRadius: 8, font: "400 13px/16px var(--font-sans)", color: "var(--ink)", cursor: "pointer", textAlign: "left", whiteSpace: "nowrap" };
   const items = cat ? actions.filter(a => (a.group || "Other") === cat.g) : [];

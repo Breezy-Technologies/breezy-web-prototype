@@ -13,7 +13,7 @@ import { Listing, shortPrice } from "@/lib/fake";
 import { ledger, upsideOf } from "@/lib/roi";
 import { pulseColor } from "@/lib/pinColors";
 
-export type RadarKind = "ub" | "drop" | "exp" | "roi" | "wd" | "stale" | "comps" | "foreclosure";
+export type RadarKind = "ub" | "drop" | "exp" | "roi" | "wd" | "stale" | "soon" | "bom" | "near" | "comps" | "foreclosure";
 const MARKER: Record<RadarKind, { src: string; shadow: boolean; icon: string }> = {
   wd: { src: "/pins/wd.svg", shadow: false, icon: "arrow-u-down-left" },
   exp: { src: "/pins/exp.svg", shadow: false, icon: "hourglass-low" },
@@ -23,7 +23,14 @@ const MARKER: Record<RadarKind, { src: string; shadow: boolean; icon: string }> 
   drop: { src: "/pins/drop.svg", shadow: true, icon: "trend-down" },
   comps: { src: "/pins/comps.svg", shadow: false, icon: "files" },
   ub: { src: "/pins/ub.svg", shadow: true, icon: "target" },
+  // 19 Nov (Feng): about_to_expire, back_on_market, nearby_activity. The blue status marker
+  // (public/pins/status.svg, the Expired marker without its icon) with the Phosphor icon on top.
+  soon: { src: "/pins/status.svg", shadow: false, icon: "hourglass-medium" },
+  bom: { src: "/pins/status.svg", shadow: false, icon: "arrow-counter-clockwise" },
+  near: { src: "/pins/status.svg", shadow: false, icon: "map-pin-area" },
 };
+/** Markers drawn as a blank shape with the icon laid over it. */
+const ICON_OVER = new Set<RadarKind>(["soon", "bom", "near"]);
 
 /** The price pins' shadow (PricePins DROP), shared so the two pin styles match. */
 export const PIN_SHADOW = "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 4px 12px rgba(30,18,12,.16)";
@@ -37,6 +44,9 @@ export function radarLabel(l: Listing): string {
     case "exp": return `Expired ${m(/Expired (\d+ days? ago|yesterday)/) ?? "recently"}`;
     case "wd": return `Withdrawn ${m(/Withdrawn (\d+ days? ago|yesterday)/) ?? "recently"}`;
     case "stale": return `${m(/On market (\d+) days/) ?? l.dom} DOM`;
+    case "soon": return `Expires in ${m(/Expires in (\d+ days?|a day)/) ?? "a week"}`;
+    case "bom": return `Back on market ${m(/Back on market (\d+ days? ago|yesterday|today)/) ?? "recently"}`;
+    case "near": return m(/^(\d+ sales? nearby|New listing nearby)/) ?? "Activity nearby";
     case "ub": return `${l.ub}% Underbuilt`;
     case "roi": {
       // The Upside report's profit for its recommended build (same as the detail tile).
@@ -66,10 +76,11 @@ export function RadarPin({ l, kind, label, dark, pulse }: { l: Listing; kind: Ra
           {kind === "foreclosure"
             ? <img src="/pins/selected-foreclosure-icon.svg" alt="" width={14} height={14} style={{ position: "absolute", left: 7, top: 7 }} />
             : <i className={`ph-bold ph-${mk.icon}`} style={{ position: "absolute", left: 6, top: 6, width: 16, height: 16, fontSize: 15, lineHeight: "16px", textAlign: "center", color: "rgb(253,252,252)" }} />}
-        </> : (
+        </> : <>
           <img src={mk.src} alt="" width={mk.shadow ? 44 : 28} height={mk.shadow ? 48 : 32}
             style={mk.shadow ? { position: "absolute", left: -8, top: -4, width: 44, height: 48, maxWidth: "none" } : { position: "absolute", left: 0, top: 0, width: 28, height: 32 }} />
-        )}
+          {ICON_OVER.has(kind) && <i className={`ph-bold ph-${mk.icon}`} style={{ position: "absolute", left: 6, top: 6, width: 16, height: 16, fontSize: 15, lineHeight: "16px", textAlign: "center", color: "rgb(253,252,252)" }} />}
+        </>}
       </span>
       {/* The label pill: white with the price pins' drop shadow (review: not the design's
           frosted glass), 20 px, 12 px bold. No label (onboarding steps without labels): marker only. */}

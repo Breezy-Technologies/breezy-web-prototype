@@ -165,11 +165,43 @@ function PropRow({ x, hover, onEnter, onLeave, onOpen, onDel }: { x: PropItem; h
   );
 }
 
-export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals, cols = 1, maxCols = 1, onCols }: {
+/* Saved searches / properties with no data (19 Nov, BREEZY-7759, Sarah): an empty state per tab
+   (what goes here, one action), or, when the request fails, an error with Retry. The greeting
+   and the tabs never depend on this data, so "Hello <name>" always shows. */
+function SavedEmpty({ icon, title, body, cta, onCta }: { icon: string; title: string; body: string; cta: string; onCta: () => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "20px 0", textAlign: "center", animation: "fadeIn .2s ease both" }}>
+      <i className={`ph ph-${icon}`} style={{ fontSize: 24, color: "rgb(196,146,134)" }} />
+      <span style={{ display: "flex", flexDirection: "column" }}>
+        <span style={{ font: "700 14px/1.48 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)" }}>{title}</span>
+        <span style={{ font: "400 14px/1.48 var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)", textWrap: "pretty" } as React.CSSProperties}>{body}</span>
+      </span>
+      <button onClick={onCta} className="btn-soft" style={{ marginTop: 4, height: 32, padding: "0 14px", font: "700 13px/16px var(--font-sans)" }}>{cta}</button>
+    </div>
+  );
+}
+function SavedError({ what, retrying, onRetry }: { what: string; retrying: boolean; onRetry: () => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "20px 0", textAlign: "center", animation: "fadeIn .2s ease both" }}>
+      <i className="ph ph-warning-circle" style={{ fontSize: 24, color: "rgb(172,44,34)" }} />
+      <span style={{ display: "flex", flexDirection: "column" }}>
+        <span style={{ font: "700 14px/1.48 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)" }}>Couldn’t load your saved {what}</span>
+        <span style={{ font: "400 14px/1.48 var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)", textWrap: "pretty" } as React.CSSProperties}>Check your connection and try again.</span>
+      </span>
+      <button onClick={onRetry} disabled={retrying} className="btn-soft" style={{ marginTop: 4, height: 32, padding: "0 14px", display: "flex", alignItems: "center", gap: 6, font: "700 13px/16px var(--font-sans)", opacity: retrying ? 0.7 : 1 }}>
+        {retrying ? <><i className="ph-bold ph-circle-notch" style={{ fontSize: 13, animation: "spin .8s linear infinite" }} />Loading…</> : <><i className="ph-bold ph-arrow-clockwise" style={{ fontSize: 13 }} />Retry</>}
+      </button>
+    </div>
+  );
+}
+
+export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals, cols = 1, maxCols = 1, onCols, savedState = null, onSavedRetry }: {
   name: string; area?: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void; onOpenSaved?: () => void;
   onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void;
   // Multi-column feed: shares the Results 1 / 2 / 3 setting (11 Nov review).
   cols?: number; maxCols?: number; onCols?: (n: number) => void;
+  // Dev menu preview of the saved data states (BREEZY-7759): nothing saved, or the request failed.
+  savedState?: "empty" | "error" | null; onSavedRetry?: () => void;
   onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
   const sv = useSaved();
@@ -195,11 +227,14 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
 
   const sorted = <T extends { when: string }>(a: T[]) => sort === "Default" ? a : a.slice().sort((x, y) => ((RANK[x.when] ?? 0) - (RANK[y.when] ?? 0)) * (sort === "Newest" ? 1 : -1));
   // Opening (clicking) a saved search marks its new matches as seen (store `markSeen`).
-  const searches = sorted(sv.searches);
+  const searches = savedState ? [] : sorted(sv.searches);
+  const [retrying, setRetrying] = useState(false);
+  useEffect(() => { setRetrying(false); if (savedState) setTab(t => (t === "For you" ? "Searches" : t)); }, [savedState]);
+  const retry = () => { setRetrying(true); onSavedRetry?.(); };
   // Status + "when" follow the row position, as the canvas `mapP` does. Row keys are "p:" + the store key.
   // Alert types: the ones set on the property, else a demo set for the seeds. The update line
   // is worded for one of them (stable per property).
-  const props: PropItem[] = sorted(sv.props.map((p, k) => {
+  const props: PropItem[] = savedState ? [] : sorted(sv.props.map((p, k) => {
     const set = alertKinds(sv.alerts[p.key]);
     const kinds = set.length ? set : p.seed ? SEED_ALERTS[k % SEED_ALERTS.length] : [];
     const fired = kinds[Math.abs(p.l.id) % Math.max(1, kinds.length)];
@@ -227,6 +262,10 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
   const propList = (rows: PropItem[], live: boolean) => rows.map(x => <PropRow key={x.key} x={x} hover={live && hover === x.key} onEnter={enter(x.key)} onLeave={leave(x.key)} onOpen={() => openProp(x)} onDel={() => askDel(x.key, x.l.addr)} />);
   // V5 "For you" feed: filter by opportunity signal, larger cards with the signal badge.
   const forYouList = <ForYouFeed items={forYou} seen={seen} onOpen={onOpen} onHover={onHover} onSignals={onSignals} area={(area || "").split(",")[0]} cols={cols} />;
+  const searchesEmpty = savedState === "error" ? <SavedError what="searches" retrying={retrying} onRetry={retry} />
+    : searches.length === 0 && <SavedEmpty icon="bell" title="Stay on top of the market" body="Save a search and we’ll notify you when there are new matches." cta="Start your search" onCta={onStart} />;
+  const propsEmpty = savedState === "error" ? <SavedError what="properties" retrying={retrying} onRetry={retry} />
+    : props.length === 0 && <SavedEmpty icon="house-line" title="No saved properties yet" body="Save a home to follow its price and status. We’ll let you know when something changes." cta="Find properties" onCta={onStart} />;
   const hello = (
     <>
       <span style={{ font: "300 26px/1.26 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>Hello {name.split(" ")[0]}</span>
@@ -254,18 +293,9 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
             </>}
             {tab === "Searches" && <>
               {searchList(searches, true)}
-              {searches.length === 0 && (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "20px 0", textAlign: "center" }}>
-                  <span style={mask("/ui/bell.svg", 24, "rgb(196,146,134)")} />
-                  <span style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ font: "700 14px/1.48 var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)" }}>Stay on top of the market</span>
-                    <span style={{ font: "400 14px/1.48 var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)", textWrap: "pretty" } as React.CSSProperties}>Save a search and we’ll notify you when there are new matches.</span>
-                  </span>
-                  <button onClick={onStart} className="btn-soft" style={{ marginTop: 4, height: 32, padding: "0 14px", font: "700 13px/16px var(--font-sans)" }}>Start your search</button>
-                </div>
-              )}
+              {searchesEmpty}
             </>}
-            {tab === "Properties" && propList(props, true)}
+            {tab === "Properties" && <>{propList(props, true)}{propsEmpty}</>}
           </div>
           {/* Homes saved with "+" from the feed: thumbnails open the Properties tab, Share opens the share report (review feedback). */}
           {tab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved ? onOpenSaved() : setTab("Properties")} onShare={onSharePicked} />}
@@ -301,8 +331,8 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
           </div>
           <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: "0 24px 24px", animation: "hcListIn .5s cubic-bezier(.2,.8,.2,1) .08s both" }}>
             {fullTab === "For you" && forYouList}
-            {fullTab === "Searches" && searchList(searches, true)}
-            {fullTab === "Properties" && propList(props, true)}
+            {fullTab === "Searches" && <>{searchList(searches, true)}{searchesEmpty}</>}
+            {fullTab === "Properties" && <>{propList(props, true)}{propsEmpty}</>}
           </div>
           {fullTab === "For you" && picked.length > 0 && <PickedFooter picked={picked} onOpen={() => onOpenSaved ? onOpenSaved() : setFullTab("Properties")} onShare={onSharePicked} />}
         </div>

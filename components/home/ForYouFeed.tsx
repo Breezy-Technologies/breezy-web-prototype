@@ -19,7 +19,7 @@ const INK = "rgb(18,18,18)";
 type Item = { c: OppType | null; lb: string; ic: string };
 // `_FT`: signal families. Signals without data yet are listed as "Soon".
 const GROUPS: [string, Item[]][] = [
-  ["Listing status", (["exp", "wd", "stale", "drop"] as OppType[]).map(c => ({ c, lb: OPP[c].lb, ic: OPP[c].ic }))],
+  ["Listing status", (["exp", "soon", "wd", "bom", "stale", "near", "drop"] as OppType[]).map(c => ({ c, lb: OPP[c].lb, ic: OPP[c].ic }))],
   ["Build & value", (["ub", "roi"] as OppType[]).map(c => ({ c, lb: OPP[c].lb, ic: OPP[c].ic }))],
   ["Owner & life events", [["Long-time owner", "user"], ["Absentee owner", "airplane-tilt"], ["Probate", "scroll"], ["Divorce filing", "heart-break"]].map(([lb, ic]) => ({ c: null, lb, ic }))],
   ["Neighbourhood", [["Neighbour just sold", "house-line"], ["New permit nearby", "file-text"], ["Zoning change", "map-trifold"]].map(([lb, ic]) => ({ c: null, lb, ic }))],

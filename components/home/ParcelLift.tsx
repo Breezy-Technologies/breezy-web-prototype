@@ -8,7 +8,15 @@ import { HEAT_PALETTES, heatColorOf, parcelPct, useHeatPrefs } from "@/lib/heat"
 import { config, hasRegrid, isLiveMap } from "@/lib/config";
 import { OwnerRow, QeRow } from "./HoverCard";
 
-export type ParcelHit = { key: string; ring: [number, number][]; cx: number; cy: number; addr: string; listing: Listing };
+export type ParcelHit = { key: string; ring: [number, number][]; cx: number; cy: number; addr: string; listing: Listing; nonRes?: string };
+
+/* Non-residential parcels (19 Nov, BREEZY-7422, Tao / William): parks, roads, railroads, schools,
+   utilities are real county parcels with an APN and an owner but no home. They keep their outline
+   and still lift on hover, but never open the property panel: the hover card just says
+   "Non-residential parcel" with its use and lot size. County use codes (scripts/fetch-la-parcels.mjs
+   keeps the first three letters); in the product, the summary's `residential: false` flag. */
+const NON_RES: Record<string, string> = { Gov: "Government", Ins: "Institutional", Rec: "Recreational", Ind: "Industrial", Mis: "Miscellaneous", Irr: "Irrigated land", "": "Right of way" };
+export const nonResUse = (t?: string): string | undefined => (t === "Res" || t === "Com" ? undefined : NON_RES[t ?? ""] ?? "Other");
 
 // Hovering a parcel (zoom ≥ 15.4) lifts it off the map as a solid slab. With the
 // heat map on the slab keeps the parcel's heat colour; otherwise it's neutral.
@@ -45,6 +53,7 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
     const move = (e: any) => {
       const layers = ["bz-lots-fill", "bz-la-fill", "bz-par-fill"].filter(id => map.getLayer(id));
       if (map.getZoom() < 15.4 || !layers.length) { if (keyRef.current) { keyRef.current = ""; setHit(null); } return; }
+      ptRef.current = { x: e.point.x, y: e.point.y };
       const f = map.queryRenderedFeatures(e.point, { layers })[0];
       if (!f || f.geometry.type !== "Polygon") { if (keyRef.current) { keyRef.current = ""; setHit(null); } return; }
       const props: any = f.properties || {};
@@ -62,16 +71,18 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
         : { ...makeListings("parcel:" + key, [cx, cy], [cx - 1e-5, cy - 1e-5, cx + 1e-5, cy + 1e-5], null, 1, "")[0] };
       if (addr && !l.apn) l.addr = String(addr);
       if (props.owner) l.owner = { ...l.owner, name: String(props.owner), ini: String(props.owner).split(" ").filter((w: string) => /^[A-Z]/.test(w)).slice(0, 2).map((w: string) => w[0]).join("") };
-      setHit({ key, ring, cx, cy, addr: l.addr, listing: l });
+      const nonRes = county ? nonResUse(props.t) : undefined;
+      setHit({ key, ring, cx, cy, addr: nonRes && (!l.addr || l.addr === "Parcel") ? "No street address" : l.addr, listing: l, nonRes });
     };
     const leave = () => { keyRef.current = ""; setHit(null); };
-    const click = () => { if (keyRef.current && hitRef.current) onOpenRef.current(hitRef.current); };
+    const click = () => { if (keyRef.current && hitRef.current && !hitRef.current.nonRes) onOpenRef.current(hitRef.current); };
     map.on("mousemove", move);
     map.on("mouseout", leave);
     map.on("click", click);
     return () => { map.off("mousemove", move); map.off("mouseout", leave); map.off("click", click); };
   }, [map]);
   const hitRef = useRef(hit); hitRef.current = hit;
+  const ptRef = useRef({ x: 0, y: 0 }); // last pointer position on the map, for parcels too big to sit beside
   const onOpenRef = useRef(onOpen); onOpenRef.current = onOpen;
   // The hover card goes beside what is actually drawn (team feedback: the card must never
   // cover the hovered parcel): after each render, measure the lifted slab and its ground
@@ -79,23 +90,39 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
   // else left, vertically centred on it; only a parcel too wide for both sides puts it
   // above or below. Measured, so the lift, the zoom and the card's real height all count.
   const slabRef = useRef<SVGGElement>(null), groundRef = useRef<SVGPolygonElement>(null);
+  // MapOverlay mounts its portal one render late, so on a fresh hover the card isn't in the DOM
+  // yet when this runs: retry on the next frames (the card used to stay at 0,0, under the search bar).
   useLayoutEffect(() => {
-    const c = cardRef.current, a = slabRef.current, g = groundRef.current, host = c?.offsetParent as HTMLElement | null;
-    if (!c || !a || !g || !host) return;
+    let id = 0, tries = 0;
+    const go = () => { if (!place() && tries++ < 6) id = requestAnimationFrame(go); };
+    go();
+    return () => cancelAnimationFrame(id);
+  });
+  const place = (): boolean => {
+    const c = cardRef.current, a = slabRef.current, g = groundRef.current, host = (c?.offsetParent || c?.parentElement) as HTMLElement | null;
+    if (!c || !a || !g || !host) return false;
     const hb = host.getBoundingClientRect(), r1 = a.getBoundingClientRect(), r2 = g.getBoundingClientRect();
     const L = Math.min(r1.left, r2.left) - hb.left, R = Math.max(r1.right, r2.right) - hb.left;
     const T = Math.min(r1.top, r2.top) - hb.top, B = Math.max(r1.bottom, r2.bottom) - hb.top;
     const cw = c.offsetWidth, ch = c.offsetHeight, W = hb.width, H = hb.height, GAP = 20, TOP = 84;
     let x: number, y: number;
-    if (R + GAP + cw <= W - 12 || L - GAP - cw >= 12) {
+    if (R - L > W * 0.7 || B - T > H * 0.7) {
+      // A parcel bigger than the view (a park, a railway): no room beside it, so the card
+      // sits beside the pointer instead (it used to land in the corner, under the search bar).
+      const pt = ptRef.current;
+      x = pt.x + GAP + cw <= W - 12 ? pt.x + GAP : pt.x - GAP - cw;
+      y = pt.y - ch / 2;
+    } else if (R + GAP + cw <= W - 12 || L - GAP - cw >= 12) {
       x = R + GAP + cw <= W - 12 ? R + GAP : L - GAP - cw;
       y = Math.max(TOP, Math.min(H - ch - 12, (T + B) / 2 - ch / 2));
     } else {
       x = Math.max(12, Math.min(W - cw - 12, (L + R) / 2 - cw / 2));
       y = T - GAP - ch >= TOP ? T - GAP - ch : B + GAP;
     }
+    x = Math.max(12, Math.min(W - cw - 12, x)); y = Math.max(TOP, Math.min(H - ch - 12, y));
     c.style.left = `${Math.round(x)}px`; c.style.top = `${Math.round(y)}px`; c.style.opacity = "1";
-  });
+    return true;
+  };
 
   const show = hit || selected;
   if (!map || !show || map.getZoom() < 15.4) return null;
@@ -143,7 +170,6 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
     }
   }
   const edgeC = sat ? "rgb(255,209,41)" : "rgba(17,16,16,.75)";
-  const hole = `M-6000,-6000H6000V6000H-6000Z M${q.map(v => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(" L")}Z`;
   const top = Math.min(...q.map(v => v.y)), bot = Math.max(...q.map(v => v.y)), cx = q.reduce((a, v) => a + v.x, 0) / q.length;
   const num = (show.addr.match(/^\d+/) || [""])[0];
   const fs = Math.max(10, Math.min(14, 8 + (map.getZoom() - 15.4) * 3));
@@ -155,11 +181,9 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
       <div ref={wrapRef} style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, zIndex: 45, pointerEvents: "none", willChange: "transform", transformOrigin: "0 0", transform: `translate3d(${p0.x}px,${p0.y}px,0)` }}>
       <svg width={1} height={1} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }} key={show.key}>
         <defs><filter id="bzLiftBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" /></filter></defs>
-        {/* Light fade around the lifted parcel so the rest of the map stays readable (review feedback).
-            Only for a selected parcel, and without a fade: on hover it pulsed the whole map every time
-            the pointer crossed a road between parcels (12 Nov review: "remove the opacity change"). */}
-        {selected && !hit && (sat ? <path d={hole} fill="rgba(8,10,12,.2)" fillRule="evenodd" />
-          : <path d={hole} fill="rgba(253,251,248,.22)" fillRule="evenodd" />)}
+        {/* No veil round the parcel (19 Nov, William): the map's opacity never changes between the
+            default state, a hovered parcel, moving to another parcel, or a selected one. The selected
+            parcel's veil vanished whenever another parcel was hovered, so the map flashed. */}
         <polygon points={pts} fill={sat ? "rgba(0,0,0,.6)" : "rgba(58,42,38,.4)"} filter="url(#bzLiftBlur)" transform="translate(5 9)" />
         {Array.from({ length: 9 }, (_, k) => <polygon key={k} points={pts} fill={sideC} stroke={sideC} strokeWidth={1} strokeLinejoin="round" style={{ ["--l" as any]: `${-(k + 1)}px`, animation: "liftUp .3s cubic-bezier(.2,.8,.2,1) both" }} />)}
         <g ref={slabRef} style={{ ["--l" as any]: "-10px", animation: "liftUp .3s cubic-bezier(.2,.8,.2,1) both" }}>
@@ -179,6 +203,16 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
       </div>
       {showCard && (
         <div ref={cardRef} key={hit!.key} style={{ position: "absolute", left: 0, top: 0, opacity: 0, width: 268, display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 18, background: "var(--paper)", boxShadow: "0 14px 34px rgba(30,18,12,.2),0 0 0 .5px rgba(13,12,12,.08)", zIndex: 60, pointerEvents: "none", animation: "hvPop .2s cubic-bezier(.2,.8,.2,1) both" }}>
+          {hit!.nonRes ? <>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ flex: "none", width: 32, height: 32, borderRadius: 10, background: "rgb(240,237,235)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-tree" style={{ fontSize: 16, color: "rgb(98,90,89)" }} /></span>
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                <span style={{ font: "700 14px/19px var(--font-sans)" }}>Non-residential parcel</span>
+                <span style={{ font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hit!.addr}</span>
+              </span>
+            </div>
+            <span style={{ font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)" }}>{hit!.nonRes}{hit!.listing.lotAc > 0 ? ` · ${hit!.listing.lotAc} ac` : ""} · no home, no listing</span>
+          </> : <>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
             <span style={{ font: "700 14px/19px var(--font-sans)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hit!.addr}</span>
             <span style={{ flex: "none", font: "400 11px/16px var(--font-sans)", color: "rgb(98,90,89)" }}>{hasRegrid() ? "Parcel" : "Off market"}</span>
@@ -186,6 +220,7 @@ export function ParcelLift({ suppressCard, onOpen, selected }: { suppressCard: b
           <span style={{ marginTop: -6, font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)" }}>{hit!.listing.beds} Bed · {hit!.listing.lotAc} ac · Built {hit!.listing.built}</span>
           <OwnerRow l={hit!.listing} />
           {!hit!.listing.noQe && <QeRow l={hit!.listing} cta="Click for comps" />}
+          </>}
         </div>
       )}
     </MapOverlay>

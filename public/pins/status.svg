@@ -1,0 +1,18 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="28" height="31.7939" viewBox="0 0 28 31.7939" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="Group 2147231369">
+<g id="Union">
+<use xlink:href="#stroke0_st" fill="url(#paint0_linear_st)"/>
+<mask id="stroke1_st" fill="white">
+<use xlink:href="#stroke0_st"/>
+</mask>
+<path d="M14 0C21.732 0 28 6.26801 28 14C28 18.8666 25.5166 23.1521 21.7482 25.6605C19.8981 26.892 18.0564 28.2386 16.9131 30.1445C15.5936 32.3436 12.4064 32.3436 11.0869 30.1445C10.3381 28.8962 9.52939 27.3493 8.20455 26.7461C3.36481 24.5425 0 19.6647 0 14C0 6.26806 6.26808 7.90788e-05 14 0Z" stroke-width="4" stroke="#121212" stroke-opacity="0.24" mask="url(#stroke1_st)"/>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_st" x1="14" y1="0" x2="14" y2="31.7939" gradientUnits="userSpaceOnUse">
+<stop stop-color="#88BDDA"/>
+<stop offset="1" stop-color="#2C88B5"/>
+</linearGradient>
+<path id="stroke0_st" d="M14 0C21.732 0 28 6.26801 28 14C28 18.8666 25.5166 23.1521 21.7482 25.6605C19.8981 26.892 18.0564 28.2386 16.9131 30.1445C15.5936 32.3436 12.4064 32.3436 11.0869 30.1445C10.3381 28.8962 9.5294 27.3493 8.20455 26.7461C3.36481 24.5425 0 19.6647 0 14C0 6.26806 6.26808 7.90788e-05 14 0Z"/>
+</defs>
+</svg>

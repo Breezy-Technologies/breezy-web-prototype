@@ -10,7 +10,7 @@ import { photosFor } from "./photos";
 /** The heat circle's box, for a quick overlap test. */
 const HEAT_BOX: BBox = (() => { const [x, y] = HEAT_AREA.center, dx = HEAT_AREA.radius / metersPerDegLng(y), dy = HEAT_AREA.radius / metersPerDegLat; return [x - dx, y - dy, x + dx, y + dy]; })();
 
-export type OppType = "ub" | "drop" | "exp" | "roi" | "wd" | "stale";
+export type OppType = "ub" | "drop" | "exp" | "roi" | "wd" | "stale" | "soon" | "bom" | "near";
 
 // `ic`: the same Phosphor icon as the signal's map marker (public/pins, RadarPin), so the
 // feed, filters and legends match the map (18 Nov comment).
@@ -21,7 +21,27 @@ export const OPP: Record<OppType, { ic: string; lb: string; pl: string; col: str
   roi: { ic: "chart-bar", lb: "High ROI", pl: "High ROI", col: "147,89,75", why: ["59% ROI: 42% underbuilt, room to add value", "$1.8m profit after buying and rebuilding", "44% ROI: $44 back for every $100 spent"] },
   wd: { ic: "arrow-u-down-left", lb: "Withdrawn", pl: "Withdrawn", col: "160,120,108", why: ["Withdrawn 14 days ago after 94 days", "Withdrawn yesterday · no new agent"] },
   stale: { ic: "clock-countdown", lb: "Stale listing", pl: "Stale listings", col: "171,162,157", why: ["On market 170 days · 2 price drops", "On market 212 days · still active"] },
+  // Market radar signals added 19 Nov (Feng: about_to_expire, back_on_market, nearby_activity),
+  // all in the blue status family.
+  soon: { ic: "hourglass-medium", lb: "About to expire", pl: "About to expire", col: "160,150,170", why: ["Expires in 5 days · 172 days on market", "Expires in 9 days · no price change", "Expires in 3 days · no offers yet"] },
+  bom: { ic: "arrow-counter-clockwise", lb: "Back on market", pl: "Back on market", col: "150,140,160", why: ["Back on market 2 days ago · escrow fell through", "Back on market yesterday · relisted after 40 days off", "Back on market 6 days ago · new price"] },
+  near: { ic: "map-pin-area", lb: "Nearby activity", pl: "Nearby activity", col: "165,160,170", why: ["2 sales nearby · same street, last 30 days", "3 sales nearby · within ¼ mile this month", "New listing nearby · 2 doors down"] },
 };
+/** The original six signals: the generators pick from these so every seeded value stays put. */
+const BASE_OPPS: OppType[] = ["ub", "drop", "exp", "roi", "wd", "stale"];
+/* The three newer status signals take over a stable ~40% of the expired / withdrawn / stale
+   picks (hashed, no seeded draw), so existing homes keep their place and data. About to expire
+   and Back on market need a live listing; otherwise the home gets Nearby activity. */
+const NEW_STATUS: OppType[] = ["soon", "bom", "near"];
+function withNewSignals<T extends Listing>(l: T, seed: string): T {
+  if (l.opp !== "exp" && l.opp !== "wd" && l.opp !== "stale") return l;
+  const h = hashStr("sig2:" + seed);
+  if (h % 100 >= 40) return l;
+  let t = NEW_STATUS[(h >>> 8) % 3];
+  if (t !== "near" && l.status !== "Active") t = "near";
+  const w = OPP[t].why;
+  return { ...l, opp: t, oppWhy: w[(h >>> 12) % w.length] };
+}
 export const OPP_TYPES = Object.keys(OPP) as OppType[];
 
 export type Listing = {
@@ -155,7 +175,7 @@ function lotToListing(l: Lot, id: number): Listing {
     feats: PFEATS.filter(() => R() < 0.35),
     noQe: false,
   };
-  return out;
+  return withNewSignals(out, l.apn);
 }
 /** The real lot at a point (its outline contains it, else the nearest centre within ~60 m). */
 export function lotAt(p: LngLat): { l: Lot; i: number } | null {
@@ -260,7 +280,7 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
     if (fromHeatCenter([lng, lat]) <= HEAT_AREA.radius) continue; // real homes only in the heat circle
     const i = out.length;
     const price = Math.round((level * (0.45 + R() * 1.3)) / 5e3) * 5e3;
-    const opp = OPP_TYPES[Math.floor(R() * OPP_TYPES.length)];
+    const opp = BASE_OPPS[Math.floor(R() * BASE_OPPS.length)];
     const ow = OWNERS[Math.floor(R() * OWNERS.length)];
     const first = ow[0].split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
     const qeV = price * (0.94 + R() * 0.14);
@@ -302,7 +322,8 @@ export function makeListings(key: string, center: LngLat, bbox: BBox | undefined
       noQe: false,
     });
   }
-  return real.length ? [...real, ...out] : out;
+  const gen = out.map(o => withNewSignals(o, `${key}:${o.id}`));
+  return real.length ? [...real, ...gen] : gen;
 }
 
 // ---- Listings for a map box ("Search this area"), stable across searches ----
