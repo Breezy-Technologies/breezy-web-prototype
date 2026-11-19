@@ -14,11 +14,11 @@ import { RefObject, useLayoutEffect } from "react";
 const LIFT = 12;
 const SMALL = 96;   // a block this short is one component
 const CARD = 520;   // a framed card up to this tall is one component
-// 13 Nov review ("a moment of delight"): a short loading beat with every skeleton
-// shimmering, then the pieces arrive one by one, slowly.
-const FIRST = 1100, STEP_ABOVE = 240, ABOVE_MAX = 4200; // above the fold: beat, then sequential
-const DWELL = 650, STEP_BELOW = 230, BATCH_MAX = 1600;  // below: a writing beat, then in
-const FADE = 900, LIFT_MS = 1000;                       // each piece's own fade / lift
+// 13 Nov review ("a moment of delight") made it slow; 19 Nov (Jimsy: "too slow") sped it
+// up about 3x: a brief beat with the skeletons shimmering, then the pieces in quick succession.
+const FIRST = 380, STEP_ABOVE = 80, ABOVE_MAX = 1300;   // above the fold: beat, then sequential
+const DWELL = 220, STEP_BELOW = 70, BATCH_MAX = 600;    // below: a writing beat, then in
+const FADE = 420, LIFT_MS = 520;                        // each piece's own fade / lift
 
 const STYLE_ID = "bz-aiwrite-css";
 const CSS = `

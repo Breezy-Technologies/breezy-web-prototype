@@ -15,6 +15,7 @@ import type { CompsSession } from "../comps/useComps";
 import { accessNow, billing, paywall, reportKey, useEntitlements } from "@/lib/billing";
 import { PRICING, money, sku } from "@/lib/pricing.config";
 import { UsageChip } from "../billing/Paywall";
+import { preloadUBReport } from "../report/UBReport";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
 type Tab = (typeof TABS)[number];
@@ -114,6 +115,8 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
       sc.scrollTo({ top: to, behavior: "smooth" });
     }));
   };
+  // The Build guidelines report is a 700 KB recording: fetch it while the panel is open (19 Nov: "too slow").
+  useEffect(() => { const t = setTimeout(preloadUBReport, 600); return () => clearTimeout(t); }, []);
   useEffect(() => {
     if (reveal !== "play") return;
     const t = setTimeout(() => setReveal("done"), 1700);

@@ -22,6 +22,11 @@ function firstSymbol(m: MbMap) {
 }
 
 // Adds every Breezy source/layer if missing. Safe to call after each style load.
+// Map flicker (Jimsy, 13 and 19 Nov): while the camera zoomed into a property, the parcels and
+// building footprints vanished for a frame each time the map crossed a whole zoom level, as the
+// GeoJSON sources were re-tiled for the new level. They're tiled once at z14 (0.3 m precision)
+// and overzoomed from there, so zooming between 14.6 and 19 never swaps their tiles.
+const PARCEL_TILE_Z = 14;
 export function ensureLayers(m: MbMap) {
   if (!(m as any).style || !(m as any).style._loaded) return false;
   // Mapbox Standard (Breezy light / dark) has no symbol layers to insert
@@ -61,7 +66,7 @@ export function ensureLayers(m: MbMap) {
         minzoom: 13, maxzoom: 21,
         promoteId: { [config.regridSourceLayer]: "ll_uuid" },
       });
-    } else m.addSource("bz-par", { type: "geojson", data: EMPTY });
+    } else m.addSource("bz-par", { type: "geojson", data: EMPTY, maxzoom: PARCEL_TILE_Z });
     const sl = hasRegrid() ? { "source-layer": config.regridSourceLayer } : {};
     add({ id: "bz-par-fill", type: "fill", source: "bz-par", ...sl, minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } });
     // Lot outlines, Pedro's style: thin warm grey, fading in with the fills.
@@ -72,18 +77,18 @@ export function ensureLayers(m: MbMap) {
     // (scripts/fetch-la-parcels.mjs), so parcels cover the whole heat surface,
     // not only Pedro's blocks. Loaded on demand; parks, streets and other
     // unvalued parcels carry no `ub` / `roi` and draw as outlines only.
-    m.addSource("bz-la", { type: "geojson", data: "/data/sl-parcels.json", tolerance: 0.2 });
+    m.addSource("bz-la", { type: "geojson", data: "/data/sl-parcels.json", tolerance: 0.2, maxzoom: PARCEL_TILE_Z });
     add({ id: "bz-la-fill", type: "fill", source: "bz-la", minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } });
     add({ id: "bz-la-line", type: "line", source: "bz-la", minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } });
   }
   if (!m.getSource("bz-lots")) {
     // Pedro's real Silver Lake / Echo Park lots: static, coloured by their own
     // ROI / Underbuilt (properties `roi`, `ub`), same ramps as the parcels.
-    m.addSource("bz-lots", { type: "geojson", data: lotData() });
+    m.addSource("bz-lots", { type: "geojson", data: lotData(), maxzoom: PARCEL_TILE_Z });
     add({ id: "bz-lots-fill", type: "fill", source: "bz-lots", minzoom: 14.6, paint: { "fill-color": "rgba(0,0,0,0)", "fill-opacity": 0 } });
     add({ id: "bz-lots-line", type: "line", source: "bz-lots", minzoom: 14.6, paint: { "line-color": "#8A7A72", "line-width": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 17.5, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.55] } });
     // Pedro's building footprints, on top of the lots so the house sits in its lot (his layers.ts values).
-    m.addSource("bz-bldgs", { type: "geojson", data: "/data/silverlake-bldgs.json" });
+    m.addSource("bz-bldgs", { type: "geojson", data: "/data/silverlake-bldgs.json", maxzoom: PARCEL_TILE_Z });
     add({ id: "bz-bldgs-fill", type: "fill", source: "bz-bldgs", minzoom: 15.6, paint: { "fill-color": "#B7969C", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.22, 17.5, 0.26] } });
     add({ id: "bz-bldgs-line", type: "line", source: "bz-bldgs", minzoom: 15.6, paint: { "line-color": "#8A7A72", "line-width": 0.6, "line-opacity": ["interpolate", ["linear"], ["zoom"], 15.6, 0, 16.4, 0.4] } });
   }

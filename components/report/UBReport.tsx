@@ -43,6 +43,8 @@ const load = () => (cache ??= Promise.all([
   fetch("/ub-report/report.json").then(r => r.json()),
   fetch("/ub-report/report.css").then(r => r.text()),
 ]));
+/** Fetch the recorded report ahead of time (the detail panel calls it), so Max build opens at once. */
+export const preloadUBReport = () => { load().catch(() => { cache = null; }); };
 
 /* ---- personalisation of the recorded sample ---- */
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");

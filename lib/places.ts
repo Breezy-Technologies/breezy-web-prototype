@@ -79,8 +79,17 @@ export async function searchPlacesStrict(q: string, near?: LngLat): Promise<Plac
   }
   return geocode(q, near);
 }
+// US state abbreviations, spelled out for the geocoder: Mapbox reads "Silver Lake, CA" as
+// "Silver Lake" + noise and can land in New Hampshire (19 Nov, Jimsy); "Silver Lake,
+// California" finds the LA neighbourhood.
+const STATES: Record<string, string> = { AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming", DC: "District of Columbia" };
+const spellState = (q: string) => q.replace(/,\s*([A-Za-z]{2})\s*$/, (m, s) => STATES[s.toUpperCase()] ? ", " + STATES[s.toUpperCase()] : m);
+/** The state a query names ("…, CA" / "…, California"), to drop matches elsewhere. */
+const stateOf = (q: string) => { const t = spellState(q).split(",").pop()!.trim().toLowerCase(); return Object.values(STATES).find(v => v.toLowerCase() === t) || null; };
 async function geocode(q: string, near?: LngLat): Promise<Place[]> {
   if (!isLiveMap()) return offlineSearch(q);
+  const st = q.includes(",") ? stateOf(q) : null;
+  q = spellState(q);
   let r: Response;
   try {
     const u = new URL("https://api.mapbox.com/search/geocode/v6/forward");
@@ -112,8 +121,10 @@ async function geocode(q: string, near?: LngLat): Promise<Place[]> {
       bbox: p.bbox as BBox | undefined,
     };
   });
+  // A query that names a state keeps only matches in it, never another state's namesake.
+  const inState = st ? res.filter(p => p.label.toLowerCase().includes(st.toLowerCase())) : res;
   // No live match: the gazetteer may still know it (e.g. "Echo Park, CA").
-  return res.length ? res : offlineSearch(q);
+  return inState.length ? inState : offlineSearch(q);
 }
 
 // Lenient search for non-interactive callers (resolving a committed area, opening
@@ -215,6 +226,9 @@ export async function resolveArea(a: Area, near?: LngLat): Promise<Place | null>
     const c = await currentPosition(near || DEFAULT_PLACE.center);
     return { ...(await reversePlace(c)), label: CURRENT_LOCATION };
   }
+  // A recent search seeded by label ("Silver Lake, CA") resolves to the gazetteer's place first.
+  const g = offlineSearch(a.label.replace(/,\s*(ca|california)$/i, "")).find(p => p.name.toLowerCase() === a.label.split(",")[0].trim().toLowerCase());
+  if (g && /,\s*(ca|california)$/i.test(a.label)) return g;
   const r = await searchPlaces(a.label, near);
   return r.find(p => p.kind !== "address") || null;
 }
