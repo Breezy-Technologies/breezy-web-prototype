@@ -16,6 +16,7 @@ export type SavedSearch = {
   params: string[]; // [status, type, price, area], as the Home rows read them
   chips?: string[]; // every criterion chip shown in the save sheet
   sq: string; when: string; notify: boolean;
+  freq?: string; // alert frequency picked in the buyer wizard (Instant / Daily digest / Weekly)
   f?: Filters; place?: Place;
 };
 

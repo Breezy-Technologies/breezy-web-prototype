@@ -11,7 +11,8 @@ import { billing } from "./billing";
 
 export type Task = "buyer" | "contact" | "comps" | "underbuilt";
 export type Stage =
-  | "create" | "search"          // Create → item → the search step (buyer / underbuilt / comps)
+  | "create" | "search"          // Create → item → the search step (underbuilt / comps)
+  | "wizard"                     // buyer: the buyer-first wizard (BuyerWizard) is its own guide
   | "filters" | "save"           // buyer: criteria, then Save search
   | "pick" | "maxbuild"          // underbuilt: open a lot, see its Max build; contact: open a listing
   | "run"                        // comps: Get comps → review → Run comps

@@ -1,4 +1,5 @@
 "use client";
+import { BuyerWizard, BuyerResult } from "@/components/home/BuyerWizard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMapCtx } from "@/components/map/MapProvider";
@@ -27,12 +28,12 @@ import { CompPins } from "@/components/comps/CompPins";
 import { CompRadius, RadiusChip } from "@/components/comps/CompRadius";
 import { CompsExport } from "@/components/comps/CompsExport";
 import { compsFor } from "@/lib/comps";
-import { SavedSheet, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
+import { SavedSheet, searchCriteria, seedFilters, useAlerts, useSearchSheet } from "@/components/home/Saved";
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
 import { AreaReport, ReportsSheet, useReports } from "@/components/home/Reports";
 import { Listing, OppType, listingForAddress } from "@/lib/fake";
-import { Filters, SortKey, fDims, homeOk, sortListings } from "@/lib/filters";
+import { Filters, SortKey, fDef, fDims, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, hashStr, pointInRings, ringBBox } from "@/lib/geo";
 import { accessNow, paywall, reportKey, spend, useEntitlements } from "@/lib/billing";
@@ -176,6 +177,33 @@ export default function HomeWeb() {
   const setIntent = (i: Intent) => { intentRef.current = i; setIntentS(i); };
   const setBuyer = (on: boolean) => setIntent(on ? "buyer" : null);
   const INTENT_PROMPT: Record<string, string> = { buyer: "Where is your buyer looking?", underbuilt: "Where should we look for underbuilt lots?", comps: "Which property do you want comps for?" };
+  // Buyer-first wizard (components/home/BuyerWizard.tsx). On save: the buyer joins the contacts,
+  // the criteria become the filters, the areas are searched, then the search is saved for that
+  // buyer once its results are in (effect below), and the results show.
+  const [buyerWiz, setBuyerWiz] = useState(false);
+  const [buyerSave, setBuyerSave] = useState<BuyerResult | null>(null);
+  const finishBuyer = async (r: BuyerResult) => {
+    setBuyerWiz(false);
+    if (r.buyer.isNew) sv.addContact(r.buyer.name);
+    fs.setF({ ...fDef(), ...r.f });
+    await commitAreas(r.areas);
+    setBuyerSave(r);
+  };
+  useEffect(() => {
+    const r = buyerSave;
+    if (!r) return;
+    setBuyerSave(null);
+    const crit = searchCriteria(fs.f, place.label.split(",")[0]);
+    const id = "s" + Date.now(), firstSearch = !getStarted.get().done.includes("buyer");
+    sv.addSearch({
+      id, name: r.name, clients: [r.buyer.name], newN: 0, th: [0, 1, 2], photos: results.slice(0, 3).map(l => l.photos[0]),
+      params: crit.params, chips: crit.chips, f: fs.f, place: { ...place, rings: undefined }, sq: place.label, when: "Today", notify: r.notify, freq: r.freq,
+    });
+    sv.setActive(id); // the results now belong to the saved search (its header in the field, no Save search)
+    const first = r.buyer.name.split(" ")[0];
+    // The first one completes Make Breezy yours' buyer task, whose own toast says it.
+    if (!firstSearch) showToast(`Search saved for ${first} · ${results.length} match${results.length === 1 ? "" : "es"}${r.notify ? ` · ${r.freq.toLowerCase()} alerts` : ""}${r.shareWithBuyer ? `, sent to ${first} too` : ""}`, "positive");
+  }, [buyerSave]); // eslint-disable-line react-hooks/exhaustive-deps
   const afterBuyerSearch = (was: Intent) => {
     if (was === "buyer" && getStarted.get().tour?.task !== "buyer") setTimeout(() => openSheet(), 450);
     if (was === "underbuilt") { setHeat("ub"); fs.setF({ ...fs.f, ub: Math.max(fs.f.ub || 0, 40) }); showToast("Showing lots with 40%+ build potential", "positive"); }
@@ -505,7 +533,7 @@ export default function HomeWeb() {
       case "create": {
         const [k, label] = ITEM[tour.task]!;
         return [
-          { sel: `[data-tour="create-${k}"]`, title: `Pick ${label}`, sub: ({ buyer: "You'll pick the area next, then your client's criteria.", comps: "You'll pick the property next, then Breezy finds its comps.", underbuilt: "You'll pick an area next, and see its lots with room to build." } as Record<string, string>)[tour.task] },
+          { sel: `[data-tour="create-${k}"]`, title: `Pick ${label}`, sub: ({ buyer: "A short wizard: your buyer first, then where and what they're looking for.", comps: "You'll pick the property next, then Breezy finds its comps.", underbuilt: "You'll pick an area next, and see its lots with room to build." } as Record<string, string>)[tour.task] },
           { sel: `[data-tour="create"]`, title: "Start from Create", sub: "Every search and report you make in Breezy starts here." },
         ];
       }
@@ -534,7 +562,7 @@ export default function HomeWeb() {
       default: return null;
     }
   })();
-  const coachPaused = (searching && tour?.stage !== "search") || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || exportOn || gs.open || !!areaComps;
+  const coachPaused = buyerWiz || (searching && tour?.stage !== "search") || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || exportOn || gs.open || !!areaComps;
 
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
@@ -561,10 +589,10 @@ export default function HomeWeb() {
         onPick={k => {
         // Make Breezy yours: a Create item not yet earned runs its guided version.
         const gt = taskOf(k);
-        if (gt) { if (!gs.isDone(gt) && !(gt === "comps" && !ent.planOn)) getStarted.go(gt, "search"); else getStarted.end(); }
+        if (gt) { if (!gs.isDone(gt) && !(gt === "comps" && !ent.planOn)) getStarted.go(gt, gt === "buyer" ? "wizard" : "search"); else getStarted.end(); }
         if (k === "Map") { closeDetail(); setView("home"); setSearching(false); if (rp.open) rp.close(); }
-        // New buyer search: open location search; once an area is picked, offer Save search.
-        if (k === "Buyer search") { if (rp.open) rp.close(); setBuyer(true); sv.setActive(null); closeDetail(); setSearching(true); }
+        // New buyer search (19 Nov, Jimsy): the buyer-first wizard, buyer → area → criteria → alerts.
+        if (k === "Buyer search") { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setSearching(false); setBuyerWiz(true); }
         // Reports (side-nav footer) opens the saved reports sheet over the left column.
         if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
         // Nimbus: Settings opens Plan & usage; Inman News is included with the plan; the AI
@@ -584,6 +612,7 @@ export default function HomeWeb() {
         if (k === "Underbuilt") { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("underbuilt"); setSearching(true); }
       }} />
       <BillingHost onToast={showToast} />
+      {buyerWiz && <BuyerWizard onClose={() => { setBuyerWiz(false); if (getStarted.get().tour?.task === "buyer") getStarted.step("buyer", "create", ["wizard"]); }} onDone={finishBuyer} />}
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none", transformOrigin: "0 50%",
           transition: "opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1),visibility 0s linear " + (compsShift ? ".55s" : "0s"),
