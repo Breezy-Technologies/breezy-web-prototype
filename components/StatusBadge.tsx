@@ -10,3 +10,14 @@ export function StatusBadge({ status, size = 16, ring, muted }: { status: string
     </span>
   );
 }
+
+/** The status tag on listing photos (results cards, detail panel): a pill filled with the status
+    colour, white text, no letter (19 Nov review, William: "remove the letter and colour the tag
+    with the fill colour of the letter, for all statuses"). Pins and legends keep the lettered dot. */
+export function StatusTag({ status, style }: { status: string; style?: React.CSSProperties }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", height: 28, padding: "0 12px", borderRadius: 9999, background: statusStyle(status).c, font: "700 13px/28px var(--font-sans)", letterSpacing: ".25px", color: "rgb(253,252,252)", whiteSpace: "nowrap", ...style }}>
+      {status}
+    </span>
+  );
+}

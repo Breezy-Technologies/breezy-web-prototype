@@ -16,7 +16,7 @@ import { accessNow, billing, paywall, reportKey, useEntitlements } from "@/lib/b
 import { PRICING, money, sku } from "@/lib/pricing.config";
 import { UsageChip } from "../billing/Paywall";
 import { preloadUBReport } from "../report/UBReport";
-import { StatusBadge } from "../StatusBadge";
+import { StatusTag } from "../StatusBadge";
 import { statusColor } from "@/lib/status";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
@@ -231,7 +231,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(17,16,16)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
             </button>
           )}
-          <span style={css("position:absolute;left:16px;top:16px;z-index:2;display:flex;align-items:center;gap:6px;padding:5.333px 10.667px 5.333px 6px;border-radius:9999px;background:rgba(18,18,18,.72);backdrop-filter:blur(8px);font:400 14px/1.26 var(--font-sans);color:rgb(249,249,249)")}><StatusBadge status={l.status} ring />{l.status}</span>
+          <StatusTag status={l.status} style={{ position: "absolute", left: 16, top: 16, zIndex: 2 }} />
           <span style={css("position:absolute;right:20px;bottom:20px;z-index:2;display:flex;align-items:center;gap:4px;padding:5.333px 10.667px;border-radius:9999px;background:rgba(18,18,18,.72);backdrop-filter:blur(12px);font:400 14px/1.26 var(--font-sans);color:rgb(249,249,249)")}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(249,249,249)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><rect x="3" y="4.5" width="18" height="15" rx="2.5" /><circle cx="8.5" cy="9.5" r="1.6" /><path d="M21 15.5l-5-5-9 9" /></svg>
             {gi + 1} / {n}

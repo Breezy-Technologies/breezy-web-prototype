@@ -1,5 +1,5 @@
 "use client";
-import { StatusBadge } from "../StatusBadge";
+import { StatusTag } from "../StatusBadge";
 import { Listing, OPP, fullPrice } from "@/lib/fake";
 import { SORT_OPTS, SortKey } from "@/lib/filters";
 import { css } from "@/lib/css";
@@ -18,9 +18,7 @@ export function ListingCard({ l, onOpen, onHover, fresh = l.isNew, dense }: { l:
   return (
     <div data-tour-card={l.opp} onClick={onOpen} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} style={{ display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }}>
       <div style={{ position: "relative", height: dense ? 180 : 210, borderRadius: dense ? 18 : 20, background: `rgb(241,231,228) url(${l.photos[0]}) center/cover no-repeat` }}>
-        <span style={{ position: "absolute", left: 12, top: 12, display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 12px 0 6px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 13px/28px var(--font-sans)" }}>
-          <StatusBadge status={l.status} />{l.status}
-        </span>
+        <StatusTag status={l.status} style={{ position: "absolute", left: 12, top: 12 }} />
         {fresh && <NewTag style={{ position: "absolute", right: 56, top: 16 }} />}
         <SaveToggle saved={sv.isSaved(l)} onToggle={() => sv.toggleProp(l)} />
         <span style={{ position: "absolute", left: 12, bottom: 12, display: "flex", alignItems: "center", gap: 6, height: 26, padding: "0 10px", borderRadius: 9999, background: "rgba(18,18,18,.72)", font: "700 12px/26px var(--font-sans)", color: "var(--paper)" }}>
