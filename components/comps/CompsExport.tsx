@@ -9,6 +9,7 @@
 //
 // What the agent changes here is kept per property for the session. The estimate is the
 // same as the detail panel's ("Your estimate"), so editing it here changes it there too.
+import { StatusBadge } from "../StatusBadge";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Listing } from "@/lib/fake";
@@ -278,7 +279,7 @@ function StepComps({ cs, st, set, l, S }: { cs: CompsSession; st: ExportState; s
     <div style={{ display: "flex", gap: 6 }}>
       {([["S", "Sold", cs.incSold.length, SOLD], ["L", "Active", cs.incActive.length, ACTIVE]] as ["S" | "L", string, number, string][]).map(([k2, t, n, c]) => (
         <button key={k2} onClick={() => setTab(k2)} aria-pressed={tab === k2} style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 18px", border: "none", borderRadius: 9999, cursor: "pointer", font: "400 14px/18px var(--font-sans)", color: INK, background: tab === k2 ? "rgb(240,238,237)" : PAPER, boxShadow: tab === k2 ? `inset 0 0 0 1.5px ${INK}` : "inset 0 0 0 .5px rgba(13,12,12,.24)" }}>
-          <span style={{ width: 8, height: 8, borderRadius: 9999, background: c }} />{t} {n}
+          <StatusBadge status={t} size={14} />{t} {n}
         </button>
       ))}
       {(["Pending", "Expired"]).map(t => <button key={t} disabled title="Not in this data yet" style={{ height: 40, padding: "0 16px", border: "none", borderRadius: 9999, font: "400 14px/18px var(--font-sans)", color: "rgb(170,162,158)", background: PAPER, boxShadow: "inset 0 0 0 .5px rgba(13,12,12,.16)" }}>{t}</button>)}
@@ -601,7 +602,7 @@ function Preview({ cs, l, st, S, fig, step, pulse, refresh, user }: { cs: CompsS
                           <span style={{ font: "700 15px/20px var(--font-sans)" }}>{shortPrice(dd.sold || dd.listed)}</span>
                         </div>
                         <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>
-                          <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 9999, background: c.st === "S" ? SOLD : ACTIVE, marginRight: 6 }} />
+                          <span style={{ display: "inline-flex", verticalAlign: "-2px", marginRight: 6 }}><StatusBadge status={c.st === "S" ? "Sold" : "Active"} size={12} /></span>
                           {c.st === "S" && dd.soldOn ? `Sold ${shortDate(dd.soldOn)}` : `Listed ${shortDate(dd.listedOn)}`} · {s.beds} bd · {s.baths} ba · {k(s.sqft)} ft² · {k(s.lotAc * 43560)} ft² lot · Built {s.built} · {c.mi.toFixed(2)} mi · ${k(c.ppsf)}/ft²
                         </span>
                         {note && <div style={{ marginTop: 8, padding: "10px 12px", borderRadius: 8, background: "rgb(247,245,244)", boxShadow: `inset 2px 0 0 ${th.accent}`, font: "400 13px/19px var(--font-sans)", whiteSpace: "pre-wrap" }}>{note}</div>}

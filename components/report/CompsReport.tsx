@@ -12,6 +12,8 @@
 //  - top: n Comps · Average, and Set Your Estimate.
 // Comps are real lots (lib/comps.ts); list prices, dates, days on market and
 // garages are seeded (compDetail).
+import { StatusBadge } from "../StatusBadge";
+import { STATUS_STYLE } from "@/lib/status";
 import { useWheelSwipe } from "../useWheelSwipe";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -21,7 +23,7 @@ import { config, isLiveMap } from "@/lib/config";
 import { hashStr } from "@/lib/geo";
 import { LOTS } from "@/lib/silverlake";
 
-export const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", SOLD = "rgb(153,92,77)", ACTIVE = "rgb(56,128,104)", GREEN = "rgb(13,87,57)", PURPLE = "rgb(108,72,180)";
+export const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", SOLD = STATUS_STYLE.Sold.c, ACTIVE = STATUS_STYLE.Active.c, GREEN = "rgb(13,87,57)", PURPLE = "rgb(108,72,180)";
 export const SPARK = (c: string, s = 11) => <svg width={s} height={s} viewBox="0 0 24 24" fill={c} aria-hidden><path d="M12 0c.8 6.4 5.6 11.2 12 12-6.4.8-11.2 5.6-12 12-.8-6.4-5.6-11.2-12-12C6.4 11.2 11.2 6.4 12 0z" /></svg>;
 const k = (n: number) => n.toLocaleString("en-US");
 export const avg = (a: number[]) => { const b = a.filter(v => v > 0); return b.length ? b.reduce((s, v) => s + v, 0) / b.length : 0; };
@@ -121,7 +123,7 @@ export function CompCard({ c, n, of, on, vacant, onToggle, compact }: { c: Comp;
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 2 }}>
-          <span style={{ flex: "none", width: 12, height: 12, borderRadius: 9999, background: sold ? SOLD : ACTIVE }} />
+          <StatusBadge status={sold ? "Sold" : "Active"} size={18} />
           <span style={{ flex: 1, minWidth: 0, font: "700 14px/18px var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>{sold ? "Sold" : "Active"} {n} of {of}</span>
           <span style={{ font: "700 13px/16px var(--font-sans)", color: INK }}>{on ? "Included" : "Excluded"}</span>
           <Switch on={on} onClick={onToggle} label={on ? "Exclude this comp" : "Include this comp"} />
@@ -210,7 +212,7 @@ export function Table({ rows, isOn, onToggle }: { rows: { c: Comp; n: number; of
               <tr key={c.i} style={{ opacity: on ? 1 : 0.5 }}>
                 <td style={td}><input type="checkbox" checked={on} onChange={() => onToggle(c)} aria-label={`Include ${c.addr}`} style={{ accentColor: INK, width: 16, height: 16, cursor: "pointer" }} /></td>
                 <td style={{ ...td, fontWeight: 700 }}>{c.addr}</td>
-                <td style={td}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: 9999, background: c.st === "S" ? SOLD : ACTIVE }} />{c.st === "S" ? `Sold ${c.sm || ""} mo ago` : "Active"}</span></td>
+                <td style={td}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><StatusBadge status={c.st === "S" ? "Sold" : "Active"} size={15} />{c.st === "S" ? `Sold ${c.sm || ""} mo ago` : "Active"}</span></td>
                 <td style={td}>{fullPrice(d.sold ?? d.listed)}</td>
                 <td style={td}>{c.sqft ? `$${k(c.ppsf)}` : "—"}</td>
                 <td style={td}>{c.beds} / {c.baths}</td>
@@ -296,8 +298,8 @@ export function CompsReport({ l, reveal = false }: { l: Listing; reveal?: boolea
                 <div style={{ position: "relative", height: "100%", borderRadius: 24, overflow: "hidden", background: `rgb(240,236,232) url('${bigMap}') center/cover` }}>
                   <button onClick={() => setMapView(false)} style={pillDark}><i className="ph-bold ph-images" style={{ fontSize: 16 }} />Show photos</button>
                   <span style={{ position: "absolute", left: 16, bottom: 16, display: "flex", gap: 14, padding: "8px 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 13px/16px var(--font-sans)" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 9999, background: SOLD }} />Sold</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 9999, background: ACTIVE }} />Active</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}><StatusBadge status="Sold" />Sold</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}><StatusBadge status="Active" />Active</span>
                   </span>
                 </div>
               ) : (
@@ -351,7 +353,7 @@ export function CompsReport({ l, reveal = false }: { l: Listing; reveal?: boolea
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <span style={{ font: "400 30px/36px var(--font-sans)", letterSpacing: "-.02em", color: INK }}>{loading ? <>Estimating comps <span style={{ color: MUTED }}>{Math.min(ready, total)} of {total}</span></> : `${total} Comps to review`}</span>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 20px" }}>
-              {[[`${sold.filter(isReady).length} Sold`, SOLD], [`${active.filter(isReady).length} Active`, ACTIVE]].map(([t, c]) => <span key={t} style={{ display: "flex", alignItems: "center", gap: 8, font: "400 17px/22px var(--font-sans)", color: INK }}><span style={{ width: 10, height: 10, borderRadius: 9999, background: c }} />{t}</span>)}
+              {[[`${sold.filter(isReady).length} Sold`, SOLD], [`${active.filter(isReady).length} Active`, ACTIVE]].map(([t, c]) => <span key={t} style={{ display: "flex", alignItems: "center", gap: 8, font: "400 17px/22px var(--font-sans)", color: INK }}><StatusBadge status={c === SOLD ? "Sold" : "Active"} />{t}</span>)}
               {!loading && average > 0 && <span style={{ font: "400 17px/22px var(--font-sans)", color: INK }}>Average <b style={{ color: GREEN }}>{fullPrice(Math.round(average / 1000) * 1000)}</b></span>}
             </div>
           </div>

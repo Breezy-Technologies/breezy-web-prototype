@@ -9,7 +9,8 @@ import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
 import { ANCHOR_STYLE, useAnchors } from "../map/anchors";
 import { shortPrice } from "@/lib/fake";
-import { ACTIVE, INK, SOLD } from "../report/CompsReport";
+import { INK } from "../report/CompsReport";
+import { StatusBadge } from "../StatusBadge";
 import { type CompsSession, compLngLat, compPrice } from "./useComps";
 
 const DROP = "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 4px 12px rgba(30,18,12,.16)";
@@ -56,16 +57,15 @@ export function CompPins({ cs }: { cs: CompsSession }) {
       </div>
       {list.map(c => {
         const on = cs.isOn(c), lit = cs.hoverC === c.i, dotOnly = folded.has(c.i) && !lit;
-        const dot = !on ? "rgb(190,184,181)" : c.st === "S" ? SOLD : ACTIVE;
         return (
           <div key={c.i} ref={anchor(c.i, compLngLat(c))} style={{ ...ANCHOR_STYLE, zIndex: lit ? 57 : dotOnly ? 51 : on ? 54 : 52 }}>
             <button
               onClick={e => { e.stopPropagation(); cs.focus(c.i); }}
               onMouseEnter={() => cs.setHoverC(c.i)} onMouseLeave={() => cs.setHoverC(null)}
               title={`${c.addr} · ${c.st === "S" ? "Sold" : "Active"}${on ? "" : " · excluded"}`}
-              style={{ position: "absolute", left: 0, top: 0, transform: "translate(-50%,-50%)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, ...(dotOnly ? { width: 20, height: 20, padding: 0 } : { height: 32, padding: "0 12px 0 10px" }), border: "none", borderRadius: 9999, cursor: "pointer", pointerEvents: "auto", whiteSpace: "nowrap", boxShadow: DROP,
+              style={{ position: "absolute", left: 0, top: 0, transform: "translate(-50%,-50%)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, ...(dotOnly ? { width: 20, height: 20, padding: 0 } : { height: 32, padding: "0 12px 0 8px" }), border: "none", borderRadius: 9999, cursor: "pointer", pointerEvents: "auto", whiteSpace: "nowrap", boxShadow: DROP,
                 background: lit ? INK : "var(--paper)", opacity: on || lit ? 1 : 0.7, transition: "background .15s,opacity .2s", animation: "cpPop .45s cubic-bezier(.2,.8,.2,1) both" }}>
-              <span style={{ flex: "none", width: 9, height: 9, borderRadius: 9999, background: dot, boxShadow: lit ? "0 0 0 1.5px rgb(253,252,252)" : "none" }} />
+              <StatusBadge status={c.st === "S" ? "Sold" : "Active"} muted={!on} ring={lit} />
               {!dotOnly && <span style={{ font: "700 13px/1 var(--font-sans)", animation: "fadeIn .2s ease both", color: lit ? "rgb(253,252,252)" : on ? INK : "rgb(129,117,111)", textDecoration: on ? "none" : "line-through" }}>{shortPrice(compPrice(c))}</span>}
             </button>
           </div>

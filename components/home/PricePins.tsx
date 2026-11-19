@@ -4,10 +4,8 @@ import { MapOverlay } from "../map/Overlay";
 import { useMapCtx } from "../map/MapProvider";
 import { Listing, OPP, shortPrice } from "@/lib/fake";
 import { RadarPin, radarLabel } from "./RadarPin";
-import { ACTIVE, SOLD } from "../report/CompsReport";
 import { ANCHOR_STYLE, useAnchors } from "../map/anchors";
-// Status dot colours: Sold and Active match the comp pins (components/report/CompsReport).
-const STATUS_DOT: Record<string, string> = { Active: ACTIVE, Sold: SOLD, Pending: "rgb(201,146,40)", "Off market": "rgb(160,152,148)" };
+import { StatusBadge } from "../StatusBadge";
 
 const DROP = "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 4px 12px rgba(30,18,12,.16)";
 
@@ -64,7 +62,7 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
       // Market radar pins say their signal ("14% price drop"), with the marker above the pill.
       const sig = !!signal?.has(l.id);
       const lab = sig ? radarLabel(l) : shortPrice(l.price);
-      const w = sig ? lab.length * 6.6 + 20 : lab.length * 9 + 45;
+      const w = sig ? lab.length * 6.6 + 20 : lab.length * 9 + 52;
       const b = sig ? [p.x - w / 2 - 2, p.y - 42, p.x + w / 2 + 2, p.y + 12] : [p.x - w / 2 - 2, p.y - 19, p.x + w / 2 + 2, p.y + 19];
       const hit = boxes.some(q => !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]));
       const blank = hit && z < 16.5;
@@ -100,12 +98,12 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
               style={{
                 display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", borderRadius: 9999, boxShadow: DROP,
                 transition: "background .18s, width .18s, height .18s",
-                ...(isBlank ? { width: 34, height: 20 } : { height: 34, padding: "0 12px 0 11px" }),
+                ...(isBlank ? { width: 34, height: 20 } : { height: 34, padding: "0 12px 0 9px" }),
                 background: dark ? "var(--ink)" : sn ? "linear-gradient(rgba(18,18,18,.08),rgba(18,18,18,.08)),var(--paper)" : "var(--paper)",
               }}
             >
-              {/* 18 Nov comment: a status dot, as on the comp pins (Sold clay, Active green, Pending amber, Off market grey) */}
-              {!isBlank && <span title={l.status} style={{ flex: "none", width: 9, height: 9, borderRadius: 9999, background: STATUS_DOT[l.status], boxShadow: dark ? "0 0 0 1.5px rgb(253,252,252)" : "none" }} />}
+              {/* 19 Nov (Jimsy / Ann): the status letter in its colour (lib/status.ts), as on mobile */}
+              {!isBlank && <StatusBadge status={l.status} ring={dark} />}
               {!isBlank && !sig && l.opp === "drop" && <i className="ph-bold ph-arrow-down" style={{ fontSize: 13, marginRight: -2, color: dark ? "var(--paper)" : "rgb(192,98,84)" }} />}
               {!isBlank && <span style={{ font: "700 14px/1.26 var(--font-sans)", color: dark ? "var(--paper)" : "var(--ink)", animation: "fadeIn .22s ease both" }}>{lab}</span>}
             </span>}

@@ -16,6 +16,8 @@ import { accessNow, billing, paywall, reportKey, useEntitlements } from "@/lib/b
 import { PRICING, money, sku } from "@/lib/pricing.config";
 import { UsageChip } from "../billing/Paywall";
 import { preloadUBReport } from "../report/UBReport";
+import { StatusBadge } from "../StatusBadge";
+import { statusColor } from "@/lib/status";
 
 const TABS = ["Summary", "Specs", "Records", "Owners"] as const;
 type Tab = (typeof TABS)[number];
@@ -229,7 +231,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(17,16,16)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
             </button>
           )}
-          <span style={css("position:absolute;left:16px;top:16px;z-index:2;display:flex;align-items:center;padding:5.333px 10.667px;border-radius:9999px;background:rgba(18,18,18,.72);backdrop-filter:blur(8px);font:400 14px/1.26 var(--font-sans);color:rgb(249,249,249)")}>{l.status}</span>
+          <span style={css("position:absolute;left:16px;top:16px;z-index:2;display:flex;align-items:center;gap:6px;padding:5.333px 10.667px 5.333px 6px;border-radius:9999px;background:rgba(18,18,18,.72);backdrop-filter:blur(8px);font:400 14px/1.26 var(--font-sans);color:rgb(249,249,249)")}><StatusBadge status={l.status} ring />{l.status}</span>
           <span style={css("position:absolute;right:20px;bottom:20px;z-index:2;display:flex;align-items:center;gap:4px;padding:5.333px 10.667px;border-radius:9999px;background:rgba(18,18,18,.72);backdrop-filter:blur(12px);font:400 14px/1.26 var(--font-sans);color:rgb(249,249,249)")}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(249,249,249)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", display: "block" }}><rect x="3" y="4.5" width="18" height="15" rx="2.5" /><circle cx="8.5" cy="9.5" r="1.6" /><path d="M21 15.5l-5-5-9 9" /></svg>
             {gi + 1} / {n}
@@ -359,7 +361,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
             <div style={css("display:flex;flex-direction:column;gap:12px;padding:16px 16px 12px;border-radius:16px;background:rgb(243,241,239) repeating-linear-gradient(135deg,rgba(13,12,12,.018) 0 2px,transparent 2px 5px)")}>
               <div style={css("display:flex;align-items:center;justify-content:space-between;gap:12px")}>
                 <span style={css(H17)}>Listing description</span>
-                <span style={css("flex:none;display:flex;align-items:center;height:24px;padding:0 10px;border-radius:9999px;background:rgb(13,87,57);font:700 13px/24px var(--font-sans);color:rgb(249,249,249)")}>{l.status}</span>
+                <span style={css("flex:none;display:flex;align-items:center;height:24px;padding:0 10px;border-radius:9999px;font:700 13px/24px var(--font-sans);color:rgb(249,249,249);background:" + statusColor(l.status))}>{l.status}</span>
               </div>
               <span style={css("font:400 15px/22px var(--font-sans);color:rgb(18,18,18);text-wrap:pretty")}>{descOpen ? d.desc : d.descShort}</span>
               <span style={css("font:400 14px/20px var(--font-sans);letter-spacing:.2px;color:rgb(98,90,89);white-space:pre-line")}>{`Listed by: ${d.agent}\n${d.brokerage}\nSource: ${d.source}`}</span>

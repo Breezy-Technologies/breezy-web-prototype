@@ -9,6 +9,7 @@
 //    tap away without leaving the map;
 //  - Add comps (next best candidates) and Hide excluded, next to it.
 // Hovering a card lights its pin; clicking a pin scrolls to its card.
+import { StatusBadge } from "../StatusBadge";
 import { useEffect, useRef, useState } from "react";
 import { fullPrice, shortPrice } from "@/lib/fake";
 import type { Comp } from "@/lib/comps";
@@ -82,7 +83,7 @@ export function CompsSide({ cs, width, cols, out, onClose, onEstimate, onAddSold
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 18px", font: "400 15px/20px var(--font-sans)", color: INK }}>
           {([[sold.filter(isReady).length, "Sold", SOLD], [active.filter(isReady).length, "Active", ACTIVE]] as [number, string, string][]).map(([n, t, c]) => (
-            <span key={t} style={{ display: "flex", alignItems: "center", gap: 7 }}><span style={{ width: 9, height: 9, borderRadius: 9999, background: c }} />{n} {t}</span>
+            <span key={t} style={{ display: "flex", alignItems: "center", gap: 7 }}><StatusBadge status={t} size={15} />{n} {t}</span>
           ))}
           {cs.average > 0 && <span>Average <b style={{ color: GREEN }}>{fullPrice(Math.round(cs.average / 1000) * 1000)}</b></span>}
         </div>
@@ -304,7 +305,7 @@ function ManualPick({ cs }: { cs: CompsSession }) {
             <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
               <span style={{ font: "700 14px/19px var(--font-sans)", color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.addr}</span>
               <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                <span style={{ display: "inline-block", width: 8, height: 8, marginRight: 6, borderRadius: 9999, background: c.st === "S" ? SOLD : ACTIVE }} />
+                <span style={{ display: "inline-flex", verticalAlign: "-3px", marginRight: 6 }}><StatusBadge status={c.st === "S" ? "Sold" : "Active"} size={14} /></span>
                 {c.st === "S" ? "Sold" : "Active"} · {shortPrice(c.price)} · {k(c.sqft)} ft² · {c.mi.toFixed(1)} mi · {c.score}% match
               </span>
             </span>
