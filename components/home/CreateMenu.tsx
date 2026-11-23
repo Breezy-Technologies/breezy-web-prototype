@@ -14,12 +14,27 @@ import { EarnChip } from "./GetStarted";
 
 export type CreateItem = { k: string; title: string; desc: string; icon: string; art: string; tint: string; group: "Search" | "Reports" };
 export const CREATE_ITEMS: CreateItem[] = [
-  { k: "Buyer search", title: "Buyer search", desc: "Set an area for a client and get alerted to new matches", icon: "/ui/pin-3d.png", art: "/iso/alerts.png", tint: "rgb(236,243,248)", group: "Search" },
-  { k: "Underbuilt", title: "Underbuilt search", desc: "Find lots with room to build more", icon: "/nav/radar.png", art: "/iso/build.png", tint: "rgb(250,243,231)", group: "Search" },
-  { k: "Comps", title: "Comps report", desc: "Price a property from recent sales nearby", icon: "/nav/comps-iso.png", art: "/iso/comps.png", tint: "rgb(245,238,243)", group: "Reports" },
+  { k: "Buyer search", title: "New buyer search", desc: "Pick an area and a client, get alerts on new listings and price drops", icon: "/ui/pin-3d.png", art: "/iso/alerts.png", tint: "rgb(236,243,248)", group: "Search" },
+  { k: "Underbuilt", title: "New underbuilt report", desc: "What the zoning lets you build on a lot", icon: "/nav/radar.png", art: "/iso/build.png", tint: "rgb(250,243,231)", group: "Search" },
+  { k: "Comps", title: "New comp", desc: "Price a property from recent sales nearby", icon: "/nav/comps-iso.png", art: "/iso/comps.png", tint: "rgb(245,238,243)", group: "Reports" },
 ];
 
 export type CreateStyle = "menu" | "flyout" | "launcher";
+
+// First visit (agent feedback, 23 Nov: "make starting a task obvious"): Create starts expanded with
+// a short label beside it until it's been opened once (or the label is dismissed); after that it
+// stays a plain button. localStorage `bz-create-intro`; Dev menu → "Reset help tips" brings it back.
+const INTRO = "bz-create-intro";
+function useIntro() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const sync = () => { try { setOn(!localStorage.getItem(INTRO)); } catch { setOn(false); } };
+    sync(); window.addEventListener("bz-tips", sync);
+    return () => window.removeEventListener("bz-tips", sync);
+  }, []);
+  return [on, () => { try { localStorage.setItem(INTRO, "1"); } catch {} setOn(false); }] as const;
+}
+export const resetCreateIntro = () => { try { localStorage.removeItem(INTRO); } catch {} };
 
 function useCreateShortcut(onOpen: () => void) {
   useEffect(() => {
@@ -45,9 +60,11 @@ export function CreateButton({ variant, expanded, navW, locked, onPick }: { vari
   const [open, setOpen] = useState(false);
   const [top, setTop] = useState(80);
   const btn = useRef<HTMLButtonElement>(null);
+  const [intro, seen] = useIntro();
   const place = () => { const r = btn.current?.getBoundingClientRect(); if (r) setTop(r.top); };
-  const toggle = () => { place(); setOpen(o => !o); };
-  useCreateShortcut(() => { place(); setOpen(true); });
+  useEffect(() => { if (intro) place(); }, [intro]);
+  const toggle = () => { place(); seen(); setOpen(o => !o); };
+  useCreateShortcut(() => { place(); seen(); setOpen(true); });
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest("[data-create]")) setOpen(false); };
@@ -79,6 +96,15 @@ export function CreateButton({ variant, expanded, navW, locked, onPick }: { vari
   return (
     <>
       {trigger}
+      {intro && !open && (
+        <div data-create="" role="note" style={{ position: "fixed", left: navW + 10, top: top + (expanded ? 4 : 0), zIndex: 190, display: "flex", alignItems: "center", gap: 10, padding: "8px 8px 8px 14px", borderRadius: 9999, background: "var(--ink)", color: "var(--paper)", boxShadow: "0 8px 24px rgba(24,14,10,.24)", animation: "panelDrop .3s cubic-bezier(.2,.8,.2,1) .4s both", whiteSpace: "nowrap" }}>
+          <span style={{ position: "absolute", left: -5, top: "50%", width: 10, height: 10, background: "var(--ink)", transform: "translateY(-50%) rotate(45deg)", borderRadius: 2 }} />
+          <button onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 8, padding: 0, border: "none", background: "none", color: "inherit", cursor: "pointer", font: "400 13px/18px var(--font-sans)" }}>
+            <b style={{ fontWeight: 700 }}>Start here</b>New buyer search, comp or underbuilt report
+          </button>
+          <button onClick={seen} title="Dismiss" style={{ width: 24, height: 24, border: "none", borderRadius: 9999, background: "rgba(255,255,255,.14)", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-x" style={{ fontSize: 11 }} /></button>
+        </div>
+      )}
       {open && variant === "menu" && <MenuPop left={navW + 8} top={top} locked={locked} onPick={pick} />}
       {open && variant === "flyout" && <FlyoutPanel left={navW + 8} top={top} locked={locked} onPick={pick} />}
       {open && variant === "launcher" && <Launcher locked={locked} onPick={pick} onClose={() => setOpen(false)} />}

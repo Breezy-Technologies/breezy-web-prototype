@@ -1,5 +1,8 @@
 "use client";
 import { BuyerWizard, BuyerResult } from "@/components/home/BuyerWizard";
+import { CreateRun, TaskBar } from "@/components/home/TaskBar";
+import { resetCreateIntro } from "@/components/home/CreateMenu";
+import { resetTips, tipDone } from "@/components/HelpTip";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMapCtx } from "@/components/map/MapProvider";
@@ -178,7 +181,7 @@ export default function HomeWeb() {
     if (!l) { const x = hoExtra.find(h => h.id === id); if (x) return openSavedNow(x); }
     if (id !== selId) alerts.close();
     setParcel(null); setSoloL(null); setSelId(id); setHoverId(null); setSearching(false);
-    setSeen(s => new Set(s).add(id));
+    setSeen(s => new Set(s).add(id)); armRun();
     if (l) frameSel(l);
   };
   // Frame the selection in the free map space right of the detail panel (lib/map/frame.ts).
@@ -197,7 +200,7 @@ export default function HomeWeb() {
   const [intent, setIntentS] = useState<Intent>(null);
   const setIntent = (i: Intent) => { intentRef.current = i; setIntentS(i); };
   const setBuyer = (on: boolean) => setIntent(on ? "buyer" : null);
-  const INTENT_PROMPT: Record<string, string> = { buyer: "Where is your buyer looking?", underbuilt: "Where should we look for underbuilt lots?", comps: "Which property do you want comps for?" };
+  const INTENT_PROMPT: Record<string, string> = { buyer: "Where is your buyer looking?", underbuilt: "Which lot? An address, or an area to scan", comps: "Which property do you want comps for?" };
   // Buyer-first wizard (components/home/BuyerWizard.tsx). On save: the buyer joins the contacts,
   // the criteria become the filters, the areas are searched, then the search is saved for that
   // buyer once its results are in (effect below), and the results show.
@@ -229,10 +232,18 @@ export default function HomeWeb() {
   }, [buyerSave]); // eslint-disable-line react-hooks/exhaustive-deps
   const afterBuyerSearch = (was: Intent) => {
     if (was === "buyer" && getStarted.get().tour?.task !== "buyer") setTimeout(() => openSheet(), 450);
-    if (was === "underbuilt") { setHeat("ub"); fs.setF({ ...fs.f, ub: Math.max(fs.f.ub || 0, 40) }); showToast("Showing lots with 40%+ build potential", "positive"); }
+    if (was === "underbuilt") { setRun(null); setHeat("ub"); fs.setF({ ...fs.f, ub: Math.max(fs.f.ub || 0, 40) }); showToast("Showing lots with 40%+ build potential", "positive"); }
   };
   // Comps intent: once the picked property is open, go straight into comps.
   const compsNext = useRef(false);
+  // Create flows on the map (agent feedback, 23 Nov): New comp and New underbuilt report keep a
+  // step (components/home/TaskBar.tsx). Step 0 is "pick the property": an address from the search,
+  // or a home / parcel clicked on the map, both lead on.
+  const [run, setRunS] = useState<CreateRun | null>(null);
+  const runRef = useRef<CreateRun | null>(null);
+  const setRun = (r: CreateRun | null) => { runRef.current = r; setRunS(r); };
+  const ubNext = useRef(false);
+  const armRun = () => { const r = runRef.current; if (r?.step !== 0) return; if (r.kind === "comps") compsNext.current = true; else ubNext.current = true; };
   const goPlace = async (p: Place) => { setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
   // `_commitAreas`: results for the field's area(s); leaves the active saved search.
   // Each chip resolves to a Place (live geocoding / gazetteer; "Current location" via
@@ -257,11 +268,12 @@ export default function HomeWeb() {
     sv.setActive(null);
     // Guided comps (18 Nov review): the property opens on its own; the guide then points at Get comps.
     compsNext.current = intentRef.current === "comps" && getStarted.get().tour?.task !== "comps"; setIntent(null);
+    armRun();
     getStarted.step("comps", "run", ["search", "create"]);
     const [lng, lat] = p.center;
     // The parcel matching the address (house number + street), not just the nearest lot.
     const l = isCovered(p) ? await listingForAddress("addr:" + p.id, p.name || p.label, p.center, p.label.split(", ").slice(1, 2).join("")) : null;
-    if (!l) { compsNext.current = false; return showToast("No property found", "info"); }
+    if (!l) { compsNext.current = false; ubNext.current = false; return showToast("No property found", "info"); }
     // A real lot keeps its own spot and address; a generated home takes the searched ones.
     openSavedProp(l.apn ? l : { ...l, lng, lat, addr: p.name });
   };
@@ -399,11 +411,41 @@ export default function HomeWeb() {
   };
   // Create → Run comps: the property just picked opens, then slides into comps.
   useEffect(() => {
+    // Create → New underbuilt report: the picked lot opens, then its Max build report runs.
+    if (ubNext.current && sel) {
+      ubNext.current = false;
+      if (runRef.current) setRun({ ...runRef.current, step: 1 });
+      const l = sel, t = setTimeout(() => openReport(l, "ub"), 600);
+      return () => clearTimeout(t);
+    }
+    // Leaving the property mid-flow goes back to picking one.
+    if (!sel && runRef.current && runRef.current.step > 0 && !flow) setRun({ ...runRef.current, step: 0 });
     if (!compsNext.current || !sel) return;
     compsNext.current = false;
+    if (runRef.current?.kind === "comps") setRun({ kind: "comps", step: 1 });
     const t = setTimeout(openCompsMode, 600);
     return () => clearTimeout(t);
   }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // New comp: settings (review / choice) → run (the comps loading) → done once they're in.
+  useEffect(() => {
+    const r = runRef.current;
+    if (r?.kind !== "comps" || r.step === 0) return;
+    if (r.step === 1 && compsOn && !compsAsk && (cm.loading || cm.setup || cm.key)) setRun({ ...r, step: 2 });
+    if (r.step === 2 && compsOn && !cm.loading && !cm.setup && cm.key) { tipDone("comps"); setRun(null); }
+  }, [compsOn, compsAsk, cm.loading, cm.setup, cm.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // New underbuilt report: done once the report has opened and closed.
+  const ubFlowWas = useRef(false);
+  useEffect(() => {
+    const r = runRef.current;
+    if (flow?.kind === "ub") { ubFlowWas.current = true; return; }
+    if (ubFlowWas.current && r?.kind === "underbuilt") { ubFlowWas.current = false; tipDone("underbuilt"); setRun(null); }
+  }, [flow]); // eslint-disable-line react-hooks/exhaustive-deps
+  const runBack = () => {
+    const r = runRef.current; if (!r) return;
+    setCompsAsk(null); setFlow(null); closeDetail(); compsNext.current = false; ubNext.current = false;
+    setRun({ ...r, step: 0 }); setIntent(r.kind); setSearching(true);
+  };
+  const runCancel = () => { setRun(null); compsNext.current = false; ubNext.current = false; setCompsAsk(null); setIntent(null); setSearching(false); };
   // Frame once the session (and so its comps) exists.
   useEffect(() => { if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [compsOn, cm.key]); // eslint-disable-line react-hooks/exhaustive-deps
   // New filters or radius: reframe once the new comps are known.
@@ -552,7 +594,7 @@ export default function HomeWeb() {
     getStarted.go(t, "create");
   };
   const TITLE: Record<Task, string> = { buyer: "Set up a buyer search", contact: "Contact an owner", comps: "Run your first comp", underbuilt: "Find underbuilt lots" };
-  const ITEM: Partial<Record<Task, [string, string]>> = { buyer: ["Buyer search", "Buyer search"], comps: ["Comps", "Comps report"], underbuilt: ["Underbuilt", "Underbuilt search"] };
+  const ITEM: Partial<Record<Task, [string, string]>> = { buyer: ["Buyer search", "New buyer search"], comps: ["Comps", "New comp"], underbuilt: ["Underbuilt", "New underbuilt report"] };
   const coachSteps: CoachStep[] | null = (() => {
     if (!tour) return null;
     const T = TITLE[tour.task];
@@ -642,6 +684,7 @@ export default function HomeWeb() {
   const devActions: DevAction[] = [
     { group: "Onboarding & activation", label: "Make Breezy yours: reset", icon: "ph-sparkle", run: () => { getStarted.reset(); getStarted.show(); } },
     { group: "Onboarding & activation", label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } },
+    { group: "Onboarding & activation", label: "Reset help tips + Create label", icon: "ph-lightbulb", run: () => { resetCreateIntro(); resetTips(); } },
     // Scan-to-link handoff (app/login, app/link): the login screen and the first web screen per trial state.
     { group: "Handoff (iPhone → web)", label: "Start: the phone and its nudge", icon: "ph-device-mobile-camera", run: () => router.push("/start") },
     { group: "Handoff (iPhone → web)", label: "Log in screen (QR)", icon: "ph-qr-code", run: () => router.push("/login") },
@@ -694,11 +737,13 @@ export default function HomeWeb() {
         // then results with the Underbuilt heat. Both start in the search step, like buyer search.
         if (k === "Comps") {
           if (!ent.planOn) paywall.open({ kind: "offer", feature: "comps" });
-          else { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("comps"); setSearching(true); }
+          else { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("comps"); setSearching(true); setRun({ kind: "comps", step: 0 }); }
         }
-        if (k === "Underbuilt") { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("underbuilt"); setSearching(true); }
+        if (k === "Underbuilt") { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("underbuilt"); setSearching(true); setRun({ kind: "underbuilt", step: 0 }); }
+        if (k === "Buyer search") setRun(null);
       }} />
       <BillingHost onToast={showToast} />
+      {run && !buyerWiz && <TaskBar run={run} left={navW} onBack={run.step > 0 && !(run.kind === "comps" && run.step === 2) ? runBack : undefined} onCancel={runCancel} />}
       {buyerWiz && <BuyerWizard onClose={() => { setBuyerWiz(false); if (getStarted.get().tour?.task === "buyer") getStarted.step("buyer", "create", ["wizard"]); }} onDone={finishBuyer} />}
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none", transformOrigin: "0 50%",
@@ -815,7 +860,7 @@ export default function HomeWeb() {
         <HoverCard l={hover} onKeep={() => clearTimeout(keepT.current)} onLeave={() => { keepT.current = setTimeout(() => setHoverId(null), 160); }} onOpen={() => openListing(hover.id)} />
       )}
       <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => gate(() => {
-        alerts.close(); setSearching(false); setSelId(null); setSoloL(null); setParcel(p);
+        alerts.close(); setSearching(false); setSelId(null); setSoloL(null); setParcel(p); armRun();
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
         frameSel(p.listing, p.ring, [p.cx, p.cy]);
       })} />
