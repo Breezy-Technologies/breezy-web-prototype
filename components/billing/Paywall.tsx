@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Access, type BillingState, PRESETS, billing, paywall, trialLength, useBilling, useEntitlements, usePaywallReq } from "@/lib/billing";
 import { SettingsDialog } from "./SettingsDialog";
+import { handoffProfile } from "@/lib/handoff/profile";
 import { type Feature, type Metered, PRICING, type Segment, money, saving, sku } from "@/lib/pricing.config";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", CLAY = "rgb(147,89,75)", SOFT = "rgb(245,240,238)", PAPER = "rgb(253,252,252)";
@@ -129,9 +130,10 @@ function OfferSheet({ onClose, onDone, feature, title, kicker }: { onClose: () =
               {kicker ? kicker : <><Lock size={14} color={MUTED} />{LOCKED[feature!]} part of {P.name}</>}
             </span>
           )}
+          {s.holiday && (win || trialAgain) && <HolidayRibbon />}
           <span style={{ font: "400 40px/1.08 var(--font-sans)", letterSpacing: "-1.2px", color: INK, textWrap: "balance" } as React.CSSProperties}>{head}</span>
           <span style={{ font: "400 16px/23px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>{sub}</span>
-          {(win || trialAgain) && <TrialTimeline days={days} card={!!win} back={!!win} />}
+          {(win || trialAgain) && <TrialTimeline days={days} card={!!win} back={!!win} holiday={!!s.holiday} />}
           {!(win || trialAgain) && <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
             <span style={{ font: "400 30px/1 var(--font-sans)", letterSpacing: "-.8px", color: INK }}>{money(P.price)}</span>
             <span style={{ font: "400 15px/20px var(--font-sans)", color: MUTED }}>/{P.period}{win || trialAgain ? " after the trial" : ""}</span>
@@ -169,13 +171,25 @@ function OfferSheet({ onClose, onDone, feature, title, kicker }: { onClose: () =
   );
 }
 
+/* ---------- Holiday offer (PRICING.holiday, web only) ---------- */
+const halfPrice = () => ({ ...P.price, amount: Math.round(P.price.amount * (100 - PRICING.holiday.pct)) / 100 });
+function HolidayRibbon() {
+  const H = PRICING.holiday;
+  return (
+    <span style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 8, height: 32, padding: "0 6px 0 10px", borderRadius: 9999, background: "rgb(255,209,41)", font: "700 13px/16px var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>
+      <i className="ph-fill ph-gift" style={{ fontSize: 16 }} />{H.label} · {H.pct}% off for {H.months} months
+      <span style={{ height: 22, padding: "0 8px", display: "flex", alignItems: "center", borderRadius: 9999, background: "rgba(253,252,252,.75)", font: "700 11px/14px var(--font-sans)" }}>Web only</span>
+    </span>
+  );
+}
+
 /* ---------- Trial timeline (18 Nov review, after the NYT trial screen) ----------
    On every "Start free trial" path: what happens and when, so the end of the trial
    and the first charge are never a surprise. Today (full access) → a reminder email
    and in-app notice (PRICING.trialReminders) → the last email → the day it ends, with
    the price. Without a card (new 2.0 users) nothing is charged until one is added. */
-function TrialTimeline({ days, card, back }: { days: number; card: boolean; back: boolean }) {
-  const R = PRICING.trialReminders, A = PRICING.allowance;
+function TrialTimeline({ days, card, back, holiday }: { days: number; card: boolean; back: boolean; holiday?: boolean }) {
+  const R = PRICING.trialReminders, A = PRICING.allowance, H = PRICING.holiday;
   const at = (d: number) => new Date(Date.now() + d * 864e5).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const steps: { t: string; d: React.ReactNode; done?: boolean; now?: boolean; icon?: string }[] = [
     { t: back ? "Welcome back" : "Account created", d: back ? "Your saved searches, properties and reports are still here." : "Your Breezy account is ready.", done: true },
@@ -183,7 +197,7 @@ function TrialTimeline({ days, card, back }: { days: number; card: boolean; back
     { t: `${at(days - R.firstDaysBefore)} · ${R.firstDaysBefore} days before`, d: "We email you and show a notice in Breezy that your trial ends soon, with what you've used.", icon: "ph-envelope-simple" },
     { t: `${at(days - R.lastDaysBefore)} · the day before`, d: card ? `A last email with the date and amount of your first charge.` : "A last email. Add a card to keep going; nothing changes until you do.", icon: "ph-bell-simple" },
     { t: `${at(days)} · trial ends`, icon: "ph-credit-card", d: <>
-        <s style={{ color: "rgb(150,140,136)" }}>{money(P.was)}</s> <b style={{ fontWeight: 700, color: INK }}>{money(P.price, P.period)}</b>{" "}
+        <s style={{ color: "rgb(150,140,136)" }}>{money(holiday ? P.price : P.was)}</s> <b style={{ fontWeight: 700, color: INK }}>{money(holiday ? halfPrice() : P.price, P.period)}</b>{holiday ? ` for your first ${H.months} months, then ${money(P.price, P.period)},` : ""}{" "}
         {card ? "billed monthly from today. Cancel before this date and you won't be charged." : "once you add a card. No card, no charge: your account stays, the Pro features lock."}
       </> },
   ];
@@ -445,11 +459,113 @@ export function BillingHost({ onToast }: { onToast: Toast }) {
   if (r.kind === "news") return <News onClose={close} onToast={onToast} />;
   // Subscribed on the iPhone (handoff): no web checkout anywhere, every upgrade entry point says so.
   if (r.kind === "appstore" || (s.store === "apple" && (r.kind === "offer" || r.kind === "upsell"))) return <AppStoreSheet onClose={close} onToast={onToast} />;
+  if (r.kind === "keep") return <KeepSheet built={r.built} onClose={close} />;
+  if (r.kind === "done") return <DoneSheet what={r.what} onClose={() => { close(); r.then?.(); }} />;
   if (r.kind === "offer") return <OfferSheet feature={r.feature} kicker={r.kicker} onClose={close} onDone={() => {
-    onToast(s.status === "none" && s.segment === "new2" ? `Your ${s.trialVariant}-day trial has started` : `${P.name} started`, "positive"); close(); r.then?.();
+    const trial = s.status === "none";
+    // Logged in from the iPhone: confirm it's on the phone too (no Restore Purchases).
+    if (handoffProfile.get().on) return paywall.open({ kind: "done", what: trial ? "trial" : "plan", then: r.then });
+    onToast(trial && s.segment === "new2" ? `Your ${s.trialVariant}-day trial has started` : `${P.name} started`, "positive"); close(); r.then?.();
   }} />;
   return <UpsellSheet feature={r.feature} then={r.then} onClose={close} onToast={onToast} />;
 }
+/** Trial days 11–13 (handoff, trial active): the trial-to-paid moment, at a desk. What the
+ *  agent built in the trial, the plan, then a Stripe checkout (mock) and the success sheet. */
+function KeepSheet({ built, onClose }: { built: [string, number][]; onClose: () => void }) {
+  const { trialLeft, trialLength: len } = useEntitlements();
+  const [pay, setPay] = useState(false), [busy, setBusy] = useState(false);
+  const end = inDays(trialLeft);
+  const go = () => { setBusy(true); setTimeout(() => { billing.startPlan(); paywall.open({ kind: "done", what: "plan" }); }, 1100); };
+  return (
+    <Sheet onClose={onClose} label="Keep your reports and saved areas" width={520}>
+      <span style={{ display: "flex", alignItems: "center", gap: 8, font: "400 14px/20px var(--font-sans)", color: MUTED }}>
+        <i className="ph-bold ph-hourglass-medium" style={{ fontSize: 15 }} />Your free trial ends in {trialLeft} day{trialLeft === 1 ? "" : "s"} · day {len - trialLeft} of {len}
+      </span>
+      <span style={{ font: "400 32px/1.1 var(--font-sans)", letterSpacing: "-.9px", color: INK, paddingRight: 32, textWrap: "balance" } as React.CSSProperties}>Keep your reports and saved areas</span>
+      {!pay ? <>
+        <span style={{ font: "400 15px/22px var(--font-sans)", color: MUTED }}>Here&apos;s what you&apos;ve built in Breezy so far. It all stays, on the web and on your iPhone.</span>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${built.length},1fr)`, gap: 8 }}>
+          {built.map(([k, n]) => (
+            <div key={k} style={{ display: "flex", flexDirection: "column", gap: 2, padding: "12px 14px", borderRadius: 14, background: SOFT }}>
+              <span style={{ font: "300 28px/1.1 var(--font-sans)", color: INK }}>{n}</span>
+              <span style={{ font: "400 13px/17px var(--font-sans)", color: MUTED }}>{k}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ font: "400 28px/1 var(--font-sans)", letterSpacing: "-.8px", color: INK }}>{money(P.price)}</span>
+          <span style={{ font: "400 15px/20px var(--font-sans)", color: MUTED }}>/{P.period}</span>
+          <s style={{ font: "400 15px/20px var(--font-sans)", color: "rgb(150,140,136)" }}>{money(P.was, P.period)}</s>
+          <span style={{ alignSelf: "center", height: 22, padding: "0 8px", display: "flex", alignItems: "center", borderRadius: 9999, background: "rgb(255,209,41)", font: "700 11px/14px var(--font-sans)", color: INK }}>{P.badge}</span>
+        </div>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, font: "700 14px/20px var(--font-sans)", color: INK }}><i className="ph-bold ph-device-mobile" style={{ fontSize: 16 }} />One plan. Works on your iPhone too.</span>
+        <button onClick={() => setPay(true)} style={btnPrimary}>Keep {P.name}</button>
+        <button onClick={onClose} className="btn-soft" style={{ alignSelf: "center" }}>Remind me later</button>
+      </> : <>
+        {/* Stripe Checkout (mock): nothing is charged in the prototype. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 16, borderRadius: 16, boxShadow: "inset 0 0 0 1px rgba(18,18,18,.12)" }}>
+          <Field label="Email" value="james.carter@privaterelay.appleid.com" />
+          <Field label="Card" value="4242 4242 4242 4242" icon="ph-credit-card" />
+          <div style={{ display: "flex", gap: 10 }}><Field label="Expiry" value="12 / 29" /><Field label="CVC" value="123" /></div>
+          <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED }}>Nothing is charged today. Your first {money(P.price)} is on {end}, when the trial ends. Cancel anytime before.</span>
+        </div>
+        <button onClick={go} disabled={busy} style={btnPrimary}>
+          {busy && <i className="ph-bold ph-circle-notch" style={{ animation: "spin .8s linear infinite" }} />}{busy ? "Confirming" : `Subscribe · ${money(P.price, P.period)}`}
+        </button>
+        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, font: "400 12px/16px var(--font-sans)", color: MUTED }}><i className="ph-bold ph-lock-simple" />Payments by Stripe · demo, no card is charged</span>
+      </>}
+    </Sheet>
+  );
+}
+const Field = ({ label, value, icon }: { label: string; value: string; icon?: string }) => (
+  <label style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4, font: "700 12px/16px var(--font-sans)", color: MUTED }}>
+    {label}
+    <span style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 12px", borderRadius: 10, background: PAPER, boxShadow: "inset 0 0 0 1px rgba(18,18,18,.16)", font: "400 14px/18px var(--font-sans)", color: INK, overflow: "hidden", whiteSpace: "nowrap" }}>
+      {icon && <i className={`ph-bold ${icon}`} style={{ fontSize: 16, color: MUTED }} />}{value}
+    </span>
+  </label>
+);
+
+/** After a web purchase or trial start (handoff): confirmed, and live on the phone too. The
+ *  app re-checks the entitlement on its next launch, so there's no Restore Purchases step. */
+function DoneSheet({ what, onClose }: { what: "trial" | "plan"; onClose: () => void }) {
+  const s = useBilling();
+  const trial = what === "trial";
+  const title = trial ? `Your ${s.trialVariant}-day free trial is on` : `You're on ${P.name}`;
+  const push = trial ? `Your ${P.name} trial is now active on this iPhone.` : `${P.name} is now active on this iPhone.`;
+  return (
+    <Sheet onClose={onClose} label={title} width={640}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 24, alignItems: "center", paddingTop: 28 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <span style={{ width: 52, height: 52, borderRadius: 9999, background: "rgb(49,140,96)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 0 8px rgba(49,140,96,.12)", animation: "riseIn .35s cubic-bezier(.2,.8,.2,1) both" }}><i className="ph-bold ph-check" style={{ fontSize: 26, color: "#fff" }} /></span>
+          <span style={{ font: "400 30px/1.1 var(--font-sans)", letterSpacing: "-.8px", color: INK, textWrap: "balance" } as React.CSSProperties}>{title}</span>
+          <span style={{ font: "400 15px/22px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>
+            One plan, on the web and on your iPhone. Open Breezy on your phone and it&apos;s already there: nothing to buy or restore in the App Store.
+          </span>
+          <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>
+            {trial ? `No card needed. Ends ${inDays(s.trialVariant)}.` : `Billed by Stripe · ${money(P.price, P.period)} · receipt sent to your email.`}
+          </span>
+          <button onClick={onClose} style={{ ...btnPrimary, alignSelf: "flex-start", marginTop: 4 }}>Continue</button>
+        </div>
+        {/* The phone gets the push */}
+        <div aria-hidden style={{ position: "relative", width: 200, height: 300, borderRadius: 34, background: INK, padding: 7, boxShadow: "0 16px 40px rgba(30,18,12,.2)" }}>
+          <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: 28, overflow: "hidden", background: "linear-gradient(160deg,rgb(196,160,146),rgb(96,70,84))" }}>
+            <span style={{ position: "absolute", top: 30, left: 0, right: 0, textAlign: "center", font: "300 44px/1 var(--font-sans)", color: "rgba(255,255,255,.92)" }}>9:41</span>
+            <div style={{ position: "absolute", left: 8, right: 8, top: 112, display: "flex", gap: 8, padding: 10, borderRadius: 16, background: "rgba(253,252,252,.82)", backdropFilter: "blur(10px)", animation: "bzPushIn .6s .5s cubic-bezier(.2,.8,.2,1) both" }}>
+              <span style={{ flex: "none", width: 26, height: 26, borderRadius: 7, background: "rgb(255,209,41)", display: "flex", alignItems: "center", justifyContent: "center", font: "700 13px/1 var(--font-sans)", color: INK }}>B</span>
+              <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                <span style={{ display: "flex", justifyContent: "space-between", font: "700 10px/13px var(--font-sans)", color: INK }}>BREEZY<span style={{ fontWeight: 400, color: MUTED }}>now</span></span>
+                <span style={{ font: "400 11px/14px var(--font-sans)", color: INK }}>{push}</span>
+              </span>
+            </div>
+          </div>
+          <style>{`@keyframes bzPushIn{from{opacity:0;transform:translateY(-18px) scale(.96)}to{opacity:1;transform:none}}`}</style>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
 /** "You're subscribed through the App Store" (handoff, `subscribed_apple`): Apple bills the
  *  plan, so the web never shows a checkout (avoids double billing). */
 function AppStoreSheet({ onClose, onToast }: { onClose: () => void; onToast: Toast }) {

@@ -31,6 +31,8 @@ export type BillingState = {
   lockStyle: LockStyle;
   /** Billed by the App Store (subscribed on the iPhone): no web checkout anywhere (handoff). */
   store?: "apple";
+  /** The holiday 50%-off offer is live (PRICING.holiday; Dev menu toggles it). */
+  holiday?: boolean;
   /** State version: 2 = locked tiles open the paywall only (17 Nov review). */
   v?: number;
 };
@@ -81,7 +83,7 @@ export const billing = {
   apply(next: Partial<BillingState>) { set({ ...next, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [] }); },
   preset(id: string) {
     const p = PRESETS.find(x => x.id === id); if (!p) return;
-    set({ ...BASE, store: undefined, unlimited: state.unlimited, lockStyle: state.lockStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
+    set({ ...BASE, store: undefined, holiday: undefined, unlimited: state.unlimited, lockStyle: state.lockStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
   },
   /** Mock purchase: adds the SKU's credits. */
   buy(id: string) {
@@ -154,6 +156,10 @@ export type PaywallReq =
   | { kind: "upsell"; feature: Metered; then?: () => void }
   | { kind: "offer"; feature?: Feature; kicker?: string; then?: () => void }
   | { kind: "appstore" }
+  /** Trial days 11–13 (handoff, active): "Keep your reports and saved areas". */
+  | { kind: "keep"; built: [string, number][] }
+  /** After a web purchase or trial start (handoff): "Works on your iPhone too". */
+  | { kind: "done"; what: "trial" | "plan"; then?: () => void }
   | { kind: "plan"; tab?: string }
   | { kind: "winback" }
   | { kind: "news" }

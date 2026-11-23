@@ -13,6 +13,7 @@ import { handoffProfile } from "@/lib/handoff/profile";
 import { useApp } from "@/components/AppState";
 
 type Mode = "qr" | "email" | "sent" | "code" | "approved";
+const EMAIL_LINK = "your email link";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", PAPER = "rgb(253,252,252)", CLAY = "rgb(147,89,75)";
 const QR_SIZE = 248;
@@ -58,7 +59,7 @@ export default function LoginPage() {
   // A magic link opened on this computer (/login?magic=…).
   useEffect(() => {
     const m = new URLSearchParams(location.search).get("magic");
-    if (m) { history.replaceState(null, "", "/login"); succeed("your email link", "magic"); }
+    if (m) { history.replaceState(null, "", "/login"); succeed(EMAIL_LINK, "magic"); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -113,7 +114,7 @@ export default function LoginPage() {
                 <span style={{ width: 88, height: 88, borderRadius: 9999, background: "rgb(49,140,96)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 0 10px rgba(49,140,96,.12)" }}>
                   <i className="ph-bold ph-check" style={{ fontSize: 44, color: "#fff" }} />
                 </span>
-                <span style={{ font: "700 18px/24px var(--font-sans)", color: INK, textAlign: "center" }}>Approved on {by}</span>
+                <span style={{ font: "700 18px/24px var(--font-sans)", color: INK, textAlign: "center" }}>{by === EMAIL_LINK ? "Logged in with your email link" : `Approved on ${by}`}</span>
                 <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED }}>Opening your map…</span>
               </div>
             )}

@@ -36,9 +36,9 @@ import { Listing, OppType, listingForAddress } from "@/lib/fake";
 import { Filters, SortKey, fDef, fDims, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, hashStr, pointInRings, ringBBox } from "@/lib/geo";
-import { accessNow, billing, paywall, reportKey, spend, useEntitlements } from "@/lib/billing";
+import { accessNow, billing, paywall, reportKey, spend, trialLength, useEntitlements } from "@/lib/billing";
 import { PROFILE, TRIAL_STATES, handoffProfile, profileLastViewed, profilePlace, profileSaved, useHandoff } from "@/lib/handoff/profile";
-import { DeskChecklist, TrialBanner, endTip, firstPanelTip, tourSteps } from "@/components/home/Handoff";
+import { DeskChecklist, TrialBanner, endTip, firstCompTips, tourSteps } from "@/components/home/Handoff";
 import { BillingHost } from "@/components/billing/Paywall";
 import { getStarted, taskOf, useGetStarted, type Task } from "@/lib/getStarted";
 import { Checklist, Coach, CoachStep, EarnedToast } from "@/components/home/GetStarted";
@@ -164,9 +164,10 @@ export default function HomeWeb() {
 
   // Handoff, trial dismissed (team, 23 Nov): the map, pins, heat and hover previews stay open;
   // pressing a result (card, pin, parcel, saved home) stops on the trial offer instead of the
-  // property panel. Starting the trial opens the property they pressed.
+  // property panel. Starting the trial opens the property they pressed. Dev menu → "lock the
+  // actions": the panel opens and its paid actions lock instead (blurred estimate, offers).
   const gate = (open: () => void) => {
-    if (!hs.on || ent.planOn) return open();
+    if (!hs.on || ent.planOn || hs.gate === "actions") return open();
     setHoverId(null);
     paywall.open({ kind: "offer", feature: "comps", kicker: "Property details are part of Agents Pro", then: open });
   };
@@ -586,7 +587,9 @@ export default function HomeWeb() {
   const coachPaused = buyerWiz || (searching && tour?.stage !== "search") || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || exportOn || gs.open || !!areaComps;
 
   // ---- Handoff: the first web screen (lib/handoff/profile.ts, components/home/Handoff.tsx) ----
-  // Land in context: the phone's last area, its saved homes pinned and saved, then the walkthrough.
+  // Land in context: the phone's last area, its saved homes pinned and saved. Trial dismissed:
+  // the walkthrough. Trial users (research, 23 Nov: no tour): the last property viewed on the
+  // phone opens with tooltips for a first comp; days 11–13, the "Keep your reports" paywall first.
   const [tourI, setTourI] = useState<number | null>(null);
   useEffect(() => {
     if (!hs.on || !hs.landing || !map || !ready) return;
@@ -598,13 +601,18 @@ export default function HomeWeb() {
       if (bb) map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { left: GAP + COL + GAP + 40, right: 120, top: 100, bottom: 60 }, duration: 900, maxZoom: 14.6 });
     });
     profileSaved().forEach(l => { if (!sv.isSaved(l)) sv.toggleProp(l); });
-    if (!hs.tourDone) setTimeout(() => setTourI(0), 1200);
+    if (hs.trial === "dismissed") { if (!hs.tourDone) setTimeout(() => setTourI(0), 1200); return; }
+    handoffProfile.endTour();
+    const l = profileLastViewed(); if (l) setTimeout(() => openSavedNow(l), 1300);
+    const b = billing.get();
+    if (hs.trial === "active" && b.status === "trial" && b.trialDay >= 11 && b.trialDay < trialLength(b) && !hs.keepShown) setTimeout(() => {
+      handoffProfile.keepSeen();
+      paywall.open({ kind: "keep", built: [["Saved homes", PROFILE.saved.length], ["Saved searches", sv.searches.length], ["Reports", rp.list.length + PROFILE.reportsOnPhone]] });
+    }, 2400);
   }, [hs.on, hs.landing, map, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const tourAll = hs.on && tourI != null ? tourSteps(hs.trial, PROFILE.saved.length) : null;
   const endTour = () => {
     setTourI(null); handoffProfile.endTour();
-    // Active trial / App Store: the last property viewed on the phone opens. Dismissed: nothing opens (gated).
-    if (hs.trial !== "dismissed") { const l = profileLastViewed(); if (l) setTimeout(() => openSavedNow(l), 300); }
   };
   const nextTour = () => { if (tourI == null || !tourAll) return; if (tourI + 1 >= tourAll.length) endTour(); else setTourI(tourI + 1); };
   const tourPaused = searching || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || buyerWiz || detailOpen;
@@ -620,8 +628,8 @@ export default function HomeWeb() {
     }, 2000);
     return () => clearTimeout(t);
   }, [tourI, tourPaused]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Active trial: one tooltip on the first property panel, pointing at Get comps.
-  const tipOn = hs.on && hs.trial === "active" && hs.tourDone && !hs.tipDone && detailOpen && !compsOn && tourI == null;
+  // Trial users: tooltips on the first property panel guide a first comp (Get comps → check the details → Let AI pick).
+  const tipOn = hs.on && hs.trial !== "dismissed" && !hs.tipDone && detailOpen && !compsOn && tourI == null;
   useEffect(() => { if (compsOn && hs.on && !hs.tipDone) endTip(); }, [compsOn]); // eslint-disable-line react-hooks/exhaustive-deps
   const hoGreeting = !hs.on ? undefined : hs.trial === "active" && ent.s.status === "trial" ? `Welcome back · day ${ent.s.trialDay} of ${ent.trialLength}` : `Welcome back, ${user.name.split(" ")[0]}`;
 
@@ -630,10 +638,13 @@ export default function HomeWeb() {
     { group: "Onboarding & activation", label: "Make Breezy yours: reset", icon: "ph-sparkle", run: () => { getStarted.reset(); getStarted.show(); } },
     { group: "Onboarding & activation", label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } },
     // Scan-to-link handoff (app/login, app/link): the login screen and the first web screen per trial state.
+    { group: "Handoff (iPhone → web)", label: "Start: the phone and its nudge", icon: "ph-device-mobile-camera", run: () => router.push("/start") },
     { group: "Handoff (iPhone → web)", label: "Log in screen (QR)", icon: "ph-qr-code", run: () => router.push("/login") },
     { group: "Handoff (iPhone → web)", label: "Replay first web screen", icon: "ph-arrow-counter-clockwise", run: () => handoffProfile.replay() },
-    ...TRIAL_STATES.map(t => ({ group: "Handoff (iPhone → web)", label: `${hs.on && hs.trial === t.id ? "● " : ""}${t.label}`, icon: "ph-device-mobile", run: () => { closeDetail(); handoffProfile.setTrial(t.id); if (!hs.on) handoffProfile.replay(); } })),
-    { group: "Handoff (iPhone → web)", label: "Phone: “Run this on your computer”", icon: "ph-desktop", run: () => window.open("/m/desk", "_blank") },
+    ...TRIAL_STATES.map(t => ({ group: "Handoff (iPhone → web)", label: `${hs.on && hs.trial === t.id && (!t.day || hs.day === t.day) ? "● " : ""}${t.label}`, icon: "ph-device-mobile", run: () => { closeDetail(); handoffProfile.setTrial(t.id, t.day); handoffProfile.replay(); } })),
+    { group: "Handoff (iPhone → web)", label: `Trial dismissed: ${hs.gate === "panel" ? "● gate the whole panel" : "gate the whole panel"}`, icon: "ph-lock", run: () => handoffProfile.setGate("panel") },
+    { group: "Handoff (iPhone → web)", label: `Trial dismissed: ${hs.gate === "actions" ? "● open the panel, lock the actions" : "open the panel, lock the actions"}`, icon: "ph-lock-open", run: () => handoffProfile.setGate("actions") },
+    { group: "Handoff (iPhone → web)", label: `Holiday 50% offer: ${ent.s.holiday ? "on → turn off" : "off → turn on"}`, icon: "ph-gift", run: () => billing.set({ holiday: !billing.get().holiday }) },
     { group: "Handoff (iPhone → web)", label: "Leave handoff mode", icon: "ph-sign-out", run: () => { handoffProfile.leave(); billing.preset("trial"); } },
     { group: "Snackbars", label: "Snackbar: neutral", icon: "ph-info", run: () => showToast("No property found", "neutral") },
     { group: "Snackbars", label: "Snackbar: positive", icon: "ph-check-circle", run: () => showToast("Search saved", "positive") },
@@ -780,7 +791,7 @@ export default function HomeWeb() {
             Offline demo map
           </span>
         )}
-        {hs.on && !ent.planOn && tourI == null && !detailOpen && !compsOn && !flow && <TrialBanner days={ent.s.trialVariant} left={GAP + COL + GAP} right={120} />}
+        {hs.on && !ent.planOn && tourI == null && !detailOpen && !compsOn && !flow && <TrialBanner days={ent.s.trialVariant} holiday={!!ent.s.holiday} left={GAP + COL + GAP} right={120} />}
         {!onboarded && (
           <button onClick={() => router.push("/onboarding")} className="btn-soft" style={{ position: "absolute", right: 20, top: 72, height: 36, fontSize: 13, background: "var(--paper)", pointerEvents: "auto", boxShadow: "0 4px 12px rgba(40,26,20,.1)" }}>
             <i className="ph-bold ph-play" />Replay onboarding
@@ -813,7 +824,7 @@ export default function HomeWeb() {
       <Toast toast={toast} />
       <Coach steps={coachSteps} task={tour?.task} paused={coachPaused} onExit={getStarted.end} />
       <Coach steps={tourCoach} paused={tourPaused} onExit={endTour} />
-      <Coach steps={tipOn ? [{ ...firstPanelTip, onNext: endTip }] : null} paused={!!flow || exportOn} onExit={endTip} />
+      <Coach steps={tipOn ? firstCompTips() : null} paused={!!flow || exportOn} onExit={endTip} />
       <Checklist left={navW + 12} onStart={startTask} />
       <EarnedToast onNext={startTask} />
     </>

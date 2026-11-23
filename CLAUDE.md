@@ -8,7 +8,7 @@ Breezy is a property-intelligence app for real-estate agents. It surfaces opport
 
 This repo is a standalone Next.js 15 + React 19 + TypeScript app. It shows two things:
 
-- the **V5 onboarding and activation flow** (`/onboarding`, also the `/` redirect);
+- the **mobile → web handoff** (`/start`, the `/` redirect since 23 Nov: the phone and its nudge, then `/login`), and the older **V5 web onboarding** (`/onboarding`, web sign-up; Dev menu → Restart onboarding);
 - the **Home Web** core experience it hands off to (`/home`).
 
 Both routes share **one Mapbox GL map** that lives in the root layout (`components/map/MapProvider.tsx`). Camera, layers and the chosen area carry over with no reload. `window.__bzMap` exposes the map in the browser console. A ResizeObserver keeps the canvas the size of its container (any change, not only window resizes).
@@ -50,15 +50,20 @@ Env keys are listed in `.env.example`, set locally in `.env.local`, and stored f
 
 The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 
-## Log in on the computer: scan-to-link handoff (`/login`, `/link`; branch `feature/qr-handoff-login`, 23 Nov)
+## Mobile → web handoff (`/start`, `/login`, `/link`; branch `feature/qr-handoff-login`, 23 Nov)
+
+Team direction (18 Nov sync; docs "Mobile → Web Activation Handover: Direction & Research Plan" and "Mobile → Web Handoff: Onboarding Patterns Research"): **web as a booster.** Everyone signs up on the iPhone (Meta → App Store), **no web sign-up**; web is introduced to every user (trial dismissed → start the trial; trial active → trial-to-paid), paying on web (Stripe) unlocks the phone too.
+- **`/start`** (`app/start/page.tsx`, the prototype's start): left, pick what happened on the phone (trial dismissed / active day 4 / active day 12 / App Store; kept in `bz-handoff`) and the nudge: **event first** (a desk action → "Run this on your computer" sheet; a 3rd saved home → "Compare them on your computer"), **time as backup** (a day-3 push on the lock screen; a day 2 / day 5 email, "Your 12 underbuilt lots in Silver Lake, on a big map" / "Run comps on the 4 homes you saved", to the Apple relay address). Right, the iPhone or the email. The sheet's Email me the link leads to the email; its button is the magic link (`/login?magic=…`, straight to the map, "Logged in with your email link"); Show me how to log in → `/login`. Once the web has been opened, a note says the nudges stop. `/m/desk` redirects here.
 
 Breezy users sign up on the iPhone (Meta ads, Apple or phone sign-in, no password), so the phone is the trusted device and the web never asks for a password (WhatsApp / Telegram Web pattern). Linked from the onboarding sign-up modal ("Already use Breezy on your iPhone? Log in"); the V5 onboarding is unchanged.
 - **`/login`** (`app/login/page.tsx`): "Log in to Breezy on your computer", three numbered steps; a one-time QR (`/link?token=…`, Breezy mark in the middle) that **renews itself every 60 s** (countdown ring, crossfade; no "expired, retry"). Under it: **Email me a link instead** (single use, 15 min, "Check your inbox" with the Hide My Email note; "Demo: open the email link" stands in for the email) and **Use a 6-digit code** (6 boxes, paste, auto-submit). "Stay logged in on this browser" (on: localStorage, off: this tab). No password, no pricing. Approved: a check, "Approved on James's iPhone", ~1.3 s, then `/home`. Not me: a new QR with "Request declined".
-- **`/link`** (`app/link/page.tsx`): the simulated iPhone screen (390 px): "Log in on your computer?", the device line from the request ("Chrome on macOS · just now"), Confirm (fake Face ID, ~0.9 s) / Not me; expired codes say so. `/link?mode=code` shows a 6-digit code to type on the computer. `/m/desk`: the mobile "Run this on your computer" sheet (Email me the link / Show me how to log in; "Find it on your phone. Close it at your desk.").
+- **`/link`** (`app/link/page.tsx`): the simulated iPhone screen (390 px): "Log in on your computer?", the device line from the request ("Chrome on macOS · just now"), Confirm (fake Face ID, ~0.9 s) / Not me; expired codes say so. `/link?mode=code` shows a 6-digit code to type on the computer.
 - **Mock layer, one module to swap:** `lib/auth/handoff.ts` (client) over `app/api/handoff/route.ts` + `lib/auth/store.ts` (in-memory tokens `pending → approved / declined → consumed`, expiry; the computer polls every 1.5 s). Two transports at once: the server store (a **real iPhone on the same Wi-Fi as `next dev`**: the QR encodes the LAN origin, shown bottom-right; `allowedDevOrigins` in `next.config.ts`) and BroadcastChannel / localStorage (the **"Simulate phone"** panel, an iframe of `/link`). On Vercel the serverless instances don't share memory, so the preview relies on Simulate phone.
-- **First web screen** (`lib/handoff/profile.ts` fixture + state `bz-handoff`, `components/home/Handoff.tsx`): lands on the phone's last area (Silver Lake), its 4 saved homes (Pedro's lots by APN) saved and pinned, "Welcome back, James", then a **6-step walkthrough** on the Coach overlay (search, feed, signal pins, price pins, heat layer, saved homes; a step whose target isn't on screen is skipped). Per `trialState` (Dev menu → Handoff):
-  - **`dismissed`** (billing `none`, 14-day trial on offer; team, 23 Nov): the map, pins, heat and hover previews stay open, but **pressing a result** (card, pin, parcel, saved home) **stops on the trial offer** ("Property details are part of Agents Pro") instead of the panel; starting the trial opens what was pressed. A slim dark banner: "Your 14-day free trial is still available · Start free trial". No free property (team: block every valuable panel).
-  - **`active`** (trial day 4 of 14): "Welcome back · day 4 of 14"; under the tabs, **"Best done at your desk"**: Run comps on a saved property, Compare ROI on 2 lots (two Profit potential reports), Export a client-ready report (Download report); it **replaces Getting started** in the nav. After the tour the last property viewed on the phone opens, with one tooltip on Get comps.
+- **First web screen** (`lib/handoff/profile.ts` fixture + state `bz-handoff`, `components/home/Handoff.tsx`): lands on the phone's last area (Silver Lake), its 4 saved homes (Pedro's lots by APN) saved and pinned, "Welcome back, James". Per `trialState` (Dev menu → Handoff):
+  - **`dismissed`** (billing `none`, 14-day trial on offer; team, 23 Nov): a **6-step walkthrough** on the Coach overlay (search, feed, signal pins, price pins, heat layer, saved homes; a step whose target isn't on screen is skipped). The map, pins, heat and hover previews stay open, but **pressing a result** (card, pin, parcel, saved home) **stops on the trial offer** ("Property details are part of Agents Pro") instead of the panel; starting the trial opens what was pressed. Dev menu → "open the panel, lock the actions" switches to William's contextual locks (the panel opens; Get comps, reports and Contact owner show the offer, the estimate is blurred). A slim dark banner: "Your 14-day free trial is still available · Start free trial". No free property (team: block every valuable panel). **Holiday offer** (`PRICING.holiday`: 50% off for 3 months, web only; `BillingState.holiday`, on in this branch, Dev menu toggles it): a yellow ribbon on the offer sheet, the price in the trial timeline, a chip on the banner. Months are an assumption until marketing confirms.
+  - **`active` / `subscribed_apple`: no tour (23 Nov, William; research: "no tour modal, contextual tooltips")**: the last property viewed on the phone opens, and tooltips on that first panel **guide a first comp** ("Your first comp · 1–3 of 3": Get comps → Check the details on the review → Let Breezy pick the comps; Skip ends them; they end once comps run).
+  - **`active`** (trial day 4 of 14): "Welcome back · day 4 of 14"; under the tabs, **"Best done at your desk"**: Run comps on a saved property, Compare ROI on 2 lots (two Profit potential reports), Export a client-ready report (Download report); it **replaces Getting started** in the nav. **Days 11–13** (Dev menu: day 12 of 14): first the **"Keep your reports and saved areas"** sheet (`KeepSheet`: trial ends in n days, what they built (saved homes, searches, reports), the price, "One plan. Works on your iPhone too.", Keep Agents Pro → a Stripe Checkout mock (nothing charged until the trial ends) / Remind me later); once per visit.
+  - **After any web purchase or trial start while in handoff mode** (`DoneSheet`): "You're on Agents Pro" / "Your 14-day free trial is on", "nothing to buy or restore in the App Store", and a phone beside it receiving the push "Agents Pro is now active on this iPhone"; Continue opens what was pressed.
   - **`subscribed_apple`** (billing `active`, `store: "apple"`): no checkout anywhere. Every offer / upsell / Buy credits / Manage billing / Cancel opens **"You're subscribed through the App Store"** + Manage in App Store (credits too: no double billing); Settings shows the App Store note and "billed by the App Store".
 
 ## Home Web (`/home`)
@@ -215,7 +220,7 @@ Breezy users sign up on the iPhone (Meta ads, Apple or phone sign-in, no passwor
 - Property with no estimate
 - Saved data: nothing saved / failed to load / back to normal
 - Plan state… and Unlimited (internal) (paywall, see above)
-- Handoff (iPhone → web): log in screen, replay the first web screen, trial state (dismissed / active / App Store), the phone's "Run this on your computer" sheet, leave handoff mode
+- Handoff (iPhone → web): start (the phone and its nudge), log in screen, replay the first web screen, trial state (dismissed / active day 4 / active day 12 / App Store), trial dismissed gate (whole panel / lock the actions), holiday offer on / off, leave handoff mode
 
 ## Heat palette (decided 17 Nov: the defaults)
 
@@ -273,11 +278,12 @@ Every coloured opportunity circle (`SignalDot` in `components/PinPalette.tsx`: m
 
 ```
 app/layout.tsx              root layout → AppStateProvider → SavedProvider → MapProvider (shared map)
-app/page.tsx                redirects to /onboarding
+app/page.tsx                redirects to /start (the phone and its nudge)
 app/onboarding/page.tsx     V5 flow (8 steps), OppCard swipe cards, FreebieArt, signup modal
 app/home/page.tsx           Home Web: layout, views (home / results), search this area, detail zoom, Dev menu
 app/api/boundary/route.ts   Census TIGERweb lookup (winding + holes)
-app/login, app/link         scan-to-link handoff: computer login (QR / email link / code), simulated iPhone; app/m/desk mobile sheet
+app/start                   the handoff's start: trial state + nudge (in-app sheet, push, email) on the phone
+app/login, app/link         scan-to-link handoff: computer login (QR / email link / code), simulated iPhone
 app/api/handoff/route.ts    handoff token API (lib/auth/store.ts in memory); client: lib/auth/handoff.ts
 lib/handoff/profile.ts      mobile user fixture + trial state for the first web screen (components/home/Handoff.tsx)
 components/AppState.tsx     place / areas, outline rings, listings, picks, onboarded (sessionStorage)

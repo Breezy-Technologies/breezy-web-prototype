@@ -74,6 +74,10 @@ export const PRICING = {
   /** Trial-end reminders (the trial timeline in the offer sheet): an email and an in-app
    *  notice this many days before the trial ends, then a last email the day before. */
   trialReminders: { firstDaysBefore: 3, lastDaysBefore: 1 },
+  /** Holiday offer (Christian's Loom, 20 Nov; the team voted for the offer sheet). Web only,
+   *  so it gives a reason to start on the web (research pattern 5). Shown while
+   *  `BillingState.holiday` is on. Months are an assumption until marketing confirms. */
+  holiday: { label: "Holiday offer", pct: 50, months: 3 },
   /** Shown before a cancel is confirmed. */
   saveOffer: { price: usd(9.9), period: "month" as const },
 } as const;

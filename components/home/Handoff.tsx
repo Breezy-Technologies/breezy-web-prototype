@@ -1,17 +1,20 @@
 "use client";
 // The first web screen after the scan-to-link handoff (app/login → /home), per trial state
 // (lib/handoff/profile.ts):
-// - every state: a short walkthrough of the map (search, feed, signal pins, price pins,
-//   heat layer, saved homes), on the Coach overlay used by Make Breezy yours;
-// - dismissed: property panels are gated (the trial offer opens when a result is pressed)
-//   and a slim "trial still available" banner sits over the map;
-// - active: "Welcome back · day 4 of 14", a 3-item desk checklist, one tooltip on the
-//   first property panel;
+// - dismissed: a short walkthrough of the map (search, feed, signal pins, price pins, heat
+//   layer, saved homes) on the Coach overlay used by Make Breezy yours; property panels are
+//   gated (the trial offer opens when a result is pressed; Dev menu: or the panel opens and
+//   its paid actions lock) and a slim "trial still available" banner sits over the map;
+// - active / subscribed_apple: no tour (research: contextual tooltips, 23 Nov). The last
+//   property viewed on the phone opens, and tooltips on that first panel guide a first comp;
+// - active: "Welcome back · day 4 of 14" and a 3-item desk checklist; days 11–13 the
+//   "Keep your reports and saved areas" paywall;
 // - subscribed_apple: no checkout anywhere (components/billing: the App Store sheet).
 import React, { useState } from "react";
 import { CoachStep } from "@/components/home/GetStarted";
 import { DESK_TASKS, HandoffState, TrialState, deskDone, handoffProfile } from "@/lib/handoff/profile";
 import { paywall } from "@/lib/billing";
+import { PRICING } from "@/lib/pricing.config";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", PAPER = "rgb(253,252,252)";
 
@@ -29,12 +32,13 @@ export function tourSteps(trial: TrialState, nSaved: number): Omit<CoachStep, "o
 }
 
 /** dismissed: "Your 14-day free trial is still available". */
-export function TrialBanner({ days, left, right }: { days: number; left: number; right: number }) {
+export function TrialBanner({ days, left, right, holiday }: { days: number; left: number; right: number; holiday?: boolean }) {
   return (
     <div style={{ position: "absolute", left, right, bottom: 20, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
       <div role="region" aria-label="Free trial" style={{ display: "flex", alignItems: "center", gap: 12, height: 44, padding: "0 6px 0 16px", borderRadius: 9999, background: INK, boxShadow: "0 10px 28px rgba(18,15,14,.28)", pointerEvents: "auto", animation: "bzToastIn .35s cubic-bezier(.2,.8,.2,1) both" }}>
         <i className="ph-fill ph-sparkle" style={{ fontSize: 16, color: "rgb(255,209,41)" }} />
         <span style={{ font: "400 14px/18px var(--font-sans)", color: PAPER, whiteSpace: "nowrap" }}>Your {days}-day free trial is still available</span>
+        {holiday && <span style={{ height: 24, padding: "0 10px", display: "flex", alignItems: "center", gap: 6, borderRadius: 9999, background: "rgb(255,209,41)", font: "700 12px/16px var(--font-sans)", color: INK, whiteSpace: "nowrap" }}><i className="ph-fill ph-gift" />Holiday: {PRICING.holiday.pct}% off</span>}
         <button onClick={() => paywall.open({ kind: "offer" })} style={{ height: 32, padding: "0 14px", border: "none", borderRadius: 9999, background: PAPER, font: "700 13px/16px var(--font-sans)", color: INK, cursor: "pointer", whiteSpace: "nowrap" }}>Start free trial</button>
       </div>
     </div>
@@ -75,10 +79,13 @@ export function DeskChecklist({ hs }: { hs: HandoffState }) {
   );
 }
 
-/** active: one tooltip on the first property panel opened after the walkthrough. */
-export const firstPanelTip: Omit<CoachStep, "onNext"> = {
-  sel: `[data-tour="get-comps"]`, title: "Start with comps", sub: "Comps are roomier here: pick and exclude comps, then export a client-ready report. It ticks off your first desk task.",
-  next: "Got it", exit: "Skip",
-};
+/** Trial users (no tour): contextual tooltips on the first property panel, which guide a
+ *  first comp (Get comps → check the details → Let AI pick). The Coach shows the first
+ *  step whose target is on screen, so the list runs from the last step back. */
+export const firstCompTips = (): CoachStep[] => [
+  { sel: `[data-tour="comps-go"]`, count: "Your first comp · 3 of 3", title: "Let Breezy pick the comps", sub: "It scores recent sales nearby on size, beds, lot and year. You can add or exclude any of them after.", exit: "Skip" },
+  { sel: `[data-tour="comps-confirm"]`, count: "Your first comp · 2 of 3", title: "Check the details", sub: "The comps are matched on these figures. Fix anything the records got wrong, then confirm.", exit: "Skip" },
+  { sel: `[data-tour="get-comps"]`, count: "Your first comp · 1 of 3", title: "Start with comps", sub: "The last home you looked at on your phone. Comps have room here: the list, the map and the estimate side by side.", exit: "Skip" },
+];
 
 export const endTip = () => handoffProfile.endTip();
