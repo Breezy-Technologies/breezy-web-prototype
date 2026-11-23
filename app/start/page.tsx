@@ -10,6 +10,7 @@
 // The older V5 web onboarding (web sign-up) stays at /onboarding.
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BreezyEmail } from "@/components/handoff/BreezyEmail";
 import { PROFILE, TRIAL_STATES, TrialState, handoffProfile, profilePlace, useHandoff } from "@/lib/handoff/profile";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", PAPER = "rgb(253,252,252)", NAV = "rgb(245,243,243)";
@@ -196,20 +197,18 @@ function Email({ day, trial, onOpen }: { day: 2 | 5; trial: TrialState; onOpen: 
         <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}><b style={{ color: INK }}>Breezy</b> &lt;hello@breezy.ai&gt; · Day {day}, 9:30 AM</span>
         <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>To: james.carter@privaterelay.appleid.com <span title="Apple's Hide My Email forwards it to your inbox">(forwarded by Apple)</span></span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "24px 28px 28px", maxWidth: 560 }}>
-        <span role="img" aria-label="Breezy" style={{ width: 70, height: 24, background: INK, WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat" }} />
-        <span style={{ font: "400 15px/22px var(--font-sans)", color: INK }}>Hi James,</span>
-        <span style={{ font: "400 15px/22px var(--font-sans)", color: INK, textWrap: "pretty" } as React.CSSProperties}>{lead}</span>
-        <div style={{ position: "relative", height: 220, borderRadius: 14, overflow: "hidden", background: "url(/map/silverlake.jpg) center/cover" }}>
-          <span style={{ position: "absolute", left: 12, bottom: 12, height: 30, padding: "0 12px", display: "flex", alignItems: "center", gap: 6, borderRadius: 9999, background: PAPER, font: "700 13px/16px var(--font-sans)", color: INK, boxShadow: "0 2px 8px rgba(18,15,14,.2)" }}>
-            <i className="ph-bold ph-map-pin" />{area} · {day === 2 ? `${PROFILE.underbuiltNearby} underbuilt lots` : `${PROFILE.saved.length} saved homes`}
-          </span>
-        </div>
-        <button onClick={onOpen} className="btn-dark" style={{ alignSelf: "flex-start", height: 48, padding: "0 24px" }}>{day === 2 ? "Open my map" : "Run comps on my homes"}</button>
-        <span style={{ font: "400 13px/19px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>
-          Open this on your computer. The button logs you in, no password: it works once, for 15 minutes, and lands where you left off on your phone.{trialLine ? ` ${trialLine}` : ""}
-        </span>
-        <span style={{ font: "400 13px/19px var(--font-sans)", color: MUTED }}>Find it on your phone. Close it at your desk.</span>
+      {/* The email itself: Breezy's template (Figma "Web experience 1.9", 2013:23088) */}
+      <div className="no-scrollbar" style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto", background: "rgb(245,235,232)" }}>
+        <BreezyEmail
+          title={day === 2 ? `Your ${PROFILE.underbuiltNearby} underbuilt lots, on a big map` : "Comp the homes you saved"}
+          hero={day === 2 ? "/map/silverlake.jpg" : "/photos/l/ext-05.jpg"}
+          heroChip={<><i className="ph-bold ph-map-pin" />{area} · {day === 2 ? `${PROFILE.underbuiltNearby} underbuilt lots` : `${PROFILE.saved.length} saved homes`}</>}
+          cta={day === 2 ? "Open my map" : "Run comps on my homes"} onCta={onOpen}
+          note={<>Open this on your computer. The button logs you in, no password: it works once, for 15 minutes.{trialLine ? ` ${trialLine}` : ""}</>}>
+          <span>Hi James,</span>
+          <span>{lead}</span>
+          <span>Find it on your phone. Close it at your desk.</span>
+        </BreezyEmail>
       </div>
     </div>
   );

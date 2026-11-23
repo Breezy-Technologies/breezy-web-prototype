@@ -11,12 +11,14 @@ import QRCode from "qrcode";
 import { handoff } from "@/lib/auth/handoff";
 import { handoffProfile } from "@/lib/handoff/profile";
 import { useApp } from "@/components/AppState";
+import { Mark } from "@/components/handoff/BreezyEmail";
 
 type Mode = "qr" | "email" | "sent" | "code" | "approved";
 const EMAIL_LINK = "your email link";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", PAPER = "rgb(253,252,252)", CLAY = "rgb(147,89,75)";
-const QR_SIZE = 216;
+const QR_SIZE = 184;
+const QR_BG = "rgb(242,234,231)";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -64,75 +66,72 @@ export default function LoginPage() {
 
   const approved = mode === "approved";
   return (
-    <main className="bz-login" style={{ position: "fixed", inset: 0, zIndex: 100, overflowY: "auto", background: "linear-gradient(180deg,rgb(238,233,228),rgb(223,213,207))", display: "flex", gap: 24, padding: 24, boxSizing: "border-box" }}>
+    <main className="bz-login" style={{ position: "fixed", inset: 0, zIndex: 100, overflowY: "auto", background: "rgb(246,239,236)" }}>
       <style>{LOGIN_CSS}</style>
-      {/* Left: the brand stage (Ann's mobile activation language: warm brown, the radar, signal pins) */}
-      <Stage done={approved} />
+      <Backdrop done={approved} />
+      {/* Logo lockup (Figma "Web experience 1.9", 5062:92652) */}
+      <header style={{ position: "absolute", left: 32, top: 28, zIndex: 2, display: "flex", alignItems: "center", gap: 8 }}>
+        <Mark size={30} color={INK} />
+        <span role="img" aria-label="Breezy" style={{ width: 60, height: 22, background: INK, WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat" }} />
+      </header>
 
-      {/* Right: log in */}
-      <section style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 28, padding: "24px 32px 24px 40px" }}>
-        <span role="img" aria-label="Breezy" style={{ width: 120, height: 40, background: "linear-gradient(180deg,rgb(186,152,144),rgb(132,98,90))", WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", animation: "riseIn .5s cubic-bezier(.2,.8,.2,1) both" }} />
-        {approved ? (
-          <div role="status" style={{ display: "flex", flexDirection: "column", gap: 14, animation: "riseIn .45s cubic-bezier(.2,.8,.2,1) both" }}>
-            <span className="bz-approve" style={{ position: "relative", width: 76, height: 76, borderRadius: 9999, background: "rgb(49,140,96)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <i className="ph-bold ph-check" style={{ fontSize: 38, color: "#fff" }} />
-            </span>
-            <span style={{ font: "700 12px/16px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: CLAY, marginTop: 8 }}>{by === EMAIL_LINK ? "Logged in with your email link" : `Approved on ${by}`}</span>
-            <h1 style={{ margin: 0, font: "300 52px/1.05 var(--font-sans)", letterSpacing: "-1.6px", color: INK }}>Welcome back, {first}</h1>
-            <span style={{ font: "400 17px/24px var(--font-sans)", color: MUTED }}>Opening Silver Lake, with your saved homes…</span>
-          </div>
-        ) : <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, animation: "riseIn .5s .05s cubic-bezier(.2,.8,.2,1) both" }}>
-            <span style={{ font: "700 12px/16px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: CLAY }}>Log in on your computer</span>
-            <h1 style={{ margin: 0, font: "300 52px/1.05 var(--font-sans)", letterSpacing: "-1.6px", color: INK, textWrap: "balance" } as React.CSSProperties}>
-              {mode === "qr" ? "Scan with your iPhone" : "Log in without a password"}
+      <div className="bz-cols" style={{ position: "relative", zIndex: 1, minHeight: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "center", padding: "96px 32px 48px", boxSizing: "border-box" }}>
+        {/* Left: welcome + the other ways in */}
+        <section style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 28 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, maxWidth: 420, animation: "riseIn .5s cubic-bezier(.2,.8,.2,1) both" }}>
+            <h1 style={{ margin: 0, font: "300 48px/1.15 var(--font-sans)", letterSpacing: "-1.2px", color: INK, textWrap: "balance" } as React.CSSProperties}>
+              {approved ? <>Welcome back,<br />{first}</> : <>Welcome back<br />to Breezy</>}
             </h1>
+            <p style={{ margin: 0, font: "400 17px/24px var(--font-sans)", color: INK, textWrap: "pretty" } as React.CSSProperties}>
+              {approved ? "Opening Silver Lake, with the homes you saved on your iPhone…" : "Your desk workspace for comps, ROI and reports. Log in with the iPhone you signed up on, no password."}
+            </p>
           </div>
-
-          {mode === "qr" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap", animation: "riseIn .5s .12s cubic-bezier(.2,.8,.2,1) both" }}>
-              <QrCard svg={qr.svg} left={qr.left} ttl={qr.ttl} k={qr.token} />
-              <div style={{ flex: "1 1 220px", display: "flex", flexDirection: "column", gap: 18 }}>
-                <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 16 }}>
-                  {[
-                    <>Open <b>Breezy</b> on your iPhone</>,
-                    <>Point your camera at the code</>,
-                    <>Confirm with <b>Face ID</b></>,
-                  ].map((t, i) => (
-                    <li key={i} style={{ display: "flex", alignItems: "center", gap: 14, font: "400 17px/24px var(--font-sans)", color: INK }}>
-                      <span aria-hidden style={{ flex: "none", width: 32, height: 32, borderRadius: 9999, background: PAPER, boxShadow: "0 1px 2px rgba(40,26,20,.08)", display: "flex", alignItems: "center", justifyContent: "center", font: "700 14px/1 var(--font-sans)", color: CLAY }}>{i + 1}</span>
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ol>
-                <span aria-live="polite" style={{ minHeight: 20, font: "400 13px/20px var(--font-sans)", color: declined ? CLAY : MUTED, display: "flex", alignItems: "center", gap: 6 }}>
-                  {declined ? <><i className="ph-bold ph-prohibit" />Request declined on your iPhone. Here&apos;s a new code.</> : <><i className="ph-bold ph-arrows-clockwise" />The code renews itself every minute</>}
-                </span>
-              </div>
+          {!approved && (mode === "qr" ? (
+            <div style={{ width: 392, maxWidth: "100%", display: "flex", flexDirection: "column", gap: 10, animation: "riseIn .5s .08s cubic-bezier(.2,.8,.2,1) both" }}>
+              <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED, margin: "0 0 4px" }}>No phone nearby?</span>
+              <button onClick={() => setMode("email")} className="btn-dark" style={{ height: 44 }}><i className="ph-bold ph-envelope-simple" />Email me a link</button>
+              <button onClick={() => setMode("code")} className="btn-dark" style={{ height: 44 }}><i className="ph-bold ph-password" />Use a 6-digit code</button>
+              <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 10, font: "400 14px/20px var(--font-sans)", color: INK, cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={stay} onChange={e => setStay(e.target.checked)} style={{ width: 18, height: 18, accentColor: INK, margin: 0 }} />
+                Stay logged in on this browser
+              </label>
+              <span style={{ marginTop: 6, font: "400 15px/22px var(--font-sans)", color: INK }}>New to Breezy? <b>Get the app on your iPhone</b></span>
             </div>
           ) : (
-            <div style={{ display: "flex" }}>
+            <div style={{ width: 392, maxWidth: "100%", display: "flex", justifyContent: "center", textAlign: "left" }}>
               {mode === "email" && <EmailForm onBack={() => setMode("qr")} onSent={(email, token) => { setSent({ email, token }); setMode("sent"); }} />}
               {mode === "sent" && sent && <Sent {...sent} onBack={() => setMode("qr")} onRetry={() => setMode("email")} />}
               {mode === "code" && <CodeForm onBack={() => setMode("qr")} onOk={who => succeed(who, "code")} />}
             </div>
-          )}
+          ))}
+        </section>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 14, animation: "riseIn .5s .2s cubic-bezier(.2,.8,.2,1) both" }}>
-            {mode === "qr" && <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <LinkBtn onClick={() => setMode("email")} icon="envelope-simple">Email me a link instead</LinkBtn>
-              <LinkBtn onClick={() => setMode("code")} icon="password">Use a 6-digit code</LinkBtn>
-            </div>}
-            <label style={{ display: "flex", alignItems: "center", gap: 10, font: "400 14px/20px var(--font-sans)", color: INK, cursor: "pointer", userSelect: "none" }}>
-              <input type="checkbox" checked={stay} onChange={e => setStay(e.target.checked)} style={{ width: 18, height: 18, accentColor: INK, margin: 0 }} />
-              Stay logged in on this browser
-            </label>
-            <span style={{ maxWidth: 440, font: "400 13px/19px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>
-              No Breezy account yet? Get the Breezy app on your iPhone and sign up there, then come back to this page.
-            </span>
+        {/* Right: the code, in the radar's rings */}
+        <section style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 640 }}>
+          <Rings done={approved} />
+          <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 18, textAlign: "center", animation: "riseIn .55s .1s cubic-bezier(.2,.8,.2,1) both" }}>
+            {approved ? (
+              <span role="status" className="bz-approve" style={{ width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: "rgba(241,233,230,.92)", display: "flex", alignItems: "center", justifyContent: "center", animation: "riseIn .4s cubic-bezier(.2,.8,.2,1) both" }}>
+                <span style={{ width: 88, height: 88, borderRadius: 9999, background: "rgb(49,140,96)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-check" style={{ fontSize: 44, color: "#fff" }} /></span>
+              </span>
+            ) : mode === "qr" ? <QrCard svg={qr.svg} left={qr.left} ttl={qr.ttl} k={qr.token} /> : (
+              <span style={{ width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: "rgba(241,233,230,.85)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <i className={`ph-bold ph-${mode === "code" ? "password" : "envelope-simple-open"}`} style={{ fontSize: 56, color: CLAY }} />
+              </span>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 320 }}>
+              <span style={{ font: "400 18px/24px var(--font-sans)", color: INK }}>
+                {approved ? (by === EMAIL_LINK ? "Logged in with your email link" : `Approved on ${by}`) : mode === "qr" ? "Scan with your iPhone" : mode === "code" ? "Get the code on your iPhone" : "Check the email on your account"}
+              </span>
+              <span aria-live="polite" style={{ font: "400 14px/20px var(--font-sans)", color: declined && mode === "qr" ? CLAY : INK }}>
+                {approved ? "Your workspace is ready" : mode === "qr"
+                  ? (declined ? "Request declined on your iPhone. Here's a new code." : "Open Breezy, point the camera at this code and confirm with Face ID. It renews every minute.")
+                  : mode === "code" ? "In the app: Profile → Log in on a computer → Use a code." : "The link works once, for 15 minutes."}
+              </span>
+            </div>
           </div>
-        </>}
-      </section>
+        </section>
+      </div>
 
       {/* Demo: approve from a simulated iPhone on this laptop (BroadcastChannel), or a real one on the same Wi-Fi in dev. */}
       {!approved && (
@@ -148,7 +147,7 @@ export default function LoginPage() {
         </div>
       )}
       {phone && (
-        // Over the brand stage, so the QR stays in view.
+        // Over the left column, so the code stays in view.
         <aside aria-label="Simulated iPhone" className="bz-sim" style={{ position: "fixed", bottom: 24, zIndex: 119, width: 390, height: "min(760px, calc(100vh - 48px))", borderRadius: 44, background: INK, padding: 10, boxShadow: "0 24px 60px rgba(30,18,12,.35)", animation: "riseIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
           <iframe key={mode === "code" ? "code" : qr.token} title="Breezy on iPhone" src={mode === "code" ? `/link?mode=code&demo=1` : `/link?token=${qr.token}&demo=1`}
             style={{ width: "100%", height: "100%", border: 0, borderRadius: 34, background: PAPER }} />
@@ -158,81 +157,65 @@ export default function LoginPage() {
   );
 }
 
-/* ---------- The brand stage ----------
-   Ann's activation prototype, brought to the computer: the warm brown frame of "See what
-   agents don't", a Silver Lake map scanned by the clay radar sweep, the teardrop signal pins
-   with their label pills ("What Breezy sees"), the shimmering AI status line, the photo stack
-   and a light headline. On approval the map leans in and every pin pulses. */
+/* ---------- The backdrop and the rings ----------
+   Figma "Web experience 1.9" (5062:92652): blush paper, the welcome on the left, the QR in
+   concentric rings on the right. Behind it all, full bleed, the Silver Lake map from the phone,
+   washed in blush and drifting slowly, with the signal pins popping in (Ann's activation
+   prototype: teardrop markers + label pills). The rings carry the radar sweep and pulse; on
+   approval the map leans in and the sweep speeds up. */
 const LOGIN_CSS = `
-@keyframes bzScanRing { 0% { transform: scale(1); opacity: .55 } 100% { transform: scale(1.32); opacity: 0 } }
+@keyframes bzScanRing { 0% { transform: scale(1); opacity: .55 } 100% { transform: scale(1.3); opacity: 0 } }
 @keyframes bzPinIn { 0% { opacity: 0; transform: translate(-50%, -100%) translateY(10px) scale(.7) } 70% { opacity: 1; transform: translate(-50%, -100%) scale(1.05) } 100% { opacity: 1; transform: translate(-50%, -100%) scale(1) } }
-@keyframes bzPinHalo { 0% { transform: translate(-50%, -50%) scale(.6); opacity: .7 } 100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0 } }
-@keyframes bzApprove { 0% { box-shadow: 0 0 0 0 rgba(49,140,96,.35) } 100% { box-shadow: 0 0 0 26px rgba(49,140,96,0) } }
+@keyframes bzDrift { from { transform: scale(1.06) translate(0, 0) } to { transform: scale(1.06) translate(-1.6%, -1.2%) } }
+@keyframes bzRingPulse { 0% { transform: translate(-50%, -50%) scale(.55); opacity: .5 } 100% { transform: translate(-50%, -50%) scale(1.25); opacity: 0 } }
+@keyframes bzApprove { 0% { box-shadow: 0 0 0 0 rgba(49,140,96,.3) } 100% { box-shadow: 0 0 0 30px rgba(49,140,96,0) } }
 .bz-approve { animation: bzApprove 1.4s ease-out infinite }
-.bz-sim { left: 48px }
-@media (max-width: 1080px) { .bz-stage { display: none !important } .bz-sim { left: auto; right: 20px; bottom: 68px } }
+.bz-sim { left: 32px }
+@media (max-width: 960px) { .bz-cols { grid-template-columns: 1fr !important; gap: 24px } .bz-pins { display: none } .bz-sim { left: auto; right: 20px; bottom: 68px } }
 @media (prefers-reduced-motion: reduce) { .bz-login * { animation-duration: .01ms !important; animation-iteration-count: 1 !important } }
 `;
+// Positions in % of the page, kept out of the two columns' content.
 const PINS: { x: number; y: number; f: string; t: string }[] = [
-  { x: 24, y: 22, f: "drop", t: "12% price drop" },
-  { x: 74, y: 25, f: "ub", t: "84% Underbuilt" },
-  { x: 80, y: 47, f: "roi", t: "$1.6m ROI" },
-  { x: 27, y: 57, f: "exp", t: "Expired 4 days ago" },
-  { x: 60, y: 74, f: "wd", t: "Withdrawn 3 days ago" },
-  { x: 15, y: 86, f: "stale", t: "193 DOM" },
-  { x: 84, y: 86, f: "comps", t: "$310k under comps" },
+  { x: 9, y: 22, f: "drop", t: "12% price drop" },
+  { x: 47, y: 13, f: "ub", t: "84% Underbuilt" },
+  { x: 92, y: 18, f: "roi", t: "$1.6m ROI" },
+  { x: 7, y: 78, f: "exp", t: "Expired 4 days ago" },
+  { x: 49, y: 88, f: "wd", t: "Withdrawn 3 days ago" },
+  { x: 93, y: 74, f: "comps", t: "$310k under comps" },
+  { x: 28, y: 92, f: "stale", t: "193 DOM" },
 ];
-const STATUS = ["Syncing your 4 saved homes", "Loading your Market Radar", "Getting comps ready", "Putting Silver Lake on a big map"];
 
-function Stage({ done }: { done: boolean }) {
-  const [i, setI] = useState(0);
-  useEffect(() => { if (done) return; const t = setInterval(() => setI(x => (x + 1) % STATUS.length), 2400); return () => clearInterval(t); }, [done]);
+function Backdrop({ done }: { done: boolean }) {
   return (
-    <div className="bz-stage" aria-hidden style={{ position: "relative", flex: "0 0 50%", minWidth: 0, display: "flex", flexDirection: "column", gap: 24, padding: 20, borderRadius: 36, overflow: "hidden", background: "linear-gradient(180deg,rgb(116,77,65) -4%,rgb(63,51,48) 100%)", boxShadow: "0 30px 70px rgba(63,40,32,.28)", animation: "riseIn .6s cubic-bezier(.2,.8,.2,1) both" }}>
-      {/* Arches, the texture behind Ann's hero */}
-      <div style={{ position: "absolute", left: -20, right: -20, bottom: -40, height: "42%", opacity: .1, background: `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="112" height="400"><path d="M8 400V64a48 48 0 0 1 96 0v336" fill="none" stroke="#fff" stroke-width="2"/></svg>')}") 0 0/112px 100% repeat-x` }} />
-      {/* The map card */}
-      <div style={{ position: "relative", flex: "1 1 0", minHeight: 300, borderRadius: 26, overflow: "hidden", background: "rgb(240,235,232)" }}>
-        <div style={{ position: "absolute", inset: "-6%", background: "url(/map/silverlake.jpg) center/cover", filter: "saturate(.55) sepia(.12) brightness(1.02)", transform: done ? "scale(1.18)" : "scale(1)", transition: "transform 1.6s cubic-bezier(.2,.8,.2,1)" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(240,233,230,.25),rgba(217,201,195,.35))" }} />
-        {/* Radar: rings, sweep, centre */}
-        {[0.22, 0.42, 0.64].map(r => <span key={r} style={{ position: "absolute", left: "50%", top: "50%", width: `${r * 200}%`, aspectRatio: "1", transform: "translate(-50%,-50%)", borderRadius: 9999, boxShadow: "inset 0 0 0 1px rgba(116,77,65,.22)" }} />)}
-        <span style={{ position: "absolute", left: "50%", top: "50%", width: "150%", aspectRatio: "1", borderRadius: 9999, background: "conic-gradient(from 0deg, rgba(116,77,65,0) 0deg, rgba(116,77,65,0) 290deg, rgba(116,77,65,.5) 359deg, rgba(116,77,65,0) 360deg)", animation: `sweep ${done ? 1.4 : 5}s linear infinite`, transform: "translate(-50%,-50%)" }} />
-        <span style={{ position: "absolute", left: "50%", top: "50%", width: 12, height: 12, borderRadius: 9999, background: "rgb(116,77,65)", transform: "translate(-50%,-50%)", boxShadow: "0 0 0 4px rgba(253,252,252,.8)" }} />
-        {/* What Breezy sees */}
-        <span style={{ position: "absolute", left: "50%", top: 18, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8, height: 44, padding: "0 18px 0 14px", borderRadius: 9999, background: "rgb(48,36,33)", boxShadow: "0 8px 20px rgba(40,26,20,.25)", font: "700 15px/1 var(--font-sans)", color: PAPER, whiteSpace: "nowrap" }}>
-          <span style={{ width: 20, height: 20, background: PAPER, WebkitMask: "url(/brand/brandmark.svg) center/contain no-repeat", mask: "url(/brand/brandmark.svg) center/contain no-repeat" }} />What Breezy sees
-        </span>
-        {/* Signal pins, popping in like the phone's scan */}
+    <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+      <div style={{ position: "absolute", inset: "-4%", transform: done ? "scale(1.14)" : undefined, transition: "transform 1.6s cubic-bezier(.2,.8,.2,1)" }}>
+        <div style={{ position: "absolute", inset: 0, background: "url(/map/silverlake.jpg) center/cover", filter: "saturate(.5) sepia(.14)", animation: "bzDrift 40s ease-in-out infinite alternate" }} />
+      </div>
+      {/* The blush wash: strong under the welcome, lighter round the code */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg,rgba(247,240,237,.93) 0%,rgba(247,240,237,.86) 38%,rgba(243,233,229,.6) 62%,rgba(241,230,226,.52) 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(248,242,240,.55) 0%,rgba(248,242,240,0) 30%,rgba(236,224,220,0) 70%,rgba(236,224,220,.6) 100%)" }} />
+      <div className="bz-pins">
         {PINS.map((p, k) => (
-          <span key={p.t} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, display: "flex", flexDirection: "column", alignItems: "center", animation: `bzPinIn .55s ${0.6 + k * 0.42}s cubic-bezier(.2,.8,.2,1) both` }}>
-            <span style={{ position: "relative", width: 32, height: 35 }}>
-              <span style={{ position: "absolute", left: "50%", top: "44%", width: 28, height: 28, borderRadius: 9999, background: "rgba(253,252,252,.7)", animation: `bzPinHalo ${done ? 0.9 : 2.6}s ${k * 0.3}s ease-out infinite` }} />
-              <img src={`/pins/${p.f}.svg`} alt="" style={{ position: "relative", width: 32, height: 35, display: "block" }} />
-            </span>
-            <span style={{ marginTop: 2, height: 26, padding: "0 10px", display: "flex", alignItems: "center", borderRadius: 9999, background: PAPER, boxShadow: "0 2px 8px rgba(40,26,20,.16)", font: "700 13px/1 var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>{p.t}</span>
+          <span key={p.t} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, display: "flex", flexDirection: "column", alignItems: "center", animation: `bzPinIn .55s ${0.5 + k * 0.35}s cubic-bezier(.2,.8,.2,1) both` }}>
+            <img src={`/pins/${p.f}.svg`} alt="" style={{ width: 30, height: 33, display: "block" }} />
+            <span style={{ marginTop: 2, height: 24, padding: "0 9px", display: "flex", alignItems: "center", borderRadius: 9999, background: PAPER, boxShadow: "0 2px 8px rgba(40,26,20,.14)", font: "700 12px/1 var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>{p.t}</span>
           </span>
         ))}
-        {/* The AI status line */}
-        <span style={{ position: "absolute", left: "50%", bottom: 18, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", borderRadius: 9999, background: "rgba(253,252,252,.92)", boxShadow: "0 6px 18px rgba(40,26,20,.14)", whiteSpace: "nowrap" }}>
-          <i className={done ? "ph-bold ph-check" : "ph-fill ph-sparkle"} style={{ fontSize: 15, color: done ? "rgb(49,140,96)" : "rgb(168,128,190)", animation: done ? undefined : "ub-pulse 1.4s cubic-bezier(.4,0,.6,1) infinite" }} />
-          <span key={done ? "done" : i} style={{ display: "block", animation: "stepIn .35s ease" }}>
-            <span style={{ display: "block", font: "700 14px/18px var(--font-sans)", color: INK }}>
-              {done ? "Your workspace is ready" : `${STATUS[i]}…`}
-            </span>
-          </span>
-        </span>
       </div>
-      {/* Under the map: the photo stack and the line */}
-      <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "0 24px 12px", textAlign: "center" }}>
-        <span style={{ position: "relative", width: 132, height: 58 }}>
-          {["ext-05", "ext-02", "ext-09"].map((f, k) => (
-            <span key={f} style={{ position: "absolute", left: [6, 36, 70][k], top: k === 1 ? 0 : 8, width: k === 1 ? 60 : 50, height: k === 1 ? 54 : 44, borderRadius: 8, background: `url(/photos/l/${f}.jpg) center/cover`, boxShadow: "0 0 0 2px rgb(253,252,252),0 6px 14px rgba(0,0,0,.3)", transform: `rotate(${[-9, 0, 9][k]}deg)`, zIndex: k === 1 ? 2 : 1 }} />
-          ))}
-        </span>
-        <span style={{ font: "300 34px/1.12 var(--font-sans)", letterSpacing: "-.8px", color: PAPER }}>Your next deal, on a bigger map</span>
-        <span style={{ maxWidth: 460, font: "400 16px/23px var(--font-sans)", color: "rgba(253,252,252,.78)", textWrap: "pretty" } as React.CSSProperties}>Comps, ROI and reports side by side, with everything you saved on your iPhone.</span>
-      </div>
+    </div>
+  );
+}
+
+function Rings({ done }: { done: boolean }) {
+  const ring = (d: number, bg: string): React.CSSProperties => ({ position: "absolute", left: "50%", top: "50%", width: d, height: d, transform: "translate(-50%,-50%)", borderRadius: 9999, background: bg });
+  return (
+    <div aria-hidden style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0 }}>
+      <span style={ring(640, "linear-gradient(180deg,rgba(234,219,214,.45),rgba(240,229,225,.25))")} />
+      <span style={ring(528, "linear-gradient(180deg,rgba(226,206,200,.5),rgba(238,226,222,.3))")} />
+      <span style={ring(376, "linear-gradient(180deg,rgba(220,198,191,.5),rgba(236,224,220,.35))")} />
+      {/* The radar sweep, inside the outer ring */}
+      <span style={{ ...ring(640, "conic-gradient(from 0deg, rgba(147,89,75,0) 0deg, rgba(147,89,75,0) 292deg, rgba(147,89,75,.16) 359deg, rgba(147,89,75,0) 360deg)"), animation: `sweep ${done ? 1.4 : 6}s linear infinite` }} />
+      {[0, 1.6].map(d => <span key={d} style={{ ...ring(640, "transparent"), boxShadow: "inset 0 0 0 1.5px rgba(147,89,75,.28)", animation: `bzRingPulse ${done ? 1.2 : 3.2}s ${d}s ease-out infinite` }} />)}
     </div>
   );
 }
@@ -268,15 +251,13 @@ function useQrToken(on: boolean, lan: string | null) {
 function QrCard({ svg, left, ttl, k }: { svg: string; left: number; ttl: number; k: string }) {
   const R = 15, C = 2 * Math.PI * R;
   return (
-    <div style={{ position: "relative", flex: "none", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 28, background: PAPER, boxShadow: "0 18px 44px rgba(63,40,32,.14),0 2px 6px rgba(63,40,32,.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      {/* Scan rings: the radar's pulse, round the code */}
-      {[0, 1.3].map(d => <span key={d} aria-hidden style={{ position: "absolute", inset: 0, borderRadius: 28, boxShadow: "0 0 0 1.5px rgba(147,89,75,.5)", animation: `bzScanRing 2.6s ${d}s ease-out infinite`, pointerEvents: "none" }} />)}
+    <div style={{ position: "relative", flex: "none", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: QR_BG, boxShadow: "0 10px 30px rgba(120,80,68,.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       {svg ? (
         <div key={k} role="img" aria-label="QR code: scan it with the Breezy app on your iPhone to log in on this computer. Or use the email link or a 6-digit code below."
           style={{ width: QR_SIZE, height: QR_SIZE, animation: "fadeIn .5s ease both" }} dangerouslySetInnerHTML={{ __html: svg.replace("<svg", `<svg width="${QR_SIZE}" height="${QR_SIZE}"`) }} />
       ) : <span style={{ width: QR_SIZE, height: QR_SIZE, borderRadius: 12, background: "linear-gradient(90deg,rgba(18,18,18,.04),rgba(18,18,18,.08),rgba(18,18,18,.04))", backgroundSize: "200% 100%", animation: "lineShimmer 1.2s linear infinite" }} />}
       {/* The Breezy mark in the middle (error correction H leaves room for it). */}
-      {svg && <span aria-hidden style={{ position: "absolute", width: 52, height: 52, borderRadius: 14, background: PAPER, boxShadow: "0 0 0 5px rgb(253,252,252)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {svg && <span aria-hidden style={{ position: "absolute", width: 48, height: 48, borderRadius: 13, background: QR_BG, boxShadow: `0 0 0 5px ${QR_BG}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ width: 34, height: 34, background: INK, WebkitMask: "url(/brand/brandmark.svg) center/contain no-repeat", mask: "url(/brand/brandmark.svg) center/contain no-repeat" }} />
       </span>}
       {/* Countdown ring: a quiet hint the code renews by itself. */}
