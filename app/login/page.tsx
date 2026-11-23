@@ -12,13 +12,15 @@ import { handoff } from "@/lib/auth/handoff";
 import { handoffProfile } from "@/lib/handoff/profile";
 import { useApp } from "@/components/AppState";
 import { Mark } from "@/components/handoff/BreezyEmail";
+import { useMapCtx } from "@/components/map/MapProvider";
+import mapboxgl from "mapbox-gl";
 
 type Mode = "qr" | "email" | "sent" | "code" | "approved";
 const EMAIL_LINK = "your email link";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", PAPER = "rgb(253,252,252)", CLAY = "rgb(147,89,75)";
 const QR_SIZE = 184;
-const QR_BG = "rgb(242,234,231)";
+const QR_BG = "rgb(253,251,250)";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,6 +35,7 @@ export default function LoginPage() {
   const [lan, setLan] = useState<string | null>(null);
   const [isLocal, setIsLocal] = useState(false);
   const qr = useQrToken(mode === "qr", lan);
+  const live = useLiveBackdrop(mode === "approved");
 
   useEffect(() => {
     const local = /^(localhost|127\.|\[::1\])/.test(location.hostname);
@@ -66,9 +69,9 @@ export default function LoginPage() {
 
   const approved = mode === "approved";
   return (
-    <main className="bz-login" style={{ position: "fixed", inset: 0, zIndex: 100, overflowY: "auto", background: "rgb(246,239,236)" }}>
+    <main className="bz-login" style={{ position: "fixed", inset: 0, zIndex: 100, overflowY: "auto", background: live ? "transparent" : "rgb(246,239,236)" }}>
       <style>{LOGIN_CSS}</style>
-      <Backdrop done={approved} />
+      <Backdrop done={approved} live={live} />
       {/* Logo lockup (Figma "Web experience 1.9", 5062:92652) */}
       <header style={{ position: "absolute", left: 32, top: 28, zIndex: 2, display: "flex", alignItems: "center", gap: 8 }}>
         <Mark size={30} color={INK} />
@@ -119,7 +122,7 @@ export default function LoginPage() {
                 <i className={`ph-bold ph-${mode === "code" ? "password" : "envelope-simple-open"}`} style={{ fontSize: 56, color: CLAY }} />
               </span>
             )}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 320 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 340, padding: "12px 18px", borderRadius: 18, background: "rgba(253,251,250,.84)", backdropFilter: "blur(12px)", boxShadow: "0 8px 24px rgba(63,40,32,.12)" }}>
               <span style={{ font: "400 18px/24px var(--font-sans)", color: INK }}>
                 {approved ? (by === EMAIL_LINK ? "Logged in with your email link" : `Approved on ${by}`) : mode === "qr" ? "Scan with your iPhone" : mode === "code" ? "Get the code on your iPhone" : "Check the email on your account"}
               </span>
@@ -168,6 +171,7 @@ const LOGIN_CSS = `
 @keyframes bzPinIn { 0% { opacity: 0; transform: translate(-50%, -100%) translateY(10px) scale(.7) } 70% { opacity: 1; transform: translate(-50%, -100%) scale(1.05) } 100% { opacity: 1; transform: translate(-50%, -100%) scale(1) } }
 @keyframes bzDrift { from { transform: scale(1.06) translate(0, 0) } to { transform: scale(1.06) translate(-1.6%, -1.2%) } }
 @keyframes bzRingPulse { 0% { transform: translate(-50%, -50%) scale(.55); opacity: .5 } 100% { transform: translate(-50%, -50%) scale(1.25); opacity: 0 } }
+@keyframes bzMarkIn { 0% { opacity: 0; transform: translateY(10px) scale(.7) } 70% { opacity: 1; transform: scale(1.05) } 100% { opacity: 1; transform: none } }
 @keyframes bzApprove { 0% { box-shadow: 0 0 0 0 rgba(49,140,96,.3) } 100% { box-shadow: 0 0 0 30px rgba(49,140,96,0) } }
 .bz-approve { animation: bzApprove 1.4s ease-out infinite }
 .bz-sim { left: 32px }
@@ -185,23 +189,73 @@ const PINS: { x: number; y: number; f: string; t: string }[] = [
   { x: 28, y: 92, f: "stale", t: "193 DOM" },
 ];
 
-function Backdrop({ done }: { done: boolean }) {
+/** The live map, full bleed (23 Nov review: "the map on full bleed in the background"): the
+ *  shared Mapbox map from the root layout, on Silver Lake, tilted, ROI heat on, turning slowly,
+ *  with the signal pins anchored on it; on approval it flies in. Offline (no token / style
+ *  error) the static Silver Lake image stands in. Returns whether the live map is showing. */
+const SL: [number, number] = [-118.2712, 34.0868];
+// Offsets from the centre in degrees, on a ring round the code (the card covers the middle).
+const MAP_PINS: { d: [number, number]; f: string; t: string }[] = [
+  { d: [-0.0112, 0.0058], f: "drop", t: "12% price drop" },
+  { d: [0.0006, 0.0092], f: "ub", t: "84% Underbuilt" },
+  { d: [0.0118, 0.0052], f: "roi", t: "$1.6m ROI" },
+  { d: [-0.0128, -0.0028], f: "exp", t: "Expired 4 days ago" },
+  { d: [0.0132, -0.0034], f: "comps", t: "$310k under comps" },
+  { d: [-0.0068, -0.0086], f: "stale", t: "193 DOM" },
+  { d: [0.0062, -0.0094], f: "wd", t: "Withdrawn 3 days ago" },
+];
+function useLiveBackdrop(done: boolean) {
+  const { map, ready, offline, setInset, setHeat, setAreaRings } = useMapCtx();
+  const live = !!map && ready && !offline;
+  useEffect(() => { setInset({ left: 0, top: 0, radius: 0 }); }, [setInset]);
+  useEffect(() => {
+    if (!live || !map) return;
+    setHeat("roi"); setAreaRings(null);
+    // Keep Silver Lake in the right half, behind the code; the welcome reads on the wash.
+    const pad = () => ({ left: Math.round(innerWidth * 0.34), right: 0, top: 0, bottom: 0 });
+    map.jumpTo({ center: SL, zoom: 14.1, pitch: 50, bearing: -24, padding: pad() });
+    const markers = MAP_PINS.map((p, k) => {
+      const el = document.createElement("div");
+      el.style.cssText = "display:flex;flex-direction:column;align-items:center;pointer-events:none";
+      el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;animation:bzMarkIn .55s ${0.6 + k * 0.3}s cubic-bezier(.2,.8,.2,1) both"><img src="/pins/${p.f}.svg" alt="" style="width:30px;height:33px;display:block"/><span style="margin-top:2px;height:24px;padding:0 9px;display:flex;align-items:center;border-radius:9999px;background:${PAPER};box-shadow:0 2px 8px rgba(40,26,20,.16);font:700 12px/1 var(--font-sans);color:${INK};white-space:nowrap">${p.t}</span></div>`;
+      return new mapboxgl.Marker({ element: el, anchor: "bottom", occludedOpacity: 1 } as mapboxgl.MarkerOptions).setLngLat([SL[0] + p.d[0], SL[1] + p.d[1]]).addTo(map);
+    });
+    // The slow turn: a few degrees a second, paused while the tab is hidden.
+    let raf = 0, last = performance.now();
+    const spin = (t: number) => { const dt = Math.min(64, t - last); last = t; if (!map.isMoving()) map.setBearing(map.getBearing() + dt * 0.0024); raf = requestAnimationFrame(spin); };
+    raf = requestAnimationFrame(spin);
+    const onResize = () => map.setPadding(pad());
+    addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(raf); removeEventListener("resize", onResize);
+      markers.forEach(m => m.remove());
+      map.jumpTo({ pitch: 0, bearing: 0, padding: { left: 0, right: 0, top: 0, bottom: 0 } });
+    };
+  }, [live, map]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Approved: the map leans in.
+  useEffect(() => { if (live && map && done) map.easeTo({ zoom: 15.4, pitch: 58, duration: 1800, easing: t => 1 - Math.pow(1 - t, 3) }); }, [live, map, done]);
+  return live;
+}
+
+function Backdrop({ done, live }: { done: boolean; live: boolean }) {
   return (
     <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-      <div style={{ position: "absolute", inset: "-4%", transform: done ? "scale(1.14)" : undefined, transition: "transform 1.6s cubic-bezier(.2,.8,.2,1)" }}>
+      {!live && <div style={{ position: "absolute", inset: "-4%", transform: done ? "scale(1.14)" : undefined, transition: "transform 1.6s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", inset: 0, background: "url(/map/silverlake.jpg) center/cover", filter: "saturate(.5) sepia(.14)", animation: "bzDrift 40s ease-in-out infinite alternate" }} />
-      </div>
-      {/* The blush wash: strong under the welcome, lighter round the code */}
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg,rgba(247,240,237,.93) 0%,rgba(247,240,237,.86) 38%,rgba(243,233,229,.6) 62%,rgba(241,230,226,.52) 100%)" }} />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(248,242,240,.55) 0%,rgba(248,242,240,0) 30%,rgba(236,224,220,0) 70%,rgba(236,224,220,.6) 100%)" }} />
-      <div className="bz-pins">
+      </div>}
+      {/* The blush wash: under the welcome only; the map stays clear round the code */}
+      <div style={{ position: "absolute", inset: 0, background: live
+        ? "linear-gradient(90deg,rgba(247,240,237,.9) 0%,rgba(247,240,237,.8) 30%,rgba(247,240,237,.32) 50%,rgba(247,240,237,0) 64%)"
+        : "linear-gradient(90deg,rgba(247,240,237,.93) 0%,rgba(247,240,237,.86) 38%,rgba(243,233,229,.6) 62%,rgba(241,230,226,.52) 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(248,242,240,.5) 0%,rgba(248,242,240,0) 22%,rgba(236,224,220,0) 78%,rgba(236,224,220,.5) 100%)" }} />
+      {!live && <div className="bz-pins">
         {PINS.map((p, k) => (
           <span key={p.t} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, display: "flex", flexDirection: "column", alignItems: "center", animation: `bzPinIn .55s ${0.5 + k * 0.35}s cubic-bezier(.2,.8,.2,1) both` }}>
             <img src={`/pins/${p.f}.svg`} alt="" style={{ width: 30, height: 33, display: "block" }} />
             <span style={{ marginTop: 2, height: 24, padding: "0 9px", display: "flex", alignItems: "center", borderRadius: 9999, background: PAPER, boxShadow: "0 2px 8px rgba(40,26,20,.14)", font: "700 12px/1 var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>{p.t}</span>
           </span>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -210,11 +264,12 @@ function Rings({ done }: { done: boolean }) {
   const ring = (d: number, bg: string): React.CSSProperties => ({ position: "absolute", left: "50%", top: "50%", width: d, height: d, transform: "translate(-50%,-50%)", borderRadius: 9999, background: bg });
   return (
     <div aria-hidden style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0 }}>
-      <span style={ring(640, "linear-gradient(180deg,rgba(234,219,214,.45),rgba(240,229,225,.25))")} />
-      <span style={ring(528, "linear-gradient(180deg,rgba(226,206,200,.5),rgba(238,226,222,.3))")} />
-      <span style={ring(376, "linear-gradient(180deg,rgba(220,198,191,.5),rgba(236,224,220,.35))")} />
+      {/* Glass rings over the map: a faint blush fill and a hairline each */}
+      <span style={{ ...ring(640, "radial-gradient(circle, rgba(253,248,246,0) 60%, rgba(253,248,246,.16) 100%)"), boxShadow: "inset 0 0 0 1px rgba(253,252,252,.55)" }} />
+      <span style={{ ...ring(528, "rgba(253,248,246,.12)"), boxShadow: "inset 0 0 0 1px rgba(253,252,252,.6)" }} />
+      <span style={{ ...ring(376, "rgba(253,248,246,.2)"), boxShadow: "inset 0 0 0 1px rgba(253,252,252,.7)", backdropFilter: "blur(2px)" }} />
       {/* The radar sweep, inside the outer ring */}
-      <span style={{ ...ring(640, "conic-gradient(from 0deg, rgba(147,89,75,0) 0deg, rgba(147,89,75,0) 292deg, rgba(147,89,75,.16) 359deg, rgba(147,89,75,0) 360deg)"), animation: `sweep ${done ? 1.4 : 6}s linear infinite` }} />
+      <span style={{ ...ring(640, "conic-gradient(from 0deg, rgba(147,89,75,0) 0deg, rgba(147,89,75,0) 292deg, rgba(147,89,75,.22) 359deg, rgba(147,89,75,0) 360deg)"), animation: `sweep ${done ? 1.4 : 6}s linear infinite` }} />
       {[0, 1.6].map(d => <span key={d} style={{ ...ring(640, "transparent"), boxShadow: "inset 0 0 0 1.5px rgba(147,89,75,.28)", animation: `bzRingPulse ${done ? 1.2 : 3.2}s ${d}s ease-out infinite` }} />)}
     </div>
   );
@@ -251,7 +306,7 @@ function useQrToken(on: boolean, lan: string | null) {
 function QrCard({ svg, left, ttl, k }: { svg: string; left: number; ttl: number; k: string }) {
   const R = 15, C = 2 * Math.PI * R;
   return (
-    <div style={{ position: "relative", flex: "none", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: QR_BG, boxShadow: "0 10px 30px rgba(120,80,68,.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ position: "relative", flex: "none", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: "rgba(253,251,250,.94)", backdropFilter: "blur(14px)", boxShadow: "0 24px 60px rgba(63,40,32,.22),0 0 0 1px rgba(253,252,252,.8)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       {svg ? (
         <div key={k} role="img" aria-label="QR code: scan it with the Breezy app on your iPhone to log in on this computer. Or use the email link or a 6-digit code below."
           style={{ width: QR_SIZE, height: QR_SIZE, animation: "fadeIn .5s ease both" }} dangerouslySetInnerHTML={{ __html: svg.replace("<svg", `<svg width="${QR_SIZE}" height="${QR_SIZE}"`) }} />
