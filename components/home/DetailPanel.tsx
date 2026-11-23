@@ -280,11 +280,11 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                   </button>
                 </div>
             ) : (
-            <div style={css("display:flex;align-items:flex-end;gap:12px;padding:16px;border-radius:20px;background:rgb(255,255,255);box-shadow:0 0 0 .5px rgba(13,12,12,.08),0 10px 28px rgba(40,26,20,.12);" + (l.noQe ? "animation:fadeIn .3s ease both" : ""))}>
+            <div style={css("display:flex;align-items:flex-end;gap:12px;padding:16px;border-radius:20px;background:rgb(255,255,255);outline:1.5px dashed rgba(13,12,12,.16);outline-offset:-1.5px;" + (l.noQe ? "animation:fadeIn .3s ease both" : ""))}>
               <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:2px")}>
-                <span style={css("display:flex;align-items:center;gap:5px;font:700 11px/14px var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:rgb(129,117,111)")}><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ flex: "none", display: "block" }}><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.5z" /></svg>Quick estimate</span>
-                <span style={css("font:300 36px/1.1 var(--font-sans);letter-spacing:-1px;color:rgb(18,18,18);white-space:nowrap")}>~{shortPrice(l.qe.value)}</span>
-                <span style={css("font:400 12px/16px var(--font-sans);color:rgb(98,90,89);white-space:nowrap;overflow:hidden;text-overflow:ellipsis")}>{shortPrice(l.qe.lo)} – {shortPrice(l.qe.hi)} · from 6 nearby sales</span>
+                <span style={css("display:flex;align-items:center;gap:5px;font:700 11px/14px var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:rgb(129,117,111)")}><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ flex: "none", display: "block" }}><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.5z" /></svg>Quick estimate · rough range</span>
+                <span style={css("font:300 30px/1.15 var(--font-sans);letter-spacing:-.8px;color:rgb(18,18,18);white-space:nowrap")}>{shortPrice(l.qe.lo)}–{shortPrice(l.qe.hi)}</span>
+                <span style={css("font:400 12px/16px var(--font-sans);color:rgb(98,90,89);white-space:nowrap;overflow:hidden;text-overflow:ellipsis")}>Preview from 6 nearby sales, not a valuation</span>
               </span>
               <button data-tour="get-comps" className="fb-dark dt-press" onClick={onGetComps} title="Full AI analysis + write-up" style={css("flex:none;display:flex;align-items:center;gap:6px;height:40px;padding:0 16px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 14px/18px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap")}>
                 <span style={maskIco("/ui/act-files.svg", 15, "currentColor")} />Get comps
@@ -319,7 +319,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
           {/* Owner: `onOwnersTab` (View history), contact lines unlock with Contact owner (`onOwnerReveal`) */}
           <div ref={ownerRef} style={css("display:flex;flex-direction:column;gap:12px;padding:24px 16px 8px")}>
             <div style={css("display:flex;align-items:center;justify-content:space-between;gap:12px")}>
-              <span style={css(H17)}>Owner</span>
+              <span style={css(H17)}>Contact owner</span>
               <button className="dt-ghost" onClick={() => setTab("Owners")} style={css("flex:none;height:32px;padding:0 10px;margin-right:-10px;border:none;border-radius:9999px;background:none;font:700 14px/18px var(--font-sans);color:rgb(17,16,16);cursor:pointer;white-space:nowrap")}>View history</button>
             </div>
             <div style={css("display:flex;align-items:center;gap:14px")}>
@@ -364,7 +364,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                 <span style={css("flex:none;display:flex;align-items:center;height:24px;padding:0 10px;border-radius:9999px;font:700 13px/24px var(--font-sans);color:rgb(249,249,249);background:" + statusColor(l.status))}>{l.status}</span>
               </div>
               <span style={css("font:400 15px/22px var(--font-sans);color:rgb(18,18,18);text-wrap:pretty")}>{descOpen ? d.desc : d.descShort}</span>
-              <span style={css("font:400 14px/20px var(--font-sans);letter-spacing:.2px;color:rgb(98,90,89);white-space:pre-line")}>{`Listed by: ${d.agent}\n${d.brokerage}\nSource: ${d.source}`}</span>
+              {d.brokerage && <span style={css("font:400 14px/20px var(--font-sans);letter-spacing:.2px;color:rgb(98,90,89);white-space:pre-line")}>{`Listed by: ${d.agent}\n${d.brokerage}\nSource: ${d.source}`}</span>}
               <button className="dt-green" onClick={() => setDescOpen(v => !v)} style={css("align-self:center;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:none;border-radius:9999px;background:none;font:700 14px/18px var(--font-sans);color:rgb(49,140,96);cursor:pointer")}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", transition: "transform .2s ease", transform: `rotate(${descOpen ? 180 : 0}deg)` }}><path d="M6 9l6 6 6-6" /></svg>
                 {descOpen ? "Show less" : "Show more"}
@@ -374,7 +374,7 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
             <div style={css("display:flex;flex-direction:column;gap:8px")}>
               <div style={css("height:32px;display:flex;align-items:center;justify-content:space-between;gap:8px")}>
                 <span style={css("font:400 18px/1.26 var(--font-sans);letter-spacing:-.25px;color:rgb(18,18,18)")}>Listing history</span>
-                <button className="dt-more" onClick={() => pickTab("Records")} style={css("flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 4px;border:none;background:none;font:700 14px/18px var(--font-sans);color:rgb(17,16,16);cursor:pointer")}>View more</button>
+                <button className="dt-more" onClick={() => pickTab("Records")} style={css("flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 4px;border:none;background:none;font:700 14px/18px var(--font-sans);color:rgb(17,16,16);cursor:pointer")}>All records</button>
               </div>
               <div style={css("border-radius:16px;padding:14px 16px;background:rgb(234,244,238);box-shadow:inset 0 0 0 .5px rgb(70,155,112);display:flex;flex-direction:column;gap:14px")}>
                 <div style={css("display:flex;gap:8px")}>
@@ -392,7 +392,6 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
                       <span style={css("font:400 16px/21px var(--font-sans);color:rgb(18,18,18)")}>{v}</span>
                     </span>
                   ))}
-                  <span style={css("flex:none;display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:9999px;box-shadow:inset 0 0 0 .5px rgb(70,155,112);font:400 12px/16px var(--font-sans);color:rgb(41,105,74)")}>More</span>
                 </div>
               </div>
             </div>
@@ -400,10 +399,10 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
             <div style={css("display:flex;flex-direction:column;gap:8px")}>
               <div style={css("height:32px;display:flex;align-items:center;justify-content:space-between;gap:8px")}>
                 <span style={css("font:400 18px/1.26 var(--font-sans);letter-spacing:-.25px;color:rgb(18,18,18)")}>Features</span>
-                <button className="dt-more" onClick={() => pickTab("Specs")} style={css("flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 4px;border:none;background:none;font:700 14px/18px var(--font-sans);color:rgb(17,16,16);cursor:pointer")}>View more</button>
+                <button className="dt-more" onClick={() => pickTab("Specs")} style={css("flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 4px;border:none;background:none;font:700 14px/18px var(--font-sans);color:rgb(17,16,16);cursor:pointer")}>All specs</button>
               </div>
               <div style={css("display:flex;flex-wrap:wrap;gap:6px")}>
-                {[l.ptype, l.pstyle, ...l.feats, "More →"].map(f => (
+                {[l.ptype, l.pstyle, ...l.feats].map(f => (
                   <span key={f} style={css("display:flex;align-items:center;height:26px;padding:0 10px;border-radius:9999px;box-shadow:inset 0 0 0 .5px rgb(18,18,18);font:400 12px/16px var(--font-sans);color:rgb(18,18,18);white-space:nowrap")}>{f}</span>
                 ))}
               </div>
@@ -555,9 +554,9 @@ export function DetailPanel({ l, onClose, onGetComps, onFlow, alertN = 0, onBell
         <div style={{ height: 80 }} />
       </div>
       <div style={css("flex:none;display:flex;align-items:center;gap:8px;padding:16px;background:rgb(253,252,252);box-shadow:inset 0 1px 0 rgb(245,240,238)")}>
-        <BellButton n={alertN} onClick={() => onBell?.()} />
-        <button className="btn-soft" title="Share property" onClick={onShare} style={{ flex: "none", width: 48, padding: 0 }}>
-          <span style={maskIco("/ui/share.svg", 18, "rgb(17,16,16)")} />
+        <BellButton n={alertN} onClick={() => onBell?.()} labelled />
+        <button className="btn-soft" title="Share property" onClick={onShare} style={{ flex: "none", gap: 6, padding: "0 14px" }}>
+          <span style={maskIco("/ui/share.svg", 16, "rgb(17,16,16)")} />Share
         </button>
         {revealed ? (
           // Email is the one CTA once the owner is unlocked (11 Nov comment: no Call on web).

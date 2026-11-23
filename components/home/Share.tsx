@@ -16,6 +16,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Listing, fullPrice } from "@/lib/fake";
 import { css } from "@/lib/css";
 
+// The agent's own branding on what the client receives. Agent feedback (23 Nov): a brokerage's
+// logo showed where it didn't belong, so a logo only shows when the agent's profile has one.
+// TODO(backend): the agent profile (logo, brokerage) from the account service.
+const AGENT_BRAND: { logo?: string; brokerage?: string } = {};
+
 // ---------------------------------------------------------------- state
 
 export type ShareState = ReturnType<typeof useShare>;
@@ -160,7 +165,7 @@ export function ShareModal({ sh, items, toast }: { sh: ShareState; items: Listin
                         <span style={css("display:flex;align-items:center;gap:4px;font:400 10px/1.26 var(--font-sans);color:rgb(18,18,18);white-space:nowrap")}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgb(195,65,55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>agentsname@brokerage.com</span>
                       </div>
                     </div>
-                    <span style={css("flex:0 1 148px;min-width:96px;aspect-ratio:148/52;box-sizing:border-box;padding:4px;border-radius:4px;background:rgb(255,255,255)")}><span style={css("display:block;width:100%;height:100%;background:url('/share/brokerage-logo.jpg') center/cover no-repeat")} /></span>
+                    {AGENT_BRAND.logo && <span style={css("flex:0 1 148px;min-width:96px;aspect-ratio:148/52;box-sizing:border-box;padding:4px;border-radius:4px;background:rgb(255,255,255)")}><span style={css("display:block;width:100%;height:100%;background:url('" + AGENT_BRAND.logo + "') center/cover no-repeat")} /></span>}
                   </div>
                   <span style={css("display:block;height:1px;background:rgb(234,215,210)")} />
                 </div>

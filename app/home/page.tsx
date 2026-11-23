@@ -743,7 +743,7 @@ export default function HomeWeb() {
         if (k === "Buyer search") setRun(null);
       }} />
       <BillingHost onToast={showToast} />
-      {run && !buyerWiz && <TaskBar run={run} left={navW} onBack={run.step > 0 && !(run.kind === "comps" && run.step === 2) ? runBack : undefined} onCancel={runCancel} />}
+      {run && !buyerWiz && tour?.task !== run.kind && <TaskBar run={run} left={navW} top={BAR_BOTTOM + 8} onBack={run.step > 0 && !(run.kind === "comps" && run.step === 2) ? runBack : undefined} onCancel={runCancel} />}
       {buyerWiz && <BuyerWizard onClose={() => { setBuyerWiz(false); if (getStarted.get().tour?.task === "buyer") getStarted.step("buyer", "create", ["wizard"]); }} onDone={finishBuyer} />}
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none", transformOrigin: "0 50%",

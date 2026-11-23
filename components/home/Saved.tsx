@@ -474,15 +474,18 @@ export function SavedSheet({ picked, out, onBack, onOpen, onRemove, onClear, onS
 // ---------- alerts ----------
 
 // Detail footer bell (`bellOff` / `bellOn` with the count badge).
-export function BellButton({ n, onClick }: { n: number; onClick: () => void }) {
+// `labelled` (agent feedback, 23 Nov: unlabeled icons): the bell says "Alert" / "Alerts" beside it.
+export function BellButton({ n, onClick, labelled }: { n: number; onClick: () => void; labelled?: boolean }) {
+  const lab = labelled ? "gap:6px;padding:0 14px;font:700 15px/20px var(--font-sans);color:rgb(17,16,16);" : "width:48px;";
   if (!n) return (
-    <button onClick={onClick} title="Set alert" className="sv-bell" style={css("flex:none;width:48px;height:48px;border:none;border-radius:9999px;background:rgba(18,18,18,.06);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
-      <span style={mask("/ui/bell.svg", 18, "rgb(17,16,16)")} />
+    <button onClick={onClick} title="Set alert" className="sv-bell" style={css("flex:none;" + lab + "height:48px;border:none;border-radius:9999px;background:rgba(18,18,18,.06);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
+      <span style={mask("/ui/bell.svg", labelled ? 16 : 18, "rgb(17,16,16)")} />{labelled && "Alert"}
     </button>
   );
   return (
-    <button onClick={onClick} title={n + (n === 1 ? " alert set · Edit" : " alerts set · Edit")} className="sv-bellon" style={css("position:relative;flex:none;width:48px;height:48px;border:none;border-radius:9999px;background:rgb(221,237,232);box-shadow:inset 0 0 0 1px rgba(49,104,89,.28);cursor:pointer;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease backwards")}>
+    <button onClick={onClick} title={n + (n === 1 ? " alert set · Edit" : " alerts set · Edit")} className="sv-bellon" style={css("position:relative;flex:none;" + lab + "width:" + (labelled ? "auto" : "48px") + ";border:none;border-radius:9999px;background:rgb(221,237,232);box-shadow:inset 0 0 0 1px rgba(49,104,89,.28);cursor:pointer;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease backwards")}>
       <svg width="20" height="20" viewBox="0 0 24 24" style={css("display:block")}><path d="M12 3a6 6 0 0 0-6 6v3.6L4.4 15.4a.9.9 0 0 0 .8 1.4h13.6a.9.9 0 0 0 .8-1.4L18 12.6V9a6 6 0 0 0-6-6z" fill="rgb(49,104,89)" /><path d="M9.6 19a2.5 2.5 0 0 0 4.8 0z" fill="rgb(49,104,89)" /></svg>
+      {labelled && <span style={{ marginLeft: 6, color: "rgb(49,104,89)" }}>Alerts</span>}
       <span style={css("position:absolute;right:-2px;top:-2px;min-width:18px;height:18px;box-sizing:border-box;padding:0 5px;border-radius:9999px;background:rgb(49,104,89);box-shadow:0 0 0 2px rgb(253,252,252);font:700 11px/18px var(--font-sans);color:rgb(249,249,249);text-align:center")}>{n}</span>
     </button>
   );

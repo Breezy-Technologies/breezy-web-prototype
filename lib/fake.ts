@@ -436,7 +436,9 @@ export type RecEvent = { date: string; change: string; title: string; price: str
 export type ListingDetail = {
   hoa: number; garage: number; condition: string; view: string;
   apn: string; zone: string; mls: string; source: string; listedOn: string; listedDate: string;
-  agent: string; brokerage: string;
+  // Only set when the home has an MLS listing (agent feedback: a partner's branding showed on
+  // a home that wasn't listed). TODO(backend): from the listing record.
+  agent?: string; brokerage?: string;
   desc: string; descShort: string;
   recYears: { year: string; events: RecEvent[] }[];
   tax: [string, string][]; mortgage: [string, string][];
@@ -496,7 +498,7 @@ export function listingDetail(l: Listing): ListingDetail {
     condition: pick(CONDS), view: pick(VIEWS),
     apn: digits(10), zone: pick(["RA", "RE", "RS", "R1"]) + digits(4), mls: digits(14), source: "CRMLS",
     listedOn: md(listed), listedDate: `${md(listed)} ${listed.getUTCFullYear()}`,
-    agent, brokerage,
+    ...(l.status === "Active" || l.status === "Pending" || l.status === "Sold" ? { agent, brokerage } : {}),
     desc, descShort: desc.slice(0, cutAt).replace(/[,.;:]$/, "") + "…",
     recYears: [...byYear.entries()].sort((a, b) => +b[0] - +a[0]).map(([year, events]) => ({ year, events })),
     tax: [

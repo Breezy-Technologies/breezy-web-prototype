@@ -22,11 +22,11 @@ const FLOWS: Record<CreateRun["kind"], { title: string; steps: string[]; hints: 
   },
 };
 
-export function TaskBar({ run, left, onBack, onCancel }: { run: CreateRun; left: number; onBack?: () => void; onCancel: () => void }) {
+export function TaskBar({ run, left, top, onBack, onCancel }: { run: CreateRun; left: number; top: number; onBack?: () => void; onCancel: () => void }) {
   const f = FLOWS[run.kind];
   const tip = useTipVisible(run.kind as TipFlow);
   return (
-    <div role="status" style={{ position: "fixed", top: 12, left: `calc(${left}px + (100vw - ${left}px) / 2)`, transform: "translateX(-50%)", zIndex: 95, display: "flex", flexDirection: "column", gap: 6, padding: "8px 8px 8px 16px", borderRadius: 20, background: "rgb(253,252,252)", boxShadow: "0 0 0 1px rgba(13,12,12,.1),0 10px 28px rgba(30,18,12,.16)", pointerEvents: "auto", animation: "panelDrop .25s cubic-bezier(.2,.8,.2,1) both", maxWidth: `calc(100vw - ${left + 32}px)` }}>
+    <div role="status" style={{ position: "fixed", top, left: `calc(${left}px + (100vw - ${left}px) / 2)`, transform: "translateX(-50%)", zIndex: 95, display: "flex", flexDirection: "column", gap: 6, padding: "8px 8px 8px 16px", borderRadius: 20, background: "rgb(253,252,252)", boxShadow: "0 0 0 1px rgba(13,12,12,.1),0 10px 28px rgba(30,18,12,.16)", pointerEvents: "auto", animation: "panelDrop .25s cubic-bezier(.2,.8,.2,1) both", maxWidth: `calc(100vw - ${left + 32}px)` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ flex: "none", font: "700 14px/18px var(--font-sans)", color: "var(--ink)", whiteSpace: "nowrap" }}>{f.title}</span>
         <span style={{ flex: "none", width: 1, height: 20, background: "rgba(13,12,12,.12)" }} />
