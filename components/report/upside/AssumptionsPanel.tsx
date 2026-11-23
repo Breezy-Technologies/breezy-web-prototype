@@ -44,9 +44,11 @@ interface NumberProps {
   fallback: number;
   onChange: (v: number | undefined) => void;
   disabled?: boolean;
+  /** No model value to fall back on (no comps): empty, with this placeholder, until the person types one. */
+  blank?: string;
 }
 
-function NumberField({ f, label, value, fallback, onChange, disabled }: NumberProps) {
+export function NumberField({ f, label, value, fallback, onChange, disabled, blank }: NumberProps) {
   // what is typed, while it is being typed; the committed value otherwise
   const [draft, setDraft] = useState<string | null>(null);
   const current = value ?? fallback;
@@ -58,7 +60,7 @@ function NumberField({ f, label, value, fallback, onChange, disabled }: NumberPr
     if (v === null) return;
     const next = clampTo(f, v);
     // focusing and leaving a field it does not change must not pin its value
-    if (value === undefined && show(f, next, true) === show(f, current, true)) return;
+    if (!blank && value === undefined && show(f, next, true) === show(f, current, true)) return;
     onChange(next);
   };
 
@@ -81,8 +83,9 @@ function NumberField({ f, label, value, fallback, onChange, disabled }: NumberPr
         {PREFIX[f.unit] && <span className="pre">{PREFIX[f.unit]}</span>}
         <input
           id={id} type="text" inputMode="decimal" disabled={disabled}
-          value={draft ?? show(f, current)}
-          onFocus={(e) => { setDraft(show(f, current, true)); e.currentTarget.select(); }}
+          value={draft ?? (blank && !changed ? '' : show(f, current))}
+          placeholder={blank && !changed ? blank : undefined}
+          onFocus={(e) => { setDraft(blank && !changed ? '' : show(f, current, true)); e.currentTarget.select(); }}
           onChange={(e) => {
             setDraft(e.target.value);
             const v = parse(f, e.target.value);
@@ -94,7 +97,7 @@ function NumberField({ f, label, value, fallback, onChange, disabled }: NumberPr
         />
         {SUFFIX[f.unit] && <span className="suf">{SUFFIX[f.unit]}</span>}
       </div>
-      {changed && !disabled && (
+      {changed && !disabled && !blank && (
         <button type="button" className="reset" onClick={() => { onChange(undefined); setDraft(null); }}>
           <Ic n="arrow-counter-clockwise" s={12} />
           <span className="sr">Reset to </span>{withUnits(f, fallback)}
@@ -113,7 +116,7 @@ interface SegProps<V extends string> {
   onChange: (v: V) => void;
 }
 
-function Segmented<V extends string>({ label, value, options, onChange }: SegProps<V>) {
+export function Segmented<V extends string>({ label, value, options, onChange }: SegProps<V>) {
   return (
     <div className="seg">
       <span className="lbl">{label}</span>
@@ -147,10 +150,18 @@ interface Props {
   /** Called once that has happened, so the URL can drop it. */
   onFocused?: () => void;
   onClose: () => void;
+  /** Replaces the default lede. */
+  lede?: string;
+  /** "Your estimate", above everything (no comps, no build scenarios, your own price). */
+  estimate?: ReactNode;
+  /** "Your project", the first group (no build scenarios). */
+  project?: ReactNode;
+  /** No comps: the sale price leads, empty until the person enters one. */
+  saleFirst?: boolean;
 }
 
 /** The report sidebar's other face: every number behind the Upside analysis, editable. */
-export function AssumptionsPanel({ p, rec, a, onChange, focus, onFocused, onClose }: Props) {
+export function AssumptionsPanel({ p, rec, a, onChange, focus, onFocused, onClose, lede, estimate, project, saleFirst }: Props) {
   /* Read through a ref: the callback is a new function on every render, and
      this should run once per field, not once per keystroke. */
   const done = useRef(onFocused);
@@ -202,7 +213,7 @@ export function AssumptionsPanel({ p, rec, a, onChange, focus, onFocused, onClos
 
   const hintFor = (key: NumberKey): string | undefined => {
     if (key === 'Hc') return `${Mk(rec.build + rec.soft)} project at ${N(rec.S)} ft²`;
-    if (key === 'C_RB') return `${Mk(rec.gross)} after the build`;
+    if (key === 'C_RB') return saleFirst && a.C_RB === undefined ? 'No nearby sales yet' : `${Mk(rec.gross)} after the build`;
     return undefined;
   };
 
@@ -249,11 +260,13 @@ export function AssumptionsPanel({ p, rec, a, onChange, focus, onFocused, onClos
         </button>
       </header>
       <p className="lede">
-        Every number behind the Upside analysis. Change one and the analysis updates as you type.
+        {lede ?? 'Every number behind the Upside analysis. Change one and the analysis updates as you type.'}
       </p>
 
       <div className="body">
-        {GROUPS.map((g) => (
+        {estimate && <div className="est">{estimate}</div>}
+        {project && <div className="grp"><h3>Your project</h3>{project}</div>}
+        {(saleFirst ? [...GROUPS.filter((g) => g.id === 'sale'), ...GROUPS.filter((g) => g.id !== 'sale')] : GROUPS).map((g) => (
           <div key={g.id} className="grp">
             <h3>{g.title}</h3>
             {setup[g.id]}
@@ -266,6 +279,7 @@ export function AssumptionsPanel({ p, rec, a, onChange, focus, onFocused, onClos
                 value={a[f.key]}
                 fallback={defaults[f.key]}
                 onChange={(v) => set(f.key, v)}
+                blank={saleFirst && f.key === 'C_RB' ? 'Price' : undefined}
               />
             ))}
           </div>

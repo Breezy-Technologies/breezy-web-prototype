@@ -27,7 +27,8 @@ const Row = ({ label, value, total, field, onAdjust }: RowProps) => (
   </div>
 );
 
-export function Ledger({ p, rec, a, onAdjust }: { p: Params; rec: EvalRow; a: Assumptions; onAdjust: (field?: NumberKey) => void }) {
+/** `noSale`: no after-build value yet (no comps, valuation updating): the Return column is a skeleton. */
+export function Ledger({ p, rec, a, onAdjust, noSale }: { p: Params; rec: EvalRow; a: Assumptions; onAdjust: (field?: NumberKey) => void; noSale?: boolean }) {
   const L = ledger(p, rec, a);
   const T = termsOf(a);
   const q = withOverrides(p, a);
@@ -65,6 +66,15 @@ export function Ledger({ p, rec, a, onAdjust }: { p: Params; rec: EvalRow; a: As
           {L.invest.map(l => <Row key={l.label} label={l.label} value={M(l.value)} {...(l.field ? field(l.field) : {})} />)}
           <Row label="Total investment" value={M(L.cash)} total />
         </div>
+        {noSale ? (
+          <div>
+            <h3>Return</h3>
+            {["Sale proceeds", "Selling costs", "Loan payoffs", "Net at close", "Cash invested", "Estimated profit"].map(k => (
+              <div key={k} className="rp-led-r"><span>{k}</span><i className="rp-bone" style={{ width: 84 }} /></div>
+            ))}
+            <p className="note">Fills in once there’s a sale price.</p>
+          </div>
+        ) : (
         <div>
           <h3>Return</h3>
           <Row label="Sale proceeds" value={M(L.proceeds)} {...field("C_RB")} />
@@ -73,19 +83,20 @@ export function Ledger({ p, rec, a, onAdjust }: { p: Params; rec: EvalRow; a: As
           {L.projectLoan > 0 && <Row label="Project loan payoff" value={M(-L.payProject)} />}
           <Row label="Net at close" value={M(L.net)} />
           <Row label="Cash invested" value={M(-L.cash)} />
-          {L.owner && <Row label="Home’s value today, as-is" value={M(-L.asIs)} />}
+          {L.owner && <Row label="Property’s value today, as-is" value={M(-L.asIs)} />}
           <Row label="Estimated profit" value={M(L.profit)} total />
           <p className="note">
-            {L.owner && <>Selling the house as it stands would bring in {M(L.asIs)} after selling costs ({M(q.Aq)} less {pct(q.D_DISP, 1)}). Building gives that up, so it counts against the sale. </>}
+            {L.owner && <>Selling the property as it stands would bring in {M(L.asIs)} after selling costs ({M(q.Aq)} less {pct(q.D_DISP, 1)}). Building gives that up, so it counts against the sale. </>}
             Your cash is tied up for{" "}
             <button type="button" className="tie" onClick={() => onAdjust(monthsField)}>{L.months} months</button>
             , which is why the return is also shown as {pct(L.annual, 1)} a year. Worth {M(L.npv)} today against a{" "}
             <button type="button" className="tie" onClick={() => onAdjust("hurdle")}>{+(T.hurdle * 100).toFixed(2)}% hurdle</button>.
           </p>
         </div>
+        )}
       </div>
 
-      <div className="rp-wif">
+      {!noSale && <div className="rp-wif">
         <h3>What could affect your return?</h3>
         {sens.map((s, i) => (
           <div key={s.label} className="sens">
@@ -99,7 +110,7 @@ export function Ledger({ p, rec, a, onAdjust }: { p: Params; rec: EvalRow; a: As
             ? <>The return is most sensitive to the sale price. A 10% miss at the exit costs about {about(saleHit)}; a 10% overrun on construction costs about {about(costHit)}. Get your comps right before you get your quotes.</>
             : <>The return is most sensitive to construction costs. A 10% overrun costs about {about(costHit)}; a 10% miss at the exit costs about {about(saleHit)}. Get firm quotes before you commit to a size.</>}
         </p>
-      </div>
+      </div>}
     </section>
   );
 }

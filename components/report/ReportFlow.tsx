@@ -259,7 +259,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
             <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
               {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
               {kind === "ub" && <UBReport l={l} write={write} onComps={toComps} />}
-              {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} />}
+              {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} onGuidelines={() => pick("ub")} onGetReport={onShare} />}
               {locked && <LockVeil key={kind} access={acc} feature={feat ?? "comps"} clear={ent.s.lockStyle === "blur" ? 0 : "42%"} onUnlock={unlock} onToast={onToast} />}
             </div>
           </div>

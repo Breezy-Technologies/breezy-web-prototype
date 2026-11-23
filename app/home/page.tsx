@@ -32,7 +32,8 @@ import { SavedSheet, searchCriteria, seedFilters, useAlerts, useSearchSheet } fr
 import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
 import { AreaReport, ReportsSheet, useReports } from "@/components/home/Reports";
-import { Listing, OppType, listingForAddress } from "@/lib/fake";
+import { Listing, OppType, listingForAddress, lotListing } from "@/lib/fake";
+import { LOTS } from "@/lib/silverlake";
 import { Filters, SortKey, fDef, fDims, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, hashStr, pointInRings, ringBBox } from "@/lib/geo";
@@ -75,6 +76,15 @@ export default function HomeWeb() {
   const [hoverId, setHoverId] = useState<number | null>(null);
   // The report sheet (Comps / Build guidelines / Upside analysis) for a property.
   const [flow, setFlow] = useState<{ l: Listing; kind: FlowKind } | null>(null);
+  // Deep link for reviews: /home?report=roi (or ub) opens that report on one of Pedro's
+  // Silver Lake lots (?lot=<index>, default 1467 Occidental Blvd); the Upside analysis
+  // also reads ?scenario=<id> (components/report/upside/scenarios.ts).
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search), r = q.get("report");
+    if (r !== "roi" && r !== "ub") return;
+    const i = Number(q.get("lot") ?? 820), lot = LOTS[i] ? i : 820;
+    setFlow({ l: lotListing(LOTS[lot], lot), kind: r });
+  }, []);
   // Share (picked set, share modal) and saved Reports; see Share.tsx / Reports.tsx.
   const sh = useShare();
   const rp = useReports();

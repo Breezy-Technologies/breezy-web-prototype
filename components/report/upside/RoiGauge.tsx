@@ -4,7 +4,7 @@
 // Breezy change: the bars take the map's ROI palette and bands (lib/heat, the
 // Heat switcher's current pick), so the gauge reads in the same colours as the
 // ROI hexes and parcels.
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { HEAT_PALETTES, bandsFor, useHeatPrefs } from "@/lib/heat";
 import { rampAt, scalePosition } from "@/lib/heat/scale";
 
@@ -16,7 +16,8 @@ const OX = 5.36, OY = 0.43, CX = 113.26, CY = 116, FIRST = 162.3, LAST = 18.3, P
 const W = 238.225, H = 118.268;
 const SWEEP = 76.6;
 
-export function RoiGauge({ pct, months, cap }: { pct: number; months: number; cap?: string }) {
+/** `ghost`: no result yet (no comps, system states): faded bars, no needle, `value` in place of the %. */
+export function RoiGauge({ pct, months, cap, ghost, value }: { pct: number; months: number; cap?: string; ghost?: boolean; value?: ReactNode }) {
   const prefs = useHeatPrefs();
   const colors = HEAT_PALETTES[prefs.roi].c;
   const bands = bandsFor("roi", colors.length);
@@ -36,16 +37,16 @@ export function RoiGauge({ pct, months, cap }: { pct: number; months: number; ca
         </defs>
         <g transform={`translate(${OX} ${OY})`}>
           {bars.map((fill, i) => (
-            <path key={i} d={BAR} fill={fill} opacity={i < lit ? undefined : 0.3}
+            <path key={i} d={BAR} fill={fill} opacity={ghost ? 0.3 : i < lit ? undefined : 0.3}
               transform={`rotate(${90 - (FIRST - i * ((FIRST - LAST) / (N_BARS - 1)))} ${CX} ${CY})`} />
           ))}
-          <path d={NEEDLE} fill={`url(#${ink})`}
-            transform={`translate(${CX} ${PIVOT_Y}) rotate(${90 - deg}) translate(${-NEEDLE_PX} ${-NEEDLE_PY})`} />
+          {!ghost && <path d={NEEDLE} fill={`url(#${ink})`}
+            transform={`translate(${CX} ${PIVOT_Y}) rotate(${90 - deg}) translate(${-NEEDLE_PX} ${-NEEDLE_PY})`} />}
         </g>
       </svg>
       <div className="txt">
         {label && <p className="cap">{label}</p>}
-        <p className="val">{pct < 0 ? `−${-pct}` : pct}<span>%</span></p>
+        {value ?? <p className="val">{pct < 0 ? `−${-pct}` : pct}<span>%</span></p>}
       </div>
     </div>
   );
