@@ -16,7 +16,7 @@ type Mode = "qr" | "email" | "sent" | "code" | "approved";
 const EMAIL_LINK = "your email link";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", PAPER = "rgb(253,252,252)", CLAY = "rgb(147,89,75)";
-const QR_SIZE = 248;
+const QR_SIZE = 216;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,68 +62,80 @@ export default function LoginPage() {
     if (m) { history.replaceState(null, "", "/login"); succeed(EMAIL_LINK, "magic"); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const approved = mode === "approved";
   return (
-    <main style={{ position: "fixed", inset: 0, zIndex: 100, overflowY: "auto", background: "rgb(245,243,243)", display: "flex", flexDirection: "column" }}>
-      <header style={{ flex: "none", display: "flex", alignItems: "center", padding: "24px 32px" }}>
-        <span role="img" aria-label="Breezy" style={{ width: 84, height: 28, background: INK, WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat" }} />
-      </header>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: `8px ${phone ? 430 : 16}px 64px 16px`, transition: "padding .35s cubic-bezier(.2,.8,.2,1)" }}>
-        <section style={{ width: 960, maxWidth: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 0, borderRadius: 32, background: PAPER, boxShadow: "inset 0 0 0 1px rgb(240,235,233),0 24px 60px rgba(40,26,20,.10)", overflow: "hidden", animation: "riseIn .4s cubic-bezier(.2,.8,.2,1) both" }}>
-          {/* Left: what to do */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 28, padding: "56px 48px 44px" }}>
-            <h1 style={{ margin: 0, font: "300 40px/1.1 var(--font-sans)", letterSpacing: "-1.2px", color: INK, textWrap: "balance" } as React.CSSProperties}>Log in to Breezy on your computer</h1>
-            <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 18 }}>
-              {[
-                <>Open <b>Breezy</b> on your iPhone</>,
-                <>Point your camera at this code</>,
-                <>Confirm with <b>Face ID</b></>,
-              ].map((t, i) => (
-                <li key={i} style={{ display: "flex", alignItems: "center", gap: 14, font: "400 17px/24px var(--font-sans)", color: INK }}>
-                  <span aria-hidden style={{ flex: "none", width: 30, height: 30, borderRadius: 9999, background: "rgba(18,18,18,.06)", display: "flex", alignItems: "center", justifyContent: "center", font: "700 14px/1 var(--font-sans)" }}>{i + 1}</span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ol>
-            <span style={{ flex: 1 }} />
+    <main className="bz-login" style={{ position: "fixed", inset: 0, zIndex: 100, overflowY: "auto", background: "linear-gradient(180deg,rgb(238,233,228),rgb(223,213,207))", display: "flex", gap: 24, padding: 24, boxSizing: "border-box" }}>
+      <style>{LOGIN_CSS}</style>
+      {/* Left: the brand stage (Ann's mobile activation language: warm brown, the radar, signal pins) */}
+      <Stage done={approved} />
+
+      {/* Right: log in */}
+      <section style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 28, padding: "24px 32px 24px 40px" }}>
+        <span role="img" aria-label="Breezy" style={{ width: 120, height: 40, background: "linear-gradient(180deg,rgb(186,152,144),rgb(132,98,90))", WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", animation: "riseIn .5s cubic-bezier(.2,.8,.2,1) both" }} />
+        {approved ? (
+          <div role="status" style={{ display: "flex", flexDirection: "column", gap: 14, animation: "riseIn .45s cubic-bezier(.2,.8,.2,1) both" }}>
+            <span className="bz-approve" style={{ position: "relative", width: 76, height: 76, borderRadius: 9999, background: "rgb(49,140,96)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <i className="ph-bold ph-check" style={{ fontSize: 38, color: "#fff" }} />
+            </span>
+            <span style={{ font: "700 12px/16px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: CLAY, marginTop: 8 }}>{by === EMAIL_LINK ? "Logged in with your email link" : `Approved on ${by}`}</span>
+            <h1 style={{ margin: 0, font: "300 52px/1.05 var(--font-sans)", letterSpacing: "-1.6px", color: INK }}>Welcome back, {first}</h1>
+            <span style={{ font: "400 17px/24px var(--font-sans)", color: MUTED }}>Opening Silver Lake, with your saved homes…</span>
+          </div>
+        ) : <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, animation: "riseIn .5s .05s cubic-bezier(.2,.8,.2,1) both" }}>
+            <span style={{ font: "700 12px/16px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: CLAY }}>Log in on your computer</span>
+            <h1 style={{ margin: 0, font: "300 52px/1.05 var(--font-sans)", letterSpacing: "-1.6px", color: INK, textWrap: "balance" } as React.CSSProperties}>
+              {mode === "qr" ? "Scan with your iPhone" : "Log in without a password"}
+            </h1>
+          </div>
+
+          {mode === "qr" ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap", animation: "riseIn .5s .12s cubic-bezier(.2,.8,.2,1) both" }}>
+              <QrCard svg={qr.svg} left={qr.left} ttl={qr.ttl} k={qr.token} />
+              <div style={{ flex: "1 1 220px", display: "flex", flexDirection: "column", gap: 18 }}>
+                <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 16 }}>
+                  {[
+                    <>Open <b>Breezy</b> on your iPhone</>,
+                    <>Point your camera at the code</>,
+                    <>Confirm with <b>Face ID</b></>,
+                  ].map((t, i) => (
+                    <li key={i} style={{ display: "flex", alignItems: "center", gap: 14, font: "400 17px/24px var(--font-sans)", color: INK }}>
+                      <span aria-hidden style={{ flex: "none", width: 32, height: 32, borderRadius: 9999, background: PAPER, boxShadow: "0 1px 2px rgba(40,26,20,.08)", display: "flex", alignItems: "center", justifyContent: "center", font: "700 14px/1 var(--font-sans)", color: CLAY }}>{i + 1}</span>
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ol>
+                <span aria-live="polite" style={{ minHeight: 20, font: "400 13px/20px var(--font-sans)", color: declined ? CLAY : MUTED, display: "flex", alignItems: "center", gap: 6 }}>
+                  {declined ? <><i className="ph-bold ph-prohibit" />Request declined on your iPhone. Here&apos;s a new code.</> : <><i className="ph-bold ph-arrows-clockwise" />The code renews itself every minute</>}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex" }}>
+              {mode === "email" && <EmailForm onBack={() => setMode("qr")} onSent={(email, token) => { setSent({ email, token }); setMode("sent"); }} />}
+              {mode === "sent" && sent && <Sent {...sent} onBack={() => setMode("qr")} onRetry={() => setMode("email")} />}
+              {mode === "code" && <CodeForm onBack={() => setMode("qr")} onOk={who => succeed(who, "code")} />}
+            </div>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, animation: "riseIn .5s .2s cubic-bezier(.2,.8,.2,1) both" }}>
+            {mode === "qr" && <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <LinkBtn onClick={() => setMode("email")} icon="envelope-simple">Email me a link instead</LinkBtn>
+              <LinkBtn onClick={() => setMode("code")} icon="password">Use a 6-digit code</LinkBtn>
+            </div>}
             <label style={{ display: "flex", alignItems: "center", gap: 10, font: "400 14px/20px var(--font-sans)", color: INK, cursor: "pointer", userSelect: "none" }}>
               <input type="checkbox" checked={stay} onChange={e => setStay(e.target.checked)} style={{ width: 18, height: 18, accentColor: INK, margin: 0 }} />
               Stay logged in on this browser
             </label>
-            <span style={{ font: "400 13px/19px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>
+            <span style={{ maxWidth: 440, font: "400 13px/19px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>
               No Breezy account yet? Get the Breezy app on your iPhone and sign up there, then come back to this page.
             </span>
           </div>
-
-          {/* Right: the code, or a fallback */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: "48px 40px 40px", background: "rgb(250,248,247)", borderLeft: "1px solid rgb(240,235,233)", minHeight: 460 }}>
-            {mode === "qr" && <>
-              <QrCard svg={qr.svg} left={qr.left} ttl={qr.ttl} k={qr.token} />
-              <span aria-live="polite" style={{ height: 20, font: "400 13px/20px var(--font-sans)", color: declined ? CLAY : MUTED, display: "flex", alignItems: "center", gap: 6 }}>
-                {declined ? <><i className="ph-bold ph-prohibit" />Request declined on your iPhone. Here&apos;s a new code.</> : "The code refreshes by itself"}
-              </span>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginTop: 4 }}>
-                <LinkBtn onClick={() => setMode("email")} icon="envelope-simple">Email me a link instead</LinkBtn>
-                <LinkBtn onClick={() => setMode("code")} icon="password">Use a 6-digit code</LinkBtn>
-              </div>
-            </>}
-            {mode === "email" && <EmailForm onBack={() => setMode("qr")} onSent={(email, token) => { setSent({ email, token }); setMode("sent"); }} />}
-             {mode === "sent" && sent && <Sent {...sent} onBack={() => setMode("qr")} onRetry={() => setMode("email")} />}
-            {mode === "code" && <CodeForm onBack={() => setMode("qr")} onOk={who => succeed(who, "code")} />}
-            {mode === "approved" && (
-              <div role="status" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, animation: "riseIn .35s cubic-bezier(.2,.8,.2,1) both" }}>
-                <span style={{ width: 88, height: 88, borderRadius: 9999, background: "rgb(49,140,96)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 0 10px rgba(49,140,96,.12)" }}>
-                  <i className="ph-bold ph-check" style={{ fontSize: 44, color: "#fff" }} />
-                </span>
-                <span style={{ font: "700 18px/24px var(--font-sans)", color: INK, textAlign: "center" }}>{by === EMAIL_LINK ? "Logged in with your email link" : `Approved on ${by}`}</span>
-                <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED }}>Opening your map…</span>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+        </>}
+      </section>
 
       {/* Demo: approve from a simulated iPhone on this laptop (BroadcastChannel), or a real one on the same Wi-Fi in dev. */}
-      {mode !== "approved" && (
+      {!approved && (
         <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 120, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
           {isLocal && lan && !phone && (
             <span title="Your iPhone must be on the same Wi-Fi" style={{ padding: "6px 12px", borderRadius: 9999, background: "rgba(253,252,252,.9)", boxShadow: "0 2px 8px rgba(40,26,20,.08)", font: "400 12px/16px var(--font-sans)", color: MUTED }}>
@@ -136,12 +148,94 @@ export default function LoginPage() {
         </div>
       )}
       {phone && (
-        <aside aria-label="Simulated iPhone" style={{ position: "fixed", right: 20, bottom: 68, zIndex: 119, width: 390, height: "min(760px, calc(100vh - 92px))", borderRadius: 44, background: INK, padding: 10, boxShadow: "0 24px 60px rgba(30,18,12,.3)", animation: "riseIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
+        // Over the brand stage, so the QR stays in view.
+        <aside aria-label="Simulated iPhone" className="bz-sim" style={{ position: "fixed", bottom: 24, zIndex: 119, width: 390, height: "min(760px, calc(100vh - 48px))", borderRadius: 44, background: INK, padding: 10, boxShadow: "0 24px 60px rgba(30,18,12,.35)", animation: "riseIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
           <iframe key={mode === "code" ? "code" : qr.token} title="Breezy on iPhone" src={mode === "code" ? `/link?mode=code&demo=1` : `/link?token=${qr.token}&demo=1`}
             style={{ width: "100%", height: "100%", border: 0, borderRadius: 34, background: PAPER }} />
         </aside>
       )}
     </main>
+  );
+}
+
+/* ---------- The brand stage ----------
+   Ann's activation prototype, brought to the computer: the warm brown frame of "See what
+   agents don't", a Silver Lake map scanned by the clay radar sweep, the teardrop signal pins
+   with their label pills ("What Breezy sees"), the shimmering AI status line, the photo stack
+   and a light headline. On approval the map leans in and every pin pulses. */
+const LOGIN_CSS = `
+@keyframes bzScanRing { 0% { transform: scale(1); opacity: .55 } 100% { transform: scale(1.32); opacity: 0 } }
+@keyframes bzPinIn { 0% { opacity: 0; transform: translate(-50%, -100%) translateY(10px) scale(.7) } 70% { opacity: 1; transform: translate(-50%, -100%) scale(1.05) } 100% { opacity: 1; transform: translate(-50%, -100%) scale(1) } }
+@keyframes bzPinHalo { 0% { transform: translate(-50%, -50%) scale(.6); opacity: .7 } 100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0 } }
+@keyframes bzStatus { 0% { opacity: 0; transform: translateY(6px) } 12%, 88% { opacity: 1; transform: none } 100% { opacity: 0; transform: translateY(-6px) } }
+@keyframes bzApprove { 0% { box-shadow: 0 0 0 0 rgba(49,140,96,.35) } 100% { box-shadow: 0 0 0 26px rgba(49,140,96,0) } }
+.bz-approve { animation: bzApprove 1.4s ease-out infinite }
+.bz-sim { left: 48px }
+@media (max-width: 1080px) { .bz-stage { display: none !important } .bz-sim { left: auto; right: 20px; bottom: 68px } }
+@media (prefers-reduced-motion: reduce) { .bz-login * { animation-duration: .01ms !important; animation-iteration-count: 1 !important } }
+`;
+const PINS: { x: number; y: number; f: string; t: string }[] = [
+  { x: 24, y: 22, f: "drop", t: "12% price drop" },
+  { x: 74, y: 25, f: "ub", t: "84% Underbuilt" },
+  { x: 80, y: 47, f: "roi", t: "$1.6m ROI" },
+  { x: 27, y: 57, f: "exp", t: "Expired 4 days ago" },
+  { x: 60, y: 74, f: "wd", t: "Withdrawn 3 days ago" },
+  { x: 15, y: 86, f: "stale", t: "193 DOM" },
+  { x: 84, y: 86, f: "comps", t: "$310k under comps" },
+];
+const STATUS = ["Syncing your 4 saved homes", "Loading your Market Radar", "Getting comps ready", "Putting Silver Lake on a big map"];
+
+function Stage({ done }: { done: boolean }) {
+  const [i, setI] = useState(0);
+  useEffect(() => { if (done) return; const t = setInterval(() => setI(x => (x + 1) % STATUS.length), 2400); return () => clearInterval(t); }, [done]);
+  return (
+    <div className="bz-stage" aria-hidden style={{ position: "relative", flex: "0 0 54%", minWidth: 0, display: "flex", flexDirection: "column", gap: 24, padding: 20, borderRadius: 36, overflow: "hidden", background: "linear-gradient(180deg,rgb(116,77,65) -4%,rgb(63,51,48) 100%)", boxShadow: "0 30px 70px rgba(63,40,32,.28)", animation: "riseIn .6s cubic-bezier(.2,.8,.2,1) both" }}>
+      {/* Arches, the texture behind Ann's hero */}
+      <div style={{ position: "absolute", left: -20, right: -20, bottom: -40, height: "42%", opacity: .1, background: `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="112" height="400"><path d="M8 400V64a48 48 0 0 1 96 0v336" fill="none" stroke="#fff" stroke-width="2"/></svg>')}") 0 0/112px 100% repeat-x` }} />
+      {/* The map card */}
+      <div style={{ position: "relative", flex: "1 1 0", minHeight: 300, borderRadius: 26, overflow: "hidden", background: "rgb(240,235,232)" }}>
+        <div style={{ position: "absolute", inset: "-6%", background: "url(/map/silverlake.jpg) center/cover", filter: "saturate(.55) sepia(.12) brightness(1.02)", transform: done ? "scale(1.18)" : "scale(1)", transition: "transform 1.6s cubic-bezier(.2,.8,.2,1)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(240,233,230,.25),rgba(217,201,195,.35))" }} />
+        {/* Radar: rings, sweep, centre */}
+        {[0.22, 0.42, 0.64].map(r => <span key={r} style={{ position: "absolute", left: "50%", top: "50%", width: `${r * 200}%`, aspectRatio: "1", transform: "translate(-50%,-50%)", borderRadius: 9999, boxShadow: "inset 0 0 0 1px rgba(116,77,65,.22)" }} />)}
+        <span style={{ position: "absolute", left: "50%", top: "50%", width: "150%", aspectRatio: "1", borderRadius: 9999, background: "conic-gradient(from 0deg, rgba(116,77,65,0) 0deg, rgba(116,77,65,0) 290deg, rgba(116,77,65,.5) 359deg, rgba(116,77,65,0) 360deg)", animation: `sweep ${done ? 1.4 : 5}s linear infinite`, transform: "translate(-50%,-50%)" }} />
+        <span style={{ position: "absolute", left: "50%", top: "50%", width: 12, height: 12, borderRadius: 9999, background: "rgb(116,77,65)", transform: "translate(-50%,-50%)", boxShadow: "0 0 0 4px rgba(253,252,252,.8)" }} />
+        {/* What Breezy sees */}
+        <span style={{ position: "absolute", left: "50%", top: 18, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8, height: 44, padding: "0 18px 0 14px", borderRadius: 9999, background: "rgb(48,36,33)", boxShadow: "0 8px 20px rgba(40,26,20,.25)", font: "700 15px/1 var(--font-sans)", color: PAPER, whiteSpace: "nowrap" }}>
+          <span style={{ width: 20, height: 20, background: PAPER, WebkitMask: "url(/brand/brandmark.svg) center/contain no-repeat", mask: "url(/brand/brandmark.svg) center/contain no-repeat" }} />What Breezy sees
+        </span>
+        {/* Signal pins, popping in like the phone's scan */}
+        {PINS.map((p, k) => (
+          <span key={p.t} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, display: "flex", flexDirection: "column", alignItems: "center", animation: `bzPinIn .55s ${0.6 + k * 0.42}s cubic-bezier(.2,.8,.2,1) both` }}>
+            <span style={{ position: "relative", width: 32, height: 35 }}>
+              <span style={{ position: "absolute", left: "50%", top: "44%", width: 28, height: 28, borderRadius: 9999, background: "rgba(253,252,252,.7)", animation: `bzPinHalo ${done ? 0.9 : 2.6}s ${k * 0.3}s ease-out infinite` }} />
+              <img src={`/pins/${p.f}.svg`} alt="" style={{ position: "relative", width: 32, height: 35, display: "block" }} />
+            </span>
+            <span style={{ marginTop: 2, height: 26, padding: "0 10px", display: "flex", alignItems: "center", borderRadius: 9999, background: PAPER, boxShadow: "0 2px 8px rgba(40,26,20,.16)", font: "700 13px/1 var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>{p.t}</span>
+          </span>
+        ))}
+        {/* The AI status line */}
+        <span style={{ position: "absolute", left: "50%", bottom: 18, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", borderRadius: 9999, background: "rgba(253,252,252,.92)", boxShadow: "0 6px 18px rgba(40,26,20,.14)", whiteSpace: "nowrap" }}>
+          <i className={done ? "ph-bold ph-check" : "ph-fill ph-sparkle"} style={{ fontSize: 15, color: done ? "rgb(49,140,96)" : "rgb(168,128,190)" }} />
+          <span key={done ? "done" : i} style={{ display: "block", animation: done ? "fadeIn .3s ease both" : "bzStatus 2.4s ease both" }}>
+            <span style={{ display: "block", font: "700 14px/18px var(--font-sans)", ...(done ? { color: INK } : { color: "transparent", WebkitBackgroundClip: "text", backgroundClip: "text", backgroundSize: "250% 100%", backgroundRepeat: "no-repeat", animation: "lineShimmer 1.8s linear infinite",
+              backgroundImage: "linear-gradient(100deg,rgb(17,16,16) 0%,rgb(17,16,16) 38%,rgb(175,127,113) 46%,rgb(150,110,190) 54%,rgb(17,16,16) 62%,rgb(17,16,16) 100%)" }) }}>
+              {done ? "Your workspace is ready" : `${STATUS[i]}…`}
+            </span>
+          </span>
+        </span>
+      </div>
+      {/* Under the map: the photo stack and the line */}
+      <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "0 24px 12px", textAlign: "center" }}>
+        <span style={{ position: "relative", width: 132, height: 58 }}>
+          {["ext-05", "ext-02", "ext-09"].map((f, k) => (
+            <span key={f} style={{ position: "absolute", left: [6, 36, 70][k], top: k === 1 ? 0 : 8, width: k === 1 ? 60 : 50, height: k === 1 ? 54 : 44, borderRadius: 8, background: `url(/photos/l/${f}.jpg) center/cover`, boxShadow: "0 0 0 2px rgb(253,252,252),0 6px 14px rgba(0,0,0,.3)", transform: `rotate(${[-9, 0, 9][k]}deg)`, zIndex: k === 1 ? 2 : 1 }} />
+          ))}
+        </span>
+        <span style={{ font: "300 34px/1.12 var(--font-sans)", letterSpacing: "-.8px", color: PAPER }}>Your next deal, on a bigger map</span>
+        <span style={{ maxWidth: 460, font: "400 16px/23px var(--font-sans)", color: "rgba(253,252,252,.78)", textWrap: "pretty" } as React.CSSProperties}>Comps, ROI and reports side by side, with everything you saved on your iPhone.</span>
+      </div>
+    </div>
   );
 }
 
@@ -176,7 +270,9 @@ function useQrToken(on: boolean, lan: string | null) {
 function QrCard({ svg, left, ttl, k }: { svg: string; left: number; ttl: number; k: string }) {
   const R = 15, C = 2 * Math.PI * R;
   return (
-    <div style={{ position: "relative", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 28, background: PAPER, boxShadow: "inset 0 0 0 1px rgb(236,230,228),0 8px 24px rgba(40,26,20,.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ position: "relative", flex: "none", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 28, background: PAPER, boxShadow: "0 18px 44px rgba(63,40,32,.14),0 2px 6px rgba(63,40,32,.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {/* Scan rings: the radar's pulse, round the code */}
+      {[0, 1.3].map(d => <span key={d} aria-hidden style={{ position: "absolute", inset: 0, borderRadius: 28, boxShadow: "0 0 0 1.5px rgba(147,89,75,.5)", animation: `bzScanRing 2.6s ${d}s ease-out infinite`, pointerEvents: "none" }} />)}
       {svg ? (
         <div key={k} role="img" aria-label="QR code: scan it with the Breezy app on your iPhone to log in on this computer. Or use the email link or a 6-digit code below."
           style={{ width: QR_SIZE, height: QR_SIZE, animation: "fadeIn .5s ease both" }} dangerouslySetInnerHTML={{ __html: svg.replace("<svg", `<svg width="${QR_SIZE}" height="${QR_SIZE}"`) }} />
