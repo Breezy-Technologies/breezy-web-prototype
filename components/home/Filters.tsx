@@ -114,7 +114,7 @@ function PlainSlider({ G, setG, kLo, kHi, fmt, gap }: { G: Filters; setG: SetG; 
 // within…). One price range below applies to all of them and never hides.
 function StatusRows({ G, setG }: { G: Filters; setG: SetG; toast?: (t: Toast | null) => void }) {
   const tg = G.tg || {};
-  const tile = (on: boolean) => css("position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:10px 12px;border:none;border-radius:14px;cursor:pointer;text-align:left;transition:background .16s,box-shadow .16s;"
+  const tile = (on: boolean) => css("position:relative;display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;padding:10px;border:none;border-radius:14px;cursor:pointer;text-align:left;transition:background .16s,box-shadow .16s;"
     + (on ? "background:rgba(13,12,12,.05);box-shadow:inset 0 0 0 1.5px rgb(17,16,16)" : "background:rgb(253,252,252);box-shadow:inset 0 0 0 1px rgba(13,12,12,.14)"));
   const on = ST_ROWS.filter(r => G.st[r[1]]);
   return (
@@ -124,10 +124,10 @@ function StatusRows({ G, setG }: { G: Filters; setG: SetG; toast?: (t: Toast | n
           const sel = !!G.st[key], st = statusStyle(key === "Recently sold" ? "Sold" : key);
           return (
             <button key={key} role="checkbox" aria-checked={sel} onClick={() => setG(g => ({ st: toggleStatus(g.st, key).st }))} style={{ ...tile(sel), gridColumn: i < 3 ? "span 2" : "span 3" }}>
-              <span style={css("display:flex;align-items:center;gap:6px;font:700 14px/18px var(--font-sans);color:rgb(18,18,18)")}>
+              <span style={css("min-width:0;display:flex;align-items:center;gap:6px;font:700 14px/18px var(--font-sans);color:rgb(18,18,18);white-space:nowrap")}>
                 <span style={{ width: 8, height: 8, borderRadius: 9999, background: st.c }} />{label}
               </span>
-              <span style={css("position:absolute;right:10px;top:10px;width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;" + (sel ? "background:rgb(18,18,18)" : "box-shadow:inset 0 0 0 1.5px rgba(13,12,12,.3)"))}>
+              <span style={css("flex:none;width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;" + (sel ? "background:rgb(18,18,18)" : "box-shadow:inset 0 0 0 1.5px rgba(13,12,12,.3)"))}>
                 {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgb(255,255,255)" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
               </span>
             </button>
