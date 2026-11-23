@@ -50,6 +50,17 @@ Env keys are listed in `.env.example`, set locally in `.env.local`, and stored f
 
 The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 
+## Log in on the computer: scan-to-link handoff (`/login`, `/link`; branch `feature/qr-handoff-login`, 23 Nov)
+
+Breezy users sign up on the iPhone (Meta ads, Apple or phone sign-in, no password), so the phone is the trusted device and the web never asks for a password (WhatsApp / Telegram Web pattern). Linked from the onboarding sign-up modal ("Already use Breezy on your iPhone? Log in"); the V5 onboarding is unchanged.
+- **`/login`** (`app/login/page.tsx`): "Log in to Breezy on your computer", three numbered steps; a one-time QR (`/link?token=…`, Breezy mark in the middle) that **renews itself every 60 s** (countdown ring, crossfade; no "expired, retry"). Under it: **Email me a link instead** (single use, 15 min, "Check your inbox" with the Hide My Email note; "Demo: open the email link" stands in for the email) and **Use a 6-digit code** (6 boxes, paste, auto-submit). "Stay logged in on this browser" (on: localStorage, off: this tab). No password, no pricing. Approved: a check, "Approved on James's iPhone", ~1.3 s, then `/home`. Not me: a new QR with "Request declined".
+- **`/link`** (`app/link/page.tsx`): the simulated iPhone screen (390 px): "Log in on your computer?", the device line from the request ("Chrome on macOS · just now"), Confirm (fake Face ID, ~0.9 s) / Not me; expired codes say so. `/link?mode=code` shows a 6-digit code to type on the computer. `/m/desk`: the mobile "Run this on your computer" sheet (Email me the link / Show me how to log in; "Find it on your phone. Close it at your desk.").
+- **Mock layer, one module to swap:** `lib/auth/handoff.ts` (client) over `app/api/handoff/route.ts` + `lib/auth/store.ts` (in-memory tokens `pending → approved / declined → consumed`, expiry; the computer polls every 1.5 s). Two transports at once: the server store (a **real iPhone on the same Wi-Fi as `next dev`**: the QR encodes the LAN origin, shown bottom-right; `allowedDevOrigins` in `next.config.ts`) and BroadcastChannel / localStorage (the **"Simulate phone"** panel, an iframe of `/link`). On Vercel the serverless instances don't share memory, so the preview relies on Simulate phone.
+- **First web screen** (`lib/handoff/profile.ts` fixture + state `bz-handoff`, `components/home/Handoff.tsx`): lands on the phone's last area (Silver Lake), its 4 saved homes (Pedro's lots by APN) saved and pinned, "Welcome back, James", then a **6-step walkthrough** on the Coach overlay (search, feed, signal pins, price pins, heat layer, saved homes; a step whose target isn't on screen is skipped). Per `trialState` (Dev menu → Handoff):
+  - **`dismissed`** (billing `none`, 14-day trial on offer; team, 23 Nov): the map, pins, heat and hover previews stay open, but **pressing a result** (card, pin, parcel, saved home) **stops on the trial offer** ("Property details are part of Agents Pro") instead of the panel; starting the trial opens what was pressed. A slim dark banner: "Your 14-day free trial is still available · Start free trial". No free property (team: block every valuable panel).
+  - **`active`** (trial day 4 of 14): "Welcome back · day 4 of 14"; under the tabs, **"Best done at your desk"**: Run comps on a saved property, Compare ROI on 2 lots (two Profit potential reports), Export a client-ready report (Download report); it **replaces Getting started** in the nav. After the tour the last property viewed on the phone opens, with one tooltip on Get comps.
+  - **`subscribed_apple`** (billing `active`, `store: "apple"`): no checkout anywhere. Every offer / upsell / Buy credits / Manage billing / Cancel opens **"You're subscribed through the App Store"** + Manage in App Store (credits too: no double billing); Settings shows the App Store note and "billed by the App Store".
+
 ## Home Web (`/home`)
 
 **Layout**
@@ -204,6 +215,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Property with no estimate
 - Saved data: nothing saved / failed to load / back to normal
 - Plan state… and Unlimited (internal) (paywall, see above)
+- Handoff (iPhone → web): log in screen, replay the first web screen, trial state (dismissed / active / App Store), the phone's "Run this on your computer" sheet, leave handoff mode
 
 ## Heat palette (decided 17 Nov: the defaults)
 
@@ -265,6 +277,9 @@ app/page.tsx                redirects to /onboarding
 app/onboarding/page.tsx     V5 flow (8 steps), OppCard swipe cards, FreebieArt, signup modal
 app/home/page.tsx           Home Web: layout, views (home / results), search this area, detail zoom, Dev menu
 app/api/boundary/route.ts   Census TIGERweb lookup (winding + holes)
+app/login, app/link         scan-to-link handoff: computer login (QR / email link / code), simulated iPhone; app/m/desk mobile sheet
+app/api/handoff/route.ts    handoff token API (lib/auth/store.ts in memory); client: lib/auth/handoff.ts
+lib/handoff/profile.ts      mobile user fixture + trial state for the first web screen (components/home/Handoff.tsx)
 components/AppState.tsx     place / areas, outline rings, listings, picks, onboarded (sessionStorage)
 components/SavedState.tsx   saved searches + properties, alert definitions
 components/PinPalette.tsx   SignalDot, pulse colour

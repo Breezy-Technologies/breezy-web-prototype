@@ -81,8 +81,8 @@ export function PricePins({ listings, selId, hoverId, onHover, onPick, seen, sig
         const sn = !dark && seen.has(l.id);
         const sig = !isBlank && !!signal?.has(l.id);
         return (
-          <div key={l.id} data-pin={l.id} data-pin-kind={isBlank ? "blank" : sig ? "radar" : "price"} ref={anchor(l.id, [l.lng, l.lat])} style={{ ...ANCHOR_STYLE, zIndex: dark ? 56 : blank && !dark ? 48 : l.opp === "drop" ? 52 : 50 }}>
-          <div
+          <div key={l.id} data-pin={l.id} ref={anchor(l.id, [l.lng, l.lat])} style={{ ...ANCHOR_STYLE, zIndex: dark ? 56 : blank && !dark ? 48 : l.opp === "drop" ? 52 : 50 }}>
+          <div data-pin-kind={isBlank ? "blank" : sig ? "radar" : "price"}
             onClick={e => { e.stopPropagation(); onPick(l.id); }}
             onMouseEnter={() => {
               clearTimeout(closeT.current); clearTimeout(openT.current);

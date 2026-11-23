@@ -66,7 +66,7 @@ export default function LoginPage() {
       <header style={{ flex: "none", display: "flex", alignItems: "center", padding: "24px 32px" }}>
         <span role="img" aria-label="Breezy" style={{ width: 84, height: 28, background: INK, WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat" }} />
       </header>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 16px 64px" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: `8px ${phone ? 430 : 16}px 64px 16px`, transition: "padding .35s cubic-bezier(.2,.8,.2,1)" }}>
         <section style={{ width: 960, maxWidth: "100%", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 0, borderRadius: 32, background: PAPER, boxShadow: "inset 0 0 0 1px rgb(240,235,233),0 24px 60px rgba(40,26,20,.10)", overflow: "hidden", animation: "riseIn .4s cubic-bezier(.2,.8,.2,1) both" }}>
           {/* Left: what to do */}
           <div style={{ display: "flex", flexDirection: "column", gap: 28, padding: "56px 48px 44px" }}>
