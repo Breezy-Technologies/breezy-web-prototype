@@ -12,7 +12,8 @@
 import { useEffect, useRef, useState } from "react";
 import { css } from "@/lib/css";
 import { Listing, fullPrice } from "@/lib/fake";
-import { F_TYPES, Filters, ST_ROWS, fDef, fDims } from "@/lib/filters";
+import { F_TYPES, Filters, ST_ROWS, fDef, fDims, priceLabel } from "@/lib/filters";
+import { DEFAULT_SEARCH_ALERTS, SEARCH_ALERTS, SearchAlertKind, askNotifyOnFirstAlert } from "@/lib/searchAlerts";
 import { Place } from "@/lib/places";
 import {
   ALERT_DEFS, ALERT_OPTS, AlertSet, CLIENT_PHOTOS, CONTACTS, SavedProp, SavedSearch, alertCount, forTxt, initials, useSaved,
@@ -39,7 +40,7 @@ export const sheetAnim = (out: boolean) => out ? "bzSheetOut .2s cubic-bezier(.4
 export function searchCriteria(F: Filters, area: string) {
   const on = (m: Record<string, boolean | undefined>) => Object.keys(m).filter(k => m[k]);
   const stOn = on(F.st as Record<string, boolean>), tOn = on(F.types);
-  const price = F.pHi < 100 ? "Up to $" + (F.pHi * 50000 / 1e6).toFixed(1).replace(/\.0$/, "") + "m" : "Any price";
+  const price = priceLabel(F);
   const d = fDims(F);
   const extra = (["roi", "ub", "drops", "beds", "baths", "size", "lot", "styles", "feats"] as const).filter(k => d[k].on).map(k => k === "drops" ? "Price drops" : d[k].label);
   // Per-status time windows ("Sold within 3 months"), only on month tags of a status that is on.
@@ -64,17 +65,17 @@ export function seedFilters(p: string[]): Filters {
   const ty = ({ Multifamily: "Multi family", Lots: "Lot" } as Record<string, string>)[p[1]] || p[1];
   if (ty && F_TYPES.some(t => t[0] === ty)) F.types = { [ty]: true };
   const m = /\$([\d.]+)m/.exec(p[2] || "");
-  if (m) F.pHi = Math.min(100, Math.round(Number(m[1]) * 1e6 / 50000));
+  if (m) F.priceMax = Math.round(Number(m[1]) * 1e6);
   return F;
 }
 
 // ---------- save search sheet + contact picker + confirms ----------
 
-type SheetState = { edit: string | null; name: string; clients: string[]; notify: boolean; snap: string };
+type SheetState = { edit: string | null; name: string; clients: string[]; notify: boolean; types: SearchAlertKind[]; snap: string };
 
 // Owns the sheet (`ssOpen`, `ssEdit`, `ssName`, `ssClients`, `ssNotify`, `ssSnap`), the
 // contact picker, and the remove / unsaved-changes confirms.
-export function useSearchSheet({ F, place, results, toast }: { F: Filters; place: Place; results: Listing[]; toast: (t: string) => void }) {
+export function useSearchSheet({ F, place, areas, results, toast }: { F: Filters; place: Place; areas: Place[]; results: Listing[]; toast: (t: string, tone?: "positive" | "neutral" | "info") => void }) {
   const sv = useSaved();
   const [st, setSt] = useState<SheetState | null>(null);
   const [out, setOut] = useState(false);
@@ -91,13 +92,14 @@ export function useSearchSheet({ F, place, results, toast }: { F: Filters; place
     clearTimeout(outT.current);
     outT.current = setTimeout(() => { setOut(false); setSt(null); }, 190);
   };
-  const openNew = () => { clearTimeout(outT.current); setOut(false); setSt({ edit: null, name: "", clients: [], notify: true, snap: "" }); };
+  const openNew = () => { clearTimeout(outT.current); setOut(false); setSt({ edit: null, name: "", clients: [], notify: true, types: DEFAULT_SEARCH_ALERTS.slice(), snap: "" }); };
   // `onManageSearch` / `onFooterSearch` with an active search.
   const openManage = (s: SavedSearch) => {
     clearTimeout(outT.current); setOut(false);
-    setSt({ edit: s.id, name: s.name, clients: s.clients.slice(), notify: s.notify !== false, snap: JSON.stringify([s.name, s.clients, s.notify !== false]) });
+    const types = s.alertTypes || DEFAULT_SEARCH_ALERTS.slice();
+    setSt({ edit: s.id, name: s.name, clients: s.clients.slice(), notify: s.notify !== false, types, snap: JSON.stringify([s.name, s.clients, s.notify !== false, types]) });
   };
-  const dirty = !!st && !!st.edit && JSON.stringify([st.name, st.clients, st.notify]) !== st.snap;
+  const dirty = !!st && !!st.edit && JSON.stringify([st.name, st.clients, st.notify, st.types]) !== st.snap;
   // `onSsClose`: editing with unsaved changes asks first.
   const onClose = () => { if (dirty) { setUnsavedOpen(true); setContactOpen(false); return; } close(); };
   // `_ssCommit`
@@ -106,14 +108,19 @@ export function useSearchSheet({ F, place, results, toast }: { F: Filters; place
     const nm = st.name.trim();
     if (!nm) return;
     if (st.edit) {
-      sv.updateSearch(st.edit, { name: nm, clients: st.clients, notify: st.notify });
+      sv.updateSearch(st.edit, { name: nm, clients: st.clients, notify: st.notify && st.types.length > 0, alertTypes: st.types });
       close(); toast("Changes saved");
     } else {
       sv.addSearch({
         id: "s" + Date.now(), name: nm, clients: st.clients, newN: 0, th: [0, 1, 2], photos: results.slice(0, 3).map(l => l.photos[0]),
-        params: crit.params, chips: crit.chips, f: F, place: { ...place, rings: undefined }, sq: place.label, when: "Today", notify: st.notify,
+        params: crit.params, chips: crit.chips, f: F, place: { ...place, rings: undefined }, sq: place.label, when: "Today", notify: st.notify && st.types.length > 0,
+        areas: areas.length > 1 ? areas.map(a => ({ ...a, rings: undefined })) : undefined, alertTypes: st.types,
       });
-      close(); toast("Search saved");
+      close();
+      // Saving with no matches is fine: the alerts are the point (agent feedback).
+      toast(results.length ? "Search saved" : "Search saved · No matches right now. We’ll alert you when one comes up.", "positive");
+      // The browser's notification prompt, at the moment it makes sense (not on page load).
+      if (st.notify && st.types.length) askNotifyOnFirstAlert();
     }
   };
   const onRemoveConfirm = () => {
@@ -158,7 +165,7 @@ function SaveSearchSheet({ st, set, out, chips, windows, onClose, onSave, onRemo
   onClose: () => void; onSave: () => void; onRemove: () => void; onContacts: () => void;
 }) {
   const named = !!st.name.trim(), has = st.clients.length > 0;
-  // Time-window caveat: only while New matches is on and a window is set.
+  // Time-window caveat: only while alerts are on and a window is set.
   const caveat = st.notify && windows.length > 0;
   const caveatTxt = windows.length === 1 ? <>Alerts aren’t limited to “{windows[0]}”.</> : <>Alerts aren’t limited to your time windows.</>;
   const nameRef = useRef<HTMLInputElement>(null);
@@ -181,7 +188,7 @@ function SaveSearchSheet({ st, set, out, chips, windows, onClose, onSave, onRemo
             {chips.map(l => {
               const w = caveat && windows.includes(l);
               return (
-                <span key={l} title={w ? "Applies to results. New match alerts aren’t limited to it." : undefined}
+                <span key={l} title={w ? "Applies to results. Alerts aren’t limited to it." : undefined}
                   style={css("display:flex;align-items:center;gap:4px;height:24px;padding:0 " + (w ? "8px 0 10px" : "10px") + ";border-radius:9999px;box-shadow:inset 0 0 0 .5px rgba(18,18,18,.4);font:400 12px/16px var(--font-sans);color:rgb(18,18,18);white-space:nowrap;cursor:" + (w ? "help" : "default"))}>
                   {l}{w && <i className="ph ph-info" style={css("font-size:13px;color:rgb(115,107,104)")} />}
                 </span>
@@ -226,13 +233,14 @@ function SaveSearchSheet({ st, set, out, chips, windows, onClose, onSave, onRemo
         <div style={css("flex:none;display:flex;flex-direction:column;border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16)")}>
         <div style={css("display:flex;align-items:center;gap:12px;padding:16px")}>
           <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:4px")}>
-            <span style={css("font:400 14px/1.26 var(--font-sans);color:rgb(18,18,18)")}>New matches</span>
-            <span style={css("font:400 12px/1.26 var(--font-sans);letter-spacing:.25px;color:rgb(73,67,65)")}>App push, email if not installed</span>
+            <span style={css("font:700 14px/1.26 var(--font-sans);color:rgb(18,18,18)")}>Alerts</span>
+            <span style={css("font:400 12px/1.26 var(--font-sans);letter-spacing:.25px;color:rgb(73,67,65)")}>{st.notify ? `${st.types.length} of ${SEARCH_ALERTS.length} types · app push, email if not installed` : "Off. The search stays saved."}</span>
           </span>
-          <button onClick={() => set({ notify: !st.notify })} title="New matches" style={css("flex:none;position:relative;width:40px;height:24px;padding:0;border:none;border-radius:9999px;cursor:pointer;transition:background .2s;background:" + (st.notify ? "rgb(18,18,18)" : "rgba(13,12,12,.2)"))}>
+          <button role="switch" aria-checked={st.notify} onClick={() => set({ notify: !st.notify })} title="Alerts" style={css("flex:none;position:relative;width:40px;height:24px;padding:0;border:none;border-radius:9999px;cursor:pointer;transition:background .2s;background:" + (st.notify ? "rgb(18,18,18)" : "rgba(13,12,12,.2)"))}>
             <span style={css("position:absolute;top:3px;left:" + (st.notify ? 19 : 3) + "px;width:18px;height:18px;border-radius:9999px;background:rgb(253,252,252);transition:left .2s cubic-bezier(.2,.8,.2,1)")} />
           </button>
         </div>
+        {st.notify && <AlertTypePicker value={st.types} onChange={types => set({ types })} />}
         {caveat && (
           <div style={css("display:flex;align-items:flex-start;gap:8px;margin:0 16px;padding:12px 0 14px;box-shadow:inset 0 .5px 0 rgba(18,18,18,.12);animation:fadeIn .2s ease both")}>
             <i className="ph ph-info" style={css("flex:none;font-size:15px;line-height:16px;color:rgb(115,107,104)")} />
@@ -246,6 +254,31 @@ function SaveSearchSheet({ st, set, out, chips, windows, onClose, onSave, onRemo
         {st.edit && <button onClick={onRemove} className="sv-remove" style={css("flex:none;height:48px;padding:0 12px;margin-left:-4px;border:none;border-radius:9999px;background:none;font:700 15px/20px var(--font-sans);color:rgb(195,65,55);cursor:pointer;white-space:nowrap")}>Remove search</button>}
         <button onClick={() => { if (named) onSave(); }} className="fb-dark" style={css("width:100%;height:48px;border:none;border-radius:9999px;font:700 15px/20px var(--font-sans);color:rgb(249,249,249);transition:opacity .16s;background:rgb(17,16,16);cursor:" + (named ? "pointer;opacity:1" : "default;opacity:.32;pointer-events:none"))}>{st.edit ? "Save changes" : "Save search"}</button>
       </div>
+    </div>
+  );
+}
+
+// The alert types a saved search fires on (agent feedback, 23 Nov). Each row names what it
+// watches; at least one stays picked while alerts are on. Shared with the buyer wizard.
+export function AlertTypePicker({ value, onChange }: { value: SearchAlertKind[]; onChange: (v: SearchAlertKind[]) => void }) {
+  return (
+    <div style={css("display:flex;flex-direction:column;gap:2px;padding:0 8px 10px;animation:fadeIn .2s ease both")}>
+      {SEARCH_ALERTS.map(([k, label, sub, ic, col]) => {
+        const on = value.includes(k);
+        return (
+          <button key={k} role="checkbox" aria-checked={on} onClick={() => onChange(on ? (value.length > 1 ? value.filter(x => x !== k) : value) : [...value, k])} className="hover-row"
+            style={css("display:flex;align-items:center;gap:10px;width:100%;padding:8px;border:none;border-radius:12px;background:none;cursor:pointer;text-align:left")}>
+            <span style={css("flex:none;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(18,18,18,.05)")}><i className={"ph-bold " + ic} style={{ fontSize: 15, color: col }} /></span>
+            <span style={css("flex:1;min-width:0;display:flex;flex-direction:column")}>
+              <span style={css("font:400 14px/18px var(--font-sans);color:rgb(18,18,18)")}>{label}</span>
+              <span style={css("font:400 12px/16px var(--font-sans);color:rgb(98,90,89)")}>{sub}</span>
+            </span>
+            <span style={css("flex:none;width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;" + (on ? "background:rgb(18,18,18)" : "box-shadow:inset 0 0 0 1.5px rgba(13,12,12,.3)"))}>
+              {on && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -1,29 +1,34 @@
 "use client";
-// New buyer search, buyer first (19 Nov, Jimsy: "the buyer journey needs to be wizard based
-// and reversed, start with the buyer"). Agents set searches up for a client, so the wizard
-// starts with who it's for, then where, then what, then how to keep them posted:
-//   1 Buyer    pick a contact or add a new one (name, email, phone)
-//   2 Area     where they're looking (search, quick picks; several areas allowed)
-//   3 Criteria budget, beds, baths, home type, must-haves
-//   4 Alerts   search name, alerts on / frequency, send matches to the buyer
+// New buyer search, a wizard (19 Nov, Jimsy). Agent feedback (23 Nov, 15+ interviews):
+// location must be asked for explicitly and first, so the order is now
+//   1 Location        where the buyer is looking (search, quick picks; several areas allowed)
+//   2 Buyer           pick a contact or add a new one (name, email, phone)
+//   3 Filters         status (Active / Pending / Sold, any mix), price, beds, baths, type, must-haves
+//   4 Review & save   what was set (each part editable), name, alert types, frequency, send to buyer
+// DECISION: Location -> Buyer (William, 23 Nov) replaces Jimsy's buyer-first order; Jimsy to review.
+// Back keeps everything typed; Cancel / Escape closes. A help tip per step until the first save.
 // Saving commits the areas and filters, saves the search for that buyer and shows the matches
 // (app/home/page.tsx `finishBuyer`). Opened from Create → Buyer search and New buyer search.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CONTACTS, CLIENT_PHOTOS, initials, useSaved } from "../SavedState";
 import { Area, Place, searchPlaces } from "@/lib/places";
-import { F_FEATS, F_TYPES, Filters } from "@/lib/filters";
+import { F_FEATS, F_TYPES, Filters, StatusKey, priceLabel } from "@/lib/filters";
+import { PriceRange } from "./Filters";
+import { AlertTypePicker } from "./Saved";
+import { DEFAULT_SEARCH_ALERTS, SearchAlertKind } from "@/lib/searchAlerts";
+import { HelpTip, tipDone } from "../HelpTip";
+import { statusStyle } from "@/lib/status";
 
 export type BuyerResult = {
   buyer: { name: string; email?: string; phone?: string; isNew: boolean };
   areas: Area[];
   f: Partial<Filters>;
-  name: string; notify: boolean; freq: string; shareWithBuyer: boolean;
+  name: string; notify: boolean; freq: string; shareWithBuyer: boolean; alertTypes: SearchAlertKind[];
 };
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", LINE = "rgba(18,18,18,.12)", SOFT = "rgb(245,243,243)";
-const STEPS = ["Buyer", "Area", "Criteria", "Alerts"];
-const BUDGET = [0, 500e3, 750e3, 1e6, 1.25e6, 1.5e6, 2e6, 2.5e6, 3e6, 4e6, 5e6];
-const money = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(2).replace(/\.?0+$/, "")}m` : `$${Math.round(v / 1e3)}k`;
+const STEPS = ["Location", "Buyer", "Filters", "Review & save"];
+const ST3: [string, StatusKey][] = [["Active", "Active"], ["Pending", "Pending"], ["Sold", "Recently sold"]];
 const QUICK_AREAS = ["Silver Lake", "Echo Park", "Los Feliz"];
 const FREQ = ["Instant", "Daily digest", "Weekly"];
 
@@ -39,14 +44,16 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
   const [areas, setAreas] = useState<Area[]>([]);
   const [aq, setAq] = useState("");
   const [sugg, setSugg] = useState<Place[] | null>(null);
-  // 3 · criteria
-  const [lo, setLo] = useState(0), [hi, setHi] = useState(0); // indexes into BUDGET (hi 0 = no max)
+  // filters
+  const [st, setSt] = useState<Partial<Record<StatusKey, boolean>>>({ Active: true });
+  const [price, setPrice] = useState<{ priceMin: number | null; priceMax: number | null }>({ priceMin: null, priceMax: null });
   const [beds, setBeds] = useState(0), [baths, setBaths] = useState(0);
   const [types, setTypes] = useState<Record<string, boolean>>({});
   const [feats, setFeats] = useState<Record<string, boolean>>({});
   // 4 · alerts
   const [name, setName] = useState(""); const [named, setNamed] = useState(false);
   const [notify, setNotify] = useState(true), [freq, setFreq] = useState("Instant"), [share, setShare] = useState(true);
+  const [alertTypes, setAlertTypes] = useState<SearchAlertKind[]>(DEFAULT_SEARCH_ALERTS.slice());
 
   const first = (buyer || nb.name || "your buyer").split(" ")[0];
   const contacts = useMemo(() => {
@@ -72,22 +79,24 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
   const areaName = areas.map(a => a.label.split(",")[0]).slice(0, 2).join(" & ") + (areas.length > 2 ? ` +${areas.length - 2}` : "");
   useEffect(() => { if (!named) setName(`${first}'s search${areaName ? " · " + areaName : ""}`); }, [first, areaName, named]);
 
+  const badPrice = price.priceMin != null && price.priceMax != null && price.priceMax < price.priceMin;
   const ok = [
-    !!buyer || (adding && nb.name.trim().length > 1),
     areas.length > 0,
-    !(hi && lo && BUDGET[hi] <= BUDGET[lo]),
+    !!buyer || (adding && nb.name.trim().length > 1),
+    !badPrice,
     name.trim().length > 0,
   ][step];
   const next = () => {
     if (!ok) return;
-    if (step < 3) { if (step === 0 && adding) setBuyer(null); setStep(step + 1); return; }
+    if (step < 3) { if (step === 1 && adding) setBuyer(null); setStep(step + 1); return; }
+    tipDone("buyer");
     const bName = adding ? nb.name.trim() : buyer!;
     const pick = (m: Record<string, boolean>) => Object.fromEntries(Object.entries(m).filter(([, v]) => v));
     onDone({
       buyer: { name: bName, email: adding ? nb.email.trim() : undefined, phone: adding ? nb.phone.trim() : undefined, isNew: adding },
       areas,
-      f: { st: { Active: true }, tg: {}, pLo: lo ? BUDGET[lo] / 50000 : 0, pHi: hi ? BUDGET[hi] / 50000 : 100, bedMin: beds, bathMin: baths, types: pick(types), feats: pick(feats) },
-      name: name.trim(), notify, freq, shareWithBuyer: share,
+      f: { st: pick(st as Record<string, boolean>), tg: {}, priceMin: price.priceMin, priceMax: price.priceMax, bedMin: beds, bathMin: baths, types: pick(types), feats: pick(feats) },
+      name: name.trim(), notify, freq, shareWithBuyer: share, alertTypes,
     });
   };
   useEffect(() => {
@@ -96,17 +105,25 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
 
+  const stOn = ST3.filter(([, k]) => st[k]).map(([l]) => l);
   const crit = [
-    lo || hi ? (lo && hi ? `${money(BUDGET[lo])}–${money(BUDGET[hi])}` : lo ? `From ${money(BUDGET[lo])}` : `Up to ${money(BUDGET[hi])}`) : "",
+    stOn.length ? stOn.join(" + ") : "Any status",
+    price.priceMin != null || price.priceMax != null ? priceLabel(price as Filters) : "",
     beds ? `${beds}+ bd` : "", baths ? `${baths}+ ba` : "",
     ...Object.keys(types).filter(k => types[k]), ...Object.keys(feats).filter(k => feats[k]),
   ].filter(Boolean);
   const titles = [
-    ["Who's this search for?", "Start with your buyer. Their search, alerts and matches stay together."],
-    [`Where is ${first} looking?`, "Add one or more areas."],
+    ["Where is your buyer looking?", "Add one or more neighborhoods, cities or ZIP codes."],
+    ["Who's this search for?", "Their search, alerts and matches stay together."],
     [`What does ${first} need?`, "Everything is optional. You can fine-tune the filters later."],
-    ["How should we keep you posted?", `We'll watch for new listings that match ${first}'s criteria.`],
+    ["Review & save", "Check what you set, then pick which alerts to get."],
   ][step];
+  const tips = [
+    "Pick the area first. You can add several, like Silver Lake and Echo Park, in one search.",
+    "Pick an existing contact or add a new one. Matches can be sent to them from you.",
+    "Leave anything blank to keep it open. Active, Pending and Sold can be combined.",
+    "It's fine if nothing matches today: the search is saved and we'll alert you when a home comes up.",
+  ];
 
   return (
     <div onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(18,15,14,.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, animation: "fadeIn .2s ease both" }}>
@@ -127,12 +144,11 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
               </button>
             ))}
           </div>
-          {step > 0 && (
+          {step > 0 && step < 3 && (
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, font: "400 12px/16px var(--font-sans)", color: MUTED }}>
-              <Avatar name={adding ? nb.name : buyer || ""} size={20} />
-              <b style={{ color: INK, fontWeight: 700 }}>{adding ? nb.name : buyer}</b>
-              {step > 1 && areaName && <><span>·</span><span>{areaName}</span></>}
-              {step > 2 && crit.length > 0 && <><span>·</span><span>{crit.slice(0, 3).join(", ")}{crit.length > 3 ? ` +${crit.length - 3}` : ""}</span></>}
+              <i className="ph ph-map-pin" style={{ fontSize: 14, color: INK }} />
+              <b style={{ color: INK, fontWeight: 700 }}>{areaName}</b>
+              {step > 1 && <><span>·</span><Avatar name={adding ? nb.name : buyer || ""} size={20} /><span style={{ color: INK }}>{adding ? nb.name : buyer}</span></>}
             </div>
           )}
         </div>
@@ -141,8 +157,9 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
             <span style={{ font: "700 22px/28px var(--font-sans)", color: INK, letterSpacing: "-.2px" }}>{titles[0]}</span>
             <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED }}>{titles[1]}</span>
           </div>
+          <HelpTip flow="buyer">{tips[step]}</HelpTip>
 
-          {step === 0 && (!adding ? (
+          {step === 1 && (!adding ? (
             <>
               <Field icon="ph-magnifying-glass" value={q} onChange={setQ} placeholder="Search your contacts" autoFocus />
               <div style={{ display: "flex", flexDirection: "column", gap: 2, margin: "-6px -8px 0" }}>
@@ -152,7 +169,7 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
                   <i className="ph ph-caret-right" style={{ fontSize: 14, color: MUTED }} />
                 </button>
                 {contacts.map(([n, tag]) => (
-                  <button key={n} onClick={() => setBuyer(n)} onDoubleClick={() => { setBuyer(n); setStep(1); }} className="hover-row" style={row(buyer === n)}>
+                  <button key={n} onClick={() => setBuyer(n)} onDoubleClick={() => { setBuyer(n); setStep(2); }} className="hover-row" style={row(buyer === n)}>
                     <Avatar name={n} size={36} />
                     <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
                       <span style={{ font: "400 14px/18px var(--font-sans)", color: INK }}>{n}</span>
@@ -175,7 +192,7 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
             </div>
           ))}
 
-          {step === 1 && (
+          {step === 0 && (
             <>
               <div style={{ position: "relative" }}>
                 <Field icon="ph-map-pin" value={aq} onChange={setAq} placeholder="Neighborhood, city or ZIP" autoFocus
@@ -205,7 +222,7 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
                 </div>
               )}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>Popular with your buyers</span>
+                <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>Popular areas</span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {QUICK_AREAS.filter(n => !areas.some(a => a.label.startsWith(n))).map(n => (
                     <Chip key={n} on={false} onClick={() => addArea({ label: `${n}, Los Angeles` })} icon="ph-plus">{n}</Chip>
@@ -217,13 +234,18 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
 
           {step === 2 && (
             <>
-              <Group t="Budget">
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Select value={lo} onChange={setLo} opts={BUDGET.map((v, i) => [i, i ? money(v) : "No min"])} />
-                  <span style={{ color: MUTED }}>–</span>
-                  <Select value={hi} onChange={setHi} opts={BUDGET.map((v, i) => [i, i ? money(v) : "No max"])} />
+              <Group t="Status">
+                <div style={{ display: "flex", gap: 8 }}>
+                  {ST3.map(([l, k]) => (
+                    <Chip key={k} on={!!st[k]} onClick={() => setSt(m => ({ ...m, [k]: !m[k] }))}>
+                      <span style={{ width: 8, height: 8, borderRadius: 9999, background: statusStyle(l).c, boxShadow: st[k] ? "0 0 0 1.5px rgb(253,252,252)" : "none" }} />{l}
+                    </Chip>
+                  ))}
                 </div>
-                {hi > 0 && lo > 0 && BUDGET[hi] <= BUDGET[lo] && <span style={{ font: "400 12px/16px var(--font-sans)", color: "rgb(195,65,55)" }}>The max should be above the min.</span>}
+                <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>{stOn.length ? `Any mix works. ${stOn.join(", ")} homes will match.` : "None picked: every status matches."}</span>
+              </Group>
+              <Group t="Price">
+                <PriceRange G={price} setG={p => setPrice(v => ({ ...v, ...p }) as typeof v)} />
               </Group>
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
                 <Group t="Beds"><Seg value={beds} onChange={setBeds} n={5} /></Group>
@@ -244,27 +266,43 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
 
           {step === 3 && (
             <>
+              <div style={{ display: "flex", flexDirection: "column", borderRadius: 16, boxShadow: `inset 0 0 0 1px ${LINE}` }}>
+                {([
+                  ["ph-map-pin", "Location", areas.map(a => a.label.split(",")[0]).join(", "), 0],
+                  ["ph-user", "Buyer", adding ? nb.name : buyer || "", 1],
+                  ["ph-sliders-horizontal", "Filters", crit.join(", "), 2],
+                ] as [string, string, string, number][]).map(([ic, t, v, to], i) => (
+                  <div key={t} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i ? `1px solid ${LINE}` : "none" }}>
+                    <i className={`ph ${ic}`} style={{ fontSize: 17, color: MUTED }} />
+                    <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                      <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>{t}</span>
+                      <span style={{ font: "400 14px/18px var(--font-sans)", color: INK }}>{v}</span>
+                    </span>
+                    <button onClick={() => setStep(to)} className="sv-ghost" style={{ flex: "none", height: 30, padding: "0 10px", border: "none", borderRadius: 9999, background: "none", cursor: "pointer", font: "700 13px/18px var(--font-sans)", color: INK }}>Edit</button>
+                  </div>
+                ))}
+              </div>
               <Label t="Search name"><Field value={name} onChange={v => { setName(v); setNamed(true); }} placeholder="Name this search" /></Label>
               <div style={{ display: "flex", flexDirection: "column", borderRadius: 16, boxShadow: `inset 0 0 0 1px ${LINE}` }}>
-                <Toggle icon="ph-bell-simple-ringing" t="Alert me about new matches" s="New listings, price drops and status changes" on={notify} set={setNotify}>
-                  {notify && <div style={{ display: "flex", gap: 8, padding: "0 16px 14px 52px" }}>{FREQ.map(f => <Chip key={f} on={freq === f} onClick={() => setFreq(f)} small>{f}</Chip>)}</div>}
+                <Toggle icon="ph-bell-simple-ringing" t="Alerts" s={notify ? "Pick what you want to hear about" : "Off. The search stays saved."} on={notify} set={setNotify}>
+                  {notify && <>
+                    <AlertTypePicker value={alertTypes} onChange={setAlertTypes} />
+                    <div style={{ display: "flex", gap: 8, padding: "0 16px 14px 16px" }}>{FREQ.map(f => <Chip key={f} on={freq === f} onClick={() => setFreq(f)} small>{f}</Chip>)}</div>
+                  </>}
                 </Toggle>
                 <span style={{ height: 1, background: LINE, margin: "0 16px" }} />
                 <Toggle icon="ph-paper-plane-tilt" t={`Send new matches to ${first}`} s={`From you, with your branding, ${freq === "Instant" ? "as they come in" : freq === "Weekly" ? "once a week" : "once a day"}`} on={share} set={setShare} />
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {[areaName, ...(crit.length ? crit : ["Any price", "Any size"])].map(c => <span key={c} style={{ height: 26, padding: "0 10px", borderRadius: 9999, background: SOFT, font: "400 12px/26px var(--font-sans)", color: INK }}>{c}</span>)}
               </div>
             </>
           )}
         </div>
         {/* Footer */}
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "14px 24px 20px" }}>
-          {step > 0 && <button onClick={() => setStep(step - 1)} className="fb-grey" style={btn(false)}>Back</button>}
+          {step > 0 ? <button onClick={() => setStep(step - 1)} className="fb-grey" style={btn(false)}>Back</button> : <button onClick={onClose} className="fb-grey" style={btn(false)}>Cancel</button>}
           <span style={{ flex: 1 }} />
           {step === 2 && <button onClick={() => setStep(3)} className="sv-ghost" style={{ ...btn(false), background: "none" }}>Skip</button>}
           <button onClick={next} disabled={!ok} className="fb-dark" style={{ ...btn(true), opacity: ok ? 1 : 0.35, cursor: ok ? "pointer" : "default" }}>
-            {step === 3 ? "Save & see matches" : step === 0 && adding ? "Add buyer & continue" : "Continue"}
+            {step === 3 ? "Save search" : step === 1 && adding ? "Add buyer & continue" : "Continue"}
           </button>
         </div>
       </div>

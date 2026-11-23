@@ -84,8 +84,8 @@ export function ResultsPanel({ title, meta, listings, seen, onOpen, onHover, com
           <div style={css("flex:1 0 auto;margin:auto 0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:32px;padding:24px 24px 48px;text-align:center;animation:fadeIn .25s ease both")}>
             <img src="/ui/pin-3d.png" alt="" style={css("display:block;width:66px;height:auto;margin-bottom:8px")} />
             <div style={css("display:flex;flex-direction:column;align-items:center;gap:6px")}>
-              <span style={css("font:400 18px/24px var(--font-sans);color:rgb(17,16,16)")}>No matches found</span>
-              <span style={css("max-width:320px;font:400 14px/1.6 var(--font-sans);letter-spacing:.25px;color:rgb(98,90,89);text-wrap:pretty")}>Try changing some of your filters or adjusting your search area.</span>
+              <span style={css("font:400 18px/24px var(--font-sans);color:rgb(17,16,16)")}>No matches right now</span>
+              <span style={css("max-width:320px;font:400 14px/1.6 var(--font-sans);letter-spacing:.25px;color:rgb(98,90,89);text-wrap:pretty")}>{active ? "We’ll alert you when one comes up." : "Save this search and we’ll alert you when one comes up, or widen your filters or area."}</span>
             </div>
             <div style={css("display:flex;flex-direction:column;align-items:center;gap:12px")}>
               <button onClick={onShowNearest} className="fb-dark fb-cta2" style={css("height:48px;padding:0 18px;border:none;border-radius:9999px;background:rgb(17,16,16);font:700 15px/20px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap")}>Show nearest properties</button>
@@ -94,7 +94,7 @@ export function ResultsPanel({ title, meta, listings, seen, onOpen, onHover, com
           </div>
         )}
       </div>
-      {!compact && picked.length === 0 && listings.length > 0 && !unsupported && (
+      {!compact && picked.length === 0 && !unsupported && (
         <div style={css("flex:none;display:flex;gap:12px;padding:16px;background:rgb(253,252,252);box-shadow:inset 0 1px 0 rgb(245,240,238)")}>
           <button data-tour="save-search" onClick={onFooterSearch} className={onCreateComps ? "fb-grey" : "fb-dark"} style={css("flex:1;min-width:0;height:48px;border:none;border-radius:9999px;" + (onCreateComps ? "background:rgb(233,233,233);color:rgb(17,16,16);" : "background:rgb(17,16,16);color:rgb(249,249,249);") + "font:700 15px/20px var(--font-sans);cursor:pointer;white-space:nowrap")}>{active ? "Manage search" : "Save search"}</button>
           {onCreateComps && (

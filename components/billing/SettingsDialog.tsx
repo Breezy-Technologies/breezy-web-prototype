@@ -1,4 +1,5 @@
 "use client";
+import { NOTIF_CATS, NotifPrefs, SEARCH_ALERTS, getNotifPrefs, setNotifPrefs } from "@/lib/searchAlerts";
 // Settings, ported from the Breezy web app (Breezy-Technologies/breezy:
 // app/components/Dashboard/SettingsDialog.tsx, SettingsMenu.tsx,
 // Settings/Membership/MembershipSettingsContent(.styles).ts + MembershipBillingSidebar.tsx,
@@ -335,24 +336,38 @@ function NoteTaker({ onToast }: { onToast: Toast }) {
   );
 }
 function Notifications() {
-  const rows = ["Market Radar alerts", "New matches on saved searches", "Price changes on saved properties", "Reports ready"];
-  const [on, setOn] = useState<Record<string, [boolean, boolean]>>(() => Object.fromEntries(rows.map(r => [r, [true, r !== "Reports ready"]])));
+  // Agent feedback (23 Nov): on / off per category, plus one Daily summary of every saved search.
+  const [p, setP] = useState<NotifPrefs>(() => getNotifPrefs());
+  const save = (n: NotifPrefs) => { setP(n); setNotifPrefs(n); };
   const sw = (v: boolean, f: () => void, label: string) => (
     <button role="switch" aria-checked={v} aria-label={label} onClick={f} style={{ width: 40, height: 24, padding: 2, border: 0, borderRadius: 9999, cursor: "pointer", background: v ? T.ink : T.drop2, display: "flex", justifyContent: v ? "flex-end" : "flex-start", transition: "background .16s" }}>
       <span style={{ width: 20, height: 20, borderRadius: 9999, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
     </button>
   );
+  const head = (t: string) => <div style={{ display: "grid", gridTemplateColumns: "1fr 64px 64px", alignItems: "center", padding: "10px 0", font: font(400, 13, 17), color: T.ter }}><span>{t}</span><span>Email</span><span>Push</span></div>;
+  const rows = (keys: [string, string][]) => keys.map(([k, r]) => (
+    <div key={k} style={{ display: "grid", gridTemplateColumns: "1fr 64px 64px", alignItems: "center", padding: "14px 0", borderTop: hair }}>
+      <span style={{ font: font(400, 15, 20) }}>{r}</span>
+      {(["email", "push"] as const).map(ch => <span key={ch}>{sw(p.cats[k][ch], () => save({ ...p, cats: { ...p.cats, [k]: { ...p.cats[k], [ch]: !p.cats[k][ch] } } }), `${r} by ${ch}`)}</span>)}
+    </div>
+  ));
   return (
     <>
       <PageTitle>Notifications</PageTitle>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, border: hair, borderRadius: 24, padding: "18px 28px", marginBottom: 16 }}>
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ font: font(700, 15, 20) }}>Daily summary</span>
+          <span style={{ font: font(400, 13, 18), color: T.sec }}>One email at {p.dailyAt} with every saved search's updates, instead of one alert each.</span>
+        </span>
+        {sw(p.daily, () => save({ ...p, daily: !p.daily }), "Daily summary")}
+      </div>
+      <div style={{ border: hair, borderRadius: 24, padding: "8px 28px", marginBottom: 16 }}>
+        {head("Saved search alerts")}
+        {rows(NOTIF_CATS.filter(([k]) => SEARCH_ALERTS.some(a => a[0] === k)))}
+      </div>
       <div style={{ border: hair, borderRadius: 24, padding: "8px 28px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 64px 64px", alignItems: "center", padding: "10px 0", font: font(400, 13, 17), color: T.ter }}><span /><span>Email</span><span>Push</span></div>
-        {rows.map((r, i) => (
-          <div key={r} style={{ display: "grid", gridTemplateColumns: "1fr 64px 64px", alignItems: "center", padding: "14px 0", borderTop: hair }}>
-            <span style={{ font: font(400, 15, 20) }}>{r}</span>
-            {[0, 1].map(k => <span key={k}>{sw(on[r][k], () => setOn(o => { const n = [...o[r]] as [boolean, boolean]; n[k] = !n[k]; return { ...o, [r]: n }; }), `${r} by ${k ? "push" : "email"}`)}</span>)}
-          </div>
-        ))}
+        {head("Everything else")}
+        {rows(NOTIF_CATS.filter(([k]) => !SEARCH_ALERTS.some(a => a[0] === k)))}
       </div>
     </>
   );

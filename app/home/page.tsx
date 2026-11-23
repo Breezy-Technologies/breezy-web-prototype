@@ -33,7 +33,8 @@ import { SavedSearch, propKey, useSaved } from "@/components/SavedState";
 import { ShareModal, useShare } from "@/components/home/Share";
 import { AreaReport, ReportsSheet, useReports } from "@/components/home/Reports";
 import { Listing, OppType, listingForAddress } from "@/lib/fake";
-import { Filters, SortKey, fDef, fDims, homeOk, sortListings } from "@/lib/filters";
+import { Filters, SortKey, fDef, fDims, homeOk, migrateF, sortListings } from "@/lib/filters";
+import { askNotifyOnFirstAlert, eventSummary, searchEvents } from "@/lib/searchAlerts";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, hashStr, pointInRings, ringBBox } from "@/lib/geo";
 import { accessNow, billing, paywall, reportKey, spend, trialLength, useEntitlements } from "@/lib/billing";
@@ -97,7 +98,7 @@ export default function HomeWeb() {
   // Saved searches / properties / alerts (components/SavedState.tsx + components/home/Saved.tsx).
   const sv = useSaved();
   const [soloL, setSoloL] = useState<Listing | null>(null); // a saved home from another area
-  const ss = useSearchSheet({ F: fs.f, place, results, toast: showToast });
+  const ss = useSearchSheet({ F: fs.f, place, areas, results, toast: showToast });
   const alerts = useAlerts({ toast: showToast });
   const [savedOpen, setSavedOpen] = useState(false);
   const [savedOut, setSavedOut] = useState(false);
@@ -218,11 +219,13 @@ export default function HomeWeb() {
     sv.addSearch({
       id, name: r.name, clients: [r.buyer.name], newN: 0, th: [0, 1, 2], photos: results.slice(0, 3).map(l => l.photos[0]),
       params: crit.params, chips: crit.chips, f: fs.f, place: { ...place, rings: undefined }, sq: place.label, when: "Today", notify: r.notify, freq: r.freq,
+      areas: areas.length > 1 ? areas.map(a => ({ ...a, rings: undefined })) : undefined, alertTypes: r.alertTypes,
     });
+    if (r.notify) askNotifyOnFirstAlert();
     sv.setActive(id); // the results now belong to the saved search (its header in the field, no Save search)
     const first = r.buyer.name.split(" ")[0];
     // The first one completes Make Breezy yours' buyer task, whose own toast says it.
-    if (!firstSearch) showToast(`Search saved for ${first} · ${results.length} match${results.length === 1 ? "" : "es"}${r.notify ? ` · ${r.freq.toLowerCase()} alerts` : ""}${r.shareWithBuyer ? `, sent to ${first} too` : ""}`, "positive");
+    if (!firstSearch) showToast(`Search saved for ${first} · ${results.length ? `${results.length} match${results.length === 1 ? "" : "es"}` : "no matches right now, we’ll alert you"}${r.notify ? ` · ${r.freq.toLowerCase()} alerts` : ""}${r.shareWithBuyer ? `, sent to ${first} too` : ""}`, "positive");
   }, [buyerSave]); // eslint-disable-line react-hooks/exhaustive-deps
   const afterBuyerSearch = (was: Intent) => {
     if (was === "buyer" && getStarted.get().tour?.task !== "buyer") setTimeout(() => openSheet(), 450);
@@ -278,7 +281,9 @@ export default function HomeWeb() {
   // `openSearch`: results for the search's area and filters, with it as the active search.
   const openSearch = async (x: SavedSearch) => {
     sv.setActive(x.id);
-    fs.setF(x.f || seedFilters(x.params));
+    fs.setF(x.f ? migrateF({ ...fDef(), ...x.f }) : seedFilters(x.params));
+    // A search over several areas reopens on all of them (agent feedback: only the last one came back).
+    if (x.areas && x.areas.length > 1) { setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); return chooseAreas(x.areas); }
     if (x.place) return goPlace(x.place);
     const r = await searchPlaces(x.sq);
     if (r[0]) goPlace(r[0]); else { setView("results"); showToast("No results for " + x.sq, "info"); }
@@ -718,8 +723,8 @@ export default function HomeWeb() {
               // The results column steps back (scale + dim) while a sheet sits on top of it.
               <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", transformOrigin: "50% 0", transition: "transform .42s cubic-bezier(.2,.8,.2,1),filter .42s ease", transform: depth > 1 ? "scale(.88)" : depth ? "scale(.94)" : "none", filter: depth > 1 ? "brightness(.93)" : depth ? "brightness(.955)" : "none" }}>
                 {/* `resultsTitle` / `resultsMeta` for an active saved search */}
-                <ResultsPanel title={active ? (active.newN ? "New matches" : active.name) : "Results"}
-                  meta={active && active.newN ? `${active.newN} since you last visited` : unsupOn ? "" : `${shown.length} ${shown.length === 1 ? "home" : "homes"} · ${active ? active.params[3] || place.label : areaMeta}`}
+                <ResultsPanel title={active ? active.name : "Results"}
+                  meta={active && active.newN ? `${eventSummary(searchEvents(active.id, active.newN, active.alertTypes))} since your last visit` : unsupOn ? "" : `${shown.length} ${shown.length === 1 ? "home" : "homes"} · ${active ? active.params[3] || place.label : areaMeta}`}
                   listings={unsupOn ? [] : results} seen={seen} onOpen={openListing} onHover={setHoverId}
                   unsupported={unsupOn ? unsup!.label.split(",")[0] : null} onTryArea={() => setSearching(true)}
                   sortOpen={sortOpen} onSortToggle={() => { setSortOpen(o => !o); fs.setDd(null); }}

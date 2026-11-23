@@ -9,6 +9,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { DEFAULT_PLACE, Place } from "@/lib/places";
 import { Listing, makeListings } from "@/lib/fake";
 import { Filters } from "@/lib/filters";
+import { SearchAlertKind } from "@/lib/searchAlerts";
 
 export type SavedSearch = {
   id: string; name: string; clients: string[]; newN: number;
@@ -18,6 +19,10 @@ export type SavedSearch = {
   sq: string; when: string; notify: boolean;
   freq?: string; // alert frequency picked in the buyer wizard (Instant / Daily digest / Weekly)
   f?: Filters; place?: Place;
+  // Every area the search covers (a search over Silver Lake + Echo Park reopens on both).
+  areas?: Place[];
+  // The alert types picked for it (lib/searchAlerts.ts); unset = the defaults.
+  alertTypes?: SearchAlertKind[];
 };
 
 // `_alertDefs`: [id, label, sub].
@@ -53,11 +58,11 @@ export type SavedProp = { key: string; l: Listing; seed?: boolean ; viewed?: boo
 
 // `_defSearches` + `_hcExtra` from the canvas (seed data so the panel isn't empty).
 const SEED_SEARCHES: SavedSearch[] = [
-  { id: "bev", name: "Condo in Bev Hills", clients: ["Steve Hall"], newN: 3, th: [0, 1, 2], params: ["Active", "Condo", "Up to $5m", "Beverly Hills"], sq: "Beverly Hills, CA", when: "Today", notify: true },
+  { id: "bev", name: "Condo in Bev Hills", clients: ["Steve Hall"], newN: 3, th: [0, 1, 2], params: ["Active", "Condo", "Up to $5m", "Beverly Hills"], sq: "Beverly Hills, CA", when: "Today", notify: true, alertTypes: ["new", "drop", "status"] },
   { id: "studio", name: "My search in Studio City", clients: ["Sarah Holmes"], newN: 0, th: [3, 4, 5], params: ["Active", "Single family", "Up to $3m", "Studio City"], sq: "Studio City, CA", when: "Today", notify: true },
-  { id: "x-kill", name: "LA Kill List", clients: ["Heyley Ross", "Alex Kim"], newN: 2, th: [6, 7, 8], params: ["Active", "Multifamily", "Up to $5m", "Los Feliz"], sq: "Los Feliz, CA", when: "Yesterday", notify: true },
+  { id: "x-kill", name: "LA Kill List", clients: ["Heyley Ross", "Alex Kim"], newN: 2, th: [6, 7, 8], params: ["Active", "Multifamily", "Up to $5m", "Los Feliz"], sq: "Los Feliz, CA", when: "Yesterday", notify: true, alertTypes: ["drop", "back", "stale"] },
   { id: "x-conv", name: "My search in Echo Park", clients: [], newN: 0, th: [9, 10, 11], params: ["Active", "Single family", "Up to $2m", "Echo Park"], sq: "Echo Park, CA", when: "Mon", notify: true },
-  { id: "x-ub", name: "Underbuilt lots in Silver Lake", clients: ["Jen Smith", "Guy Hawkins"], newN: 5, th: [1, 4, 7], params: ["Active", "Lots", "Up to $3m", "Silver Lake"], sq: "Silver Lake, CA", when: "Last week", notify: true },
+  { id: "x-ub", name: "Underbuilt lots in Silver Lake", clients: ["Jen Smith", "Guy Hawkins"], newN: 5, th: [1, 4, 7], params: ["Active", "Lots", "Up to $3m", "Silver Lake"], sq: "Silver Lake, CA", when: "Last week", notify: true, alertTypes: ["new", "drop", "stale"] },
 ];
 // Seed saved properties: the first six homes of the default area, as before.
 const seedProps = (): SavedProp[] => makeListings(DEFAULT_PLACE.id, DEFAULT_PLACE.center, DEFAULT_PLACE.bbox, DEFAULT_PLACE.rings || null, 28, DEFAULT_PLACE.label)

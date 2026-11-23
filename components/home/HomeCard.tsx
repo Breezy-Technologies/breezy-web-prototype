@@ -1,4 +1,5 @@
 "use client";
+import { ALERT_OF, searchEvents } from "@/lib/searchAlerts";
 // Home panel (For you / Searches / Properties), ported from the canvas
 // `Home Web.dc.html`: template around the `hcCard` / `hcFull` blocks and the
 // logic in `_hcVals` (t.pick, ss.*, pp.*, onHcViewAll, onHcBack,
@@ -108,6 +109,7 @@ function SearchRow({ x, hover, full, onEnter, onLeave, onOpen, onDel }: { x: Sav
                 </span>Active
               </span>}
         </div>
+        {x.newN > 0 && <SearchUpdate x={x} />}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingTop: 6 }}>
           {tags.map(t => (
             <span key={t.label} style={{ flex: "none", display: "flex", alignItems: "center", gap: 4, height: 24, boxSizing: "border-box", padding: "0 8px 0 6px", borderRadius: 9999, boxShadow: "inset 0 0 0 1px rgba(13,12,12,.16)", font: "400 12px/16px var(--font-sans)", letterSpacing: ".25px", color: "rgb(73,67,65)", whiteSpace: "nowrap" }}>
@@ -116,6 +118,18 @@ function SearchRow({ x, hover, full, onEnter, onLeave, onOpen, onDel }: { x: Sav
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// The search's latest alert, typed: "Price drop −$25k · 1432 Lucretia Ave", then "+2 more".
+function SearchUpdate({ x }: { x: SavedSearch }) {
+  const ev = searchEvents(x.id, x.newN, x.alertTypes), e = ev[0], a = ALERT_OF[e.kind];
+  return (
+    <div title={ev.map(v => `${v.text} · ${v.addr}`).join("\n")} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, padding: "6px 8px", borderRadius: 8, background: "rgba(13,12,12,.04)", font: "400 12px/16px var(--font-sans)", color: "rgb(48,42,40)", minWidth: 0 }}>
+      <i className={`ph-bold ${a[3]}`} style={{ flex: "none", fontSize: 13, color: a[4] }} />
+      <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><b style={{ fontWeight: 700 }}>{e.text}</b> · {e.addr}</span>
+      {ev.length > 1 && <span style={{ flex: "none", color: "rgb(98,90,89)" }}>+{ev.length - 1} more</span>}
     </div>
   );
 }
