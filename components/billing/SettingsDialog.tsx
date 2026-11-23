@@ -128,6 +128,7 @@ function Membership({ onBilling, onCancel, onBuy }: { onBilling: () => void; onC
   const { s, planOn, trialLeft } = useEntitlements();
   const trial = s.status === "trial";
   const unl = s.unlimited;
+  const apple = s.store === "apple";
   const meters: Meter[] = [
     { id: "comps", label: "Comps reports", used: 0, limit: null, period: "Per month" },
     ...METERS.map(f => ({ id: f, label: METER[f].title, used: Math.min(PRICING.allowance[f], s.used[f]), limit: unl ? null : PRICING.allowance[f],
@@ -167,7 +168,9 @@ function Membership({ onBilling, onCancel, onBuy }: { onBilling: () => void; onC
                   </div>
                 ))}
               </dl>
-              <button onClick={onBilling} className="st-hover" style={{ ...outlineBtn, alignSelf: "stretch", marginTop: 18 }}>Manage billing</button>
+              {apple
+                ? <button onClick={() => paywall.open({ kind: "appstore" })} className="st-hover" style={{ ...outlineBtn, alignSelf: "stretch", marginTop: 18 }}>Manage in App Store</button>
+                : <button onClick={onBilling} className="st-hover" style={{ ...outlineBtn, alignSelf: "stretch", marginTop: 18 }}>Manage billing</button>}
             </section>
           </div>
         ) : <Meters meters={meters.map(m => ({ ...m, used: 0, limit: m.limit == null ? null : 0, period: m.limit == null ? m.period : "Locked" }))} />}
@@ -178,7 +181,14 @@ function Membership({ onBilling, onCancel, onBuy }: { onBilling: () => void; onC
           <button onClick={() => paywall.open({ kind: "offer" })} style={primaryBtn}>Upgrade Now</button>
         </NoteCard>
       )}
-      {planOn && !unl && (
+      {/* Subscribed on the iPhone (handoff): Apple bills it, so no checkout, cancel or credits here (no double billing). */}
+      {apple && (
+        <NoteCard>
+          <span>You&apos;re subscribed through the App Store. Your plan, renewals and credits are managed by Apple, from the Breezy app on your iPhone.</span>
+          <button onClick={() => paywall.open({ kind: "appstore" })} style={primaryBtn}>Manage in App Store</button>
+        </NoteCard>
+      )}
+      {planOn && !unl && !apple && (
         <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 22, flexWrap: "wrap" }}>
           <button onClick={onCancel} style={{ padding: "12px 24px", border: 0, borderRadius: 9999, background: "transparent", color: T.warn, font: font(700, 15, 20), cursor: "pointer" }}>Cancel my plan</button>
           <span style={{ maxWidth: 420, font: font(400, 13, 19), color: T.ter, textWrap: "pretty" } as React.CSSProperties}>
@@ -190,7 +200,7 @@ function Membership({ onBilling, onCancel, onBuy }: { onBilling: () => void; onC
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, margin: "34px 0 6px" }}>
             <h3 style={{ margin: 0, font: font(400, 20, 26), color: T.ink }}>Credits &amp; usage</h3>
-            <button onClick={() => onBuy("maxBuild")} className="st-hover" style={outlineBtn}><i className="ph-bold ph-plus" style={{ fontSize: 13 }} />Buy credits</button>
+            <button onClick={() => apple ? paywall.open({ kind: "appstore" }) : onBuy("maxBuild")} className="st-hover" style={outlineBtn}><i className="ph-bold ph-plus" style={{ fontSize: 13 }} />Buy credits</button>
           </div>
           <p style={{ margin: "0 0 18px", maxWidth: 680, font: font(400, 14, 20), color: T.sec }}>
             Included reports and contacts reset on {longDate(monthOn())}. When they run out, credits keep you going; they don&apos;t expire.
@@ -255,22 +265,25 @@ const cardIcon = <svg width="22" height="22" viewBox="0 0 24 24" fill="none" str
 function Billing({ onToast, onBuy }: { onToast: Toast; onBuy: () => void }) {
   const { s, planOn, trialLeft } = useEntitlements();
   const trial = s.status === "trial";
+  const apple = s.store === "apple";
   return (
     <>
       <PageTitle gap={6}>Subscriptions on this account</PageTitle>
       <p style={{ margin: "0 0 20px", maxWidth: 680, font: font(400, 14, 20), color: T.sec }}>Your Breezy plan and the credits you&apos;ve bought. Payments run through Stripe, where you can change your card and download invoices.</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {planOn ? (
-          <SubCard icon={cardIcon} plan={P.name} badge={trial ? "Free trial" : undefined} source="Breezy web · billed by Stripe"
+          <SubCard icon={cardIcon} plan={P.name} badge={trial ? "Free trial" : undefined} source={apple ? "Breezy for iPhone · billed by the App Store" : "Breezy web · billed by Stripe"}
             facts={[["Status", trial ? `Trial, ${trialLeft} day${trialLeft === 1 ? "" : "s"} left` : "Active"], [trial ? "First charge" : "Renews", longDate(trial ? dayOffset(trialLeft) : monthOn())], ["Amount", `${s.saved ? money(PRICING.saveOffer.price) : money(P.price)} / month`]]}
-            action={<button onClick={() => onToast("Stripe isn't connected in the prototype", "neutral")} style={{ ...primaryBtn, flex: "none" }}>Manage in Stripe</button>} />
+            action={apple
+              ? <button onClick={() => paywall.open({ kind: "appstore" })} style={{ ...primaryBtn, flex: "none" }}>Manage in App Store</button>
+              : <button onClick={() => onToast("Stripe isn't connected in the prototype", "neutral")} style={{ ...primaryBtn, flex: "none" }}>Manage in Stripe</button>} />
         ) : (
           <SubCard icon={cardIcon} plan="No subscription" source="No paid subscription on this account" facts={[["Status", s.status === "expired" ? "Trial ended" : "Inactive"]]}
             action={<button onClick={() => paywall.open({ kind: "offer" })} style={{ ...primaryBtn, flex: "none" }}>See {P.name}</button>} />
         )}
         <SubCard icon={<i className="ph ph-coins" style={{ fontSize: 22 }} />} plan="Credits" source="Bought as you need them · charged once · they don't expire"
           facts={METERS.map(f => [METER[f].title, String(s.credits[f] || 0)] as [string, string])}
-          action={planOn ? <button onClick={onBuy} className="st-hover" style={{ ...outlineBtn, flex: "none" }}>Buy credits</button> : undefined} />
+          action={planOn ? <button onClick={() => apple ? paywall.open({ kind: "appstore" }) : onBuy()} className="st-hover" style={{ ...outlineBtn, flex: "none" }}>Buy credits</button> : undefined} />
       </div>
     </>
   );

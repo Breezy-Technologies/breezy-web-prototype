@@ -443,8 +443,29 @@ export function BillingHost({ onToast }: { onToast: Toast }) {
   if (r.kind === "plan") return <SettingsDialog tab={r.tab} onClose={close} onToast={onToast} />;
   if (r.kind === "winback") return <WinBack onClose={close} onToast={onToast} />;
   if (r.kind === "news") return <News onClose={close} onToast={onToast} />;
-  if (r.kind === "offer") return <OfferSheet feature={r.feature} onClose={close} onDone={() => { onToast(`${P.name} started`, "positive"); close(); }} />;
+  // Subscribed on the iPhone (handoff): no web checkout anywhere, every upgrade entry point says so.
+  if (r.kind === "appstore" || (s.store === "apple" && (r.kind === "offer" || r.kind === "upsell"))) return <AppStoreSheet onClose={close} onToast={onToast} />;
+  if (r.kind === "offer") return <OfferSheet feature={r.feature} kicker={r.kicker} onClose={close} onDone={() => {
+    onToast(s.status === "none" && s.segment === "new2" ? `Your ${s.trialVariant}-day trial has started` : `${P.name} started`, "positive"); close(); r.then?.();
+  }} />;
   return <UpsellSheet feature={r.feature} then={r.then} onClose={close} onToast={onToast} />;
+}
+/** "You're subscribed through the App Store" (handoff, `subscribed_apple`): Apple bills the
+ *  plan, so the web never shows a checkout (avoids double billing). */
+function AppStoreSheet({ onClose, onToast }: { onClose: () => void; onToast: Toast }) {
+  return (
+    <Sheet onClose={onClose} label="Subscribed through the App Store" width={460}>
+      <span style={{ alignSelf: "center", width: 56, height: 56, marginTop: 8, borderRadius: 16, background: "linear-gradient(180deg,rgb(30,160,250),rgb(10,110,230))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <i className="ph-fill ph-app-store-logo" style={{ fontSize: 30, color: "#fff" }} />
+      </span>
+      <span style={{ font: "300 26px/1.2 var(--font-sans)", letterSpacing: "-.4px", textAlign: "center", textWrap: "balance" } as React.CSSProperties}>You&apos;re subscribed through the App Store</span>
+      <span style={{ font: "400 15px/22px var(--font-sans)", color: MUTED, textAlign: "center", textWrap: "pretty" } as React.CSSProperties}>
+        Your {P.name} plan is billed by Apple. To change it, or to add reports and contacts, open the Breezy app on your iPhone. Nothing is charged here.
+      </span>
+      <button onClick={() => { onToast("Opens App Store subscriptions on a real device", "neutral"); onClose(); }} style={btnPrimary}>Manage in App Store</button>
+      <button onClick={onClose} className="btn-soft" style={{ alignSelf: "center" }}>Not now</button>
+    </Sheet>
+  );
 }
 function UpsellSheet({ feature, then, onClose, onToast }: { feature: Metered; then?: () => void; onClose: () => void; onToast: Toast }) {
   const { access, s } = useEntitlements();

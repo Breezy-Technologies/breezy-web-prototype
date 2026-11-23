@@ -29,6 +29,8 @@ export type BillingState = {
   /** On the $9.90 save offer after trying to cancel. */
   saved: boolean;
   lockStyle: LockStyle;
+  /** Billed by the App Store (subscribed on the iPhone): no web checkout anywhere (handoff). */
+  store?: "apple";
   /** State version: 2 = locked tiles open the paywall only (17 Nov review). */
   v?: number;
 };
@@ -75,9 +77,11 @@ const serverSnap = () => BASE;
 export const billing = {
   get: snap,
   set,
+  /** Set several fields at once (the handoff's trial states, lib/handoff/profile.ts). */
+  apply(next: Partial<BillingState>) { set({ ...next, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [] }); },
   preset(id: string) {
     const p = PRESETS.find(x => x.id === id); if (!p) return;
-    set({ ...BASE, unlimited: state.unlimited, lockStyle: state.lockStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
+    set({ ...BASE, store: undefined, unlimited: state.unlimited, lockStyle: state.lockStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
   },
   /** Mock purchase: adds the SKU's credits. */
   buy(id: string) {
@@ -148,7 +152,8 @@ export function useEntitlements() {
 // sheet without prop drilling.
 export type PaywallReq =
   | { kind: "upsell"; feature: Metered; then?: () => void }
-  | { kind: "offer"; feature?: Feature }
+  | { kind: "offer"; feature?: Feature; kicker?: string; then?: () => void }
+  | { kind: "appstore" }
   | { kind: "plan"; tab?: string }
   | { kind: "winback" }
   | { kind: "news" }
