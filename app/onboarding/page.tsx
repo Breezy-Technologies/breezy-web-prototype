@@ -236,6 +236,8 @@ export default function Onboarding() {
           </div>
           <button className="btn-dark" onClick={next}>Continue as {app.user.name.split(" ")[0]}</button>
           <span style={{ font: "400 12px/16px var(--font-sans)", color: "rgb(98,90,89)", textAlign: "center" }}>Pre-filled from your Google sign-in · Not you? <u>Use another account</u></span>
+          {/* Returning iPhone users log in by scanning a code (app/login), never with a password. */}
+          <a href="/login" style={{ font: "400 13px/18px var(--font-sans)", color: "var(--ink)", textAlign: "center", textDecoration: "none" }}>Already use Breezy on your iPhone? <b>Log in</b></a>
         </div>
       </>}
 
