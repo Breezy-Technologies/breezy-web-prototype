@@ -167,7 +167,6 @@ const LOGIN_CSS = `
 @keyframes bzScanRing { 0% { transform: scale(1); opacity: .55 } 100% { transform: scale(1.32); opacity: 0 } }
 @keyframes bzPinIn { 0% { opacity: 0; transform: translate(-50%, -100%) translateY(10px) scale(.7) } 70% { opacity: 1; transform: translate(-50%, -100%) scale(1.05) } 100% { opacity: 1; transform: translate(-50%, -100%) scale(1) } }
 @keyframes bzPinHalo { 0% { transform: translate(-50%, -50%) scale(.6); opacity: .7 } 100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0 } }
-@keyframes bzStatus { 0% { opacity: 0; transform: translateY(6px) } 12%, 88% { opacity: 1; transform: none } 100% { opacity: 0; transform: translateY(-6px) } }
 @keyframes bzApprove { 0% { box-shadow: 0 0 0 0 rgba(49,140,96,.35) } 100% { box-shadow: 0 0 0 26px rgba(49,140,96,0) } }
 .bz-approve { animation: bzApprove 1.4s ease-out infinite }
 .bz-sim { left: 48px }
@@ -189,7 +188,7 @@ function Stage({ done }: { done: boolean }) {
   const [i, setI] = useState(0);
   useEffect(() => { if (done) return; const t = setInterval(() => setI(x => (x + 1) % STATUS.length), 2400); return () => clearInterval(t); }, [done]);
   return (
-    <div className="bz-stage" aria-hidden style={{ position: "relative", flex: "0 0 54%", minWidth: 0, display: "flex", flexDirection: "column", gap: 24, padding: 20, borderRadius: 36, overflow: "hidden", background: "linear-gradient(180deg,rgb(116,77,65) -4%,rgb(63,51,48) 100%)", boxShadow: "0 30px 70px rgba(63,40,32,.28)", animation: "riseIn .6s cubic-bezier(.2,.8,.2,1) both" }}>
+    <div className="bz-stage" aria-hidden style={{ position: "relative", flex: "0 0 50%", minWidth: 0, display: "flex", flexDirection: "column", gap: 24, padding: 20, borderRadius: 36, overflow: "hidden", background: "linear-gradient(180deg,rgb(116,77,65) -4%,rgb(63,51,48) 100%)", boxShadow: "0 30px 70px rgba(63,40,32,.28)", animation: "riseIn .6s cubic-bezier(.2,.8,.2,1) both" }}>
       {/* Arches, the texture behind Ann's hero */}
       <div style={{ position: "absolute", left: -20, right: -20, bottom: -40, height: "42%", opacity: .1, background: `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="112" height="400"><path d="M8 400V64a48 48 0 0 1 96 0v336" fill="none" stroke="#fff" stroke-width="2"/></svg>')}") 0 0/112px 100% repeat-x` }} />
       {/* The map card */}
@@ -216,10 +215,9 @@ function Stage({ done }: { done: boolean }) {
         ))}
         {/* The AI status line */}
         <span style={{ position: "absolute", left: "50%", bottom: 18, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", borderRadius: 9999, background: "rgba(253,252,252,.92)", boxShadow: "0 6px 18px rgba(40,26,20,.14)", whiteSpace: "nowrap" }}>
-          <i className={done ? "ph-bold ph-check" : "ph-fill ph-sparkle"} style={{ fontSize: 15, color: done ? "rgb(49,140,96)" : "rgb(168,128,190)" }} />
-          <span key={done ? "done" : i} style={{ display: "block", animation: done ? "fadeIn .3s ease both" : "bzStatus 2.4s ease both" }}>
-            <span style={{ display: "block", font: "700 14px/18px var(--font-sans)", ...(done ? { color: INK } : { color: "transparent", WebkitBackgroundClip: "text", backgroundClip: "text", backgroundSize: "250% 100%", backgroundRepeat: "no-repeat", animation: "lineShimmer 1.8s linear infinite",
-              backgroundImage: "linear-gradient(100deg,rgb(17,16,16) 0%,rgb(17,16,16) 38%,rgb(175,127,113) 46%,rgb(150,110,190) 54%,rgb(17,16,16) 62%,rgb(17,16,16) 100%)" }) }}>
+          <i className={done ? "ph-bold ph-check" : "ph-fill ph-sparkle"} style={{ fontSize: 15, color: done ? "rgb(49,140,96)" : "rgb(168,128,190)", animation: done ? undefined : "ub-pulse 1.4s cubic-bezier(.4,0,.6,1) infinite" }} />
+          <span key={done ? "done" : i} style={{ display: "block", animation: "stepIn .35s ease" }}>
+            <span style={{ display: "block", font: "700 14px/18px var(--font-sans)", color: INK }}>
               {done ? "Your workspace is ready" : `${STATUS[i]}…`}
             </span>
           </span>
