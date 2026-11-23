@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { css } from "@/lib/css";
 import { Listing, fullPrice } from "@/lib/fake";
-import { F_TYPES, Filters, fDef, fDims } from "@/lib/filters";
+import { F_TYPES, Filters, ST_ROWS, fDef, fDims } from "@/lib/filters";
 import { Place } from "@/lib/places";
 import {
   ALERT_DEFS, ALERT_OPTS, AlertSet, CLIENT_PHOTOS, CONTACTS, SavedProp, SavedSearch, alertCount, forTxt, initials, useSaved,
@@ -42,10 +42,18 @@ export function searchCriteria(F: Filters, area: string) {
   const price = F.pHi < 100 ? "Up to $" + (F.pHi * 50000 / 1e6).toFixed(1).replace(/\.0$/, "") + "m" : "Any price";
   const d = fDims(F);
   const extra = (["roi", "ub", "drops", "beds", "baths", "size", "lot", "styles", "feats"] as const).filter(k => d[k].on).map(k => k === "drops" ? "Price drops" : d[k].label);
+  // Per-status time windows ("Sold within 3 months"), only on month tags of a status that is on.
+  const windows = timeWindows(F);
   // Canvas: statuses, types (or "Single family"), price, area. Defaults here are "any", so say so.
-  const chips = [...(stOn.length ? stOn : ["Any status"]), ...(tOn.length ? tOn : ["Any type"]), price, area, ...extra];
+  const chips = [...(stOn.length ? stOn : ["Any status"]), ...(tOn.length ? tOn : ["Any type"]), price, ...windows, area, ...extra];
   const multi = (a: string[], none: string) => a.length ? a[0] + (a.length > 1 ? " +" + (a.length - 1) : "") : none;
-  return { chips, params: [multi(stOn, "Any status"), multi(tOn, "Any type"), price, area] };
+  return { chips, windows, params: [multi(stOn, "Any status"), multi(tOn, "Any type"), price, area] };
+}
+
+// "Sold within 3 months", "Expired within 1 month"… for each status that is on with a month tag.
+// The alert engine can't filter by these yet (#ws-web, 20 Nov), so the sheet notes it.
+export function timeWindows(F: Filters): string[] {
+  return ST_ROWS.filter(r => F.st[r[1]] && /months?$/.test(F.tg[r[1]] || "")).map(r => r[5] + " " + F.tg[r[1]]);
 }
 
 // Seeded searches only carry their chip labels; turn them back into filters
@@ -118,6 +126,7 @@ export function useSearchSheet({ F, place, results, toast }: { F: Filters; place
     <>
       {st && (
         <SaveSearchSheet st={st} set={p => setSt(s => s && { ...s, ...p })} out={out} chips={editing ? (editing.chips || editing.params) : crit.chips}
+          windows={editing ? (editing.f ? timeWindows(editing.f) : []) : crit.windows}
           onClose={onClose} onSave={commit} onRemove={() => { setRemoveOpen(true); setContactOpen(false); }} onContacts={() => setContactOpen(true)} />
       )}
     </>
@@ -144,11 +153,14 @@ export function useSearchSheet({ F, place, results, toast }: { F: Filters; place
   return { open: !!st, on: !!st && !out, openNew, openManage, close, requestClose: onClose, layers, modals };
 }
 
-function SaveSearchSheet({ st, set, out, chips, onClose, onSave, onRemove, onContacts }: {
-  st: SheetState; set: (p: Partial<SheetState>) => void; out: boolean; chips: string[];
+function SaveSearchSheet({ st, set, out, chips, windows, onClose, onSave, onRemove, onContacts }: {
+  st: SheetState; set: (p: Partial<SheetState>) => void; out: boolean; chips: string[]; windows: string[];
   onClose: () => void; onSave: () => void; onRemove: () => void; onContacts: () => void;
 }) {
   const named = !!st.name.trim(), has = st.clients.length > 0;
+  // Time-window caveat: only while New matches is on and a window is set.
+  const caveat = st.notify && windows.length > 0;
+  const caveatTxt = windows.length === 1 ? <>Alerts aren’t limited to “{windows[0]}”.</> : <>Alerts aren’t limited to your time windows.</>;
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { const t = setTimeout(() => { try { nameRef.current?.focus({ preventScroll: true }); } catch {} }, 80); return () => clearTimeout(t); }, []);
   const box = "flex:none;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16)";
@@ -166,7 +178,15 @@ function SaveSearchSheet({ st, set, out, chips, onClose, onSave, onRemove, onCon
         <div style={css(box)}>
           <span style={css("font:700 14px/1.26 var(--font-sans);color:rgb(18,18,18)")}>Search parameters</span>
           <div style={css("display:flex;flex-wrap:wrap;gap:4px")}>
-            {chips.map(l => <span key={l} style={css("display:flex;align-items:center;height:24px;padding:0 10px;border-radius:9999px;box-shadow:inset 0 0 0 .5px rgba(18,18,18,.4);font:400 12px/16px var(--font-sans);color:rgb(18,18,18);white-space:nowrap")}>{l}</span>)}
+            {chips.map(l => {
+              const w = caveat && windows.includes(l);
+              return (
+                <span key={l} title={w ? "Applies to results. New match alerts aren’t limited to it." : undefined}
+                  style={css("display:flex;align-items:center;gap:4px;height:24px;padding:0 " + (w ? "8px 0 10px" : "10px") + ";border-radius:9999px;box-shadow:inset 0 0 0 .5px rgba(18,18,18,.4);font:400 12px/16px var(--font-sans);color:rgb(18,18,18);white-space:nowrap;cursor:" + (w ? "help" : "default"))}>
+                  {l}{w && <i className="ph ph-info" style={css("font-size:13px;color:rgb(115,107,104)")} />}
+                </span>
+              );
+            })}
           </div>
         </div>
         <div style={css(box)}>
@@ -203,7 +223,8 @@ function SaveSearchSheet({ st, set, out, chips, onClose, onSave, onRemove, onCon
             </div>
           )}
         </div>
-        <div style={css("flex:none;display:flex;align-items:center;gap:12px;padding:16px;border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16)")}>
+        <div style={css("flex:none;display:flex;flex-direction:column;border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16)")}>
+        <div style={css("display:flex;align-items:center;gap:12px;padding:16px")}>
           <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:4px")}>
             <span style={css("font:400 14px/1.26 var(--font-sans);color:rgb(18,18,18)")}>New matches</span>
             <span style={css("font:400 12px/1.26 var(--font-sans);letter-spacing:.25px;color:rgb(73,67,65)")}>App push, email if not installed</span>
@@ -211,6 +232,13 @@ function SaveSearchSheet({ st, set, out, chips, onClose, onSave, onRemove, onCon
           <button onClick={() => set({ notify: !st.notify })} title="New matches" style={css("flex:none;position:relative;width:40px;height:24px;padding:0;border:none;border-radius:9999px;cursor:pointer;transition:background .2s;background:" + (st.notify ? "rgb(18,18,18)" : "rgba(13,12,12,.2)"))}>
             <span style={css("position:absolute;top:3px;left:" + (st.notify ? 19 : 3) + "px;width:18px;height:18px;border-radius:9999px;background:rgb(253,252,252);transition:left .2s cubic-bezier(.2,.8,.2,1)")} />
           </button>
+        </div>
+        {caveat && (
+          <div style={css("display:flex;align-items:flex-start;gap:8px;margin:0 16px;padding:12px 0 14px;box-shadow:inset 0 .5px 0 rgba(18,18,18,.12);animation:fadeIn .2s ease both")}>
+            <i className="ph ph-info" style={css("flex:none;font-size:15px;line-height:16px;color:rgb(115,107,104)")} />
+            <span style={css("flex:1;min-width:0;font:400 12px/16px var(--font-sans);letter-spacing:.25px;color:rgb(73,67,65)")}>{caveatTxt}</span>
+          </div>
+        )}
         </div>
         <span style={css("flex:none;padding:4px 4px 0;font:400 12px/16px var(--font-sans);color:rgb(73,67,65)")}>*You can change this at any time.</span>
       </div>

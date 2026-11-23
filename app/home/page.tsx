@@ -579,6 +579,7 @@ export default function HomeWeb() {
     { group: "Saved data", label: "Saved: nothing saved", icon: "ph-tray", run: () => { closeDetail(); setSearching(false); setView("home"); setSavedPreview("empty"); } },
     { group: "Saved data", label: "Saved: failed to load", icon: "ph-cloud-x", run: () => { closeDetail(); setSearching(false); setView("home"); setSavedPreview("error"); } },
     { group: "Saved data", label: "Saved: back to normal", icon: "ph-arrow-counter-clockwise", run: () => setSavedPreview(null) },
+    { group: "Saved data", label: "Save search: Sold within 3 months", icon: "ph-info", run: () => { closeDetail(); fs.setF({ ...fs.f, st: { "Recently sold": true }, tg: { "Recently sold": "3 months" } }); setView("results"); ss.openNew(); } },
     { group: "Property", label: "Property with no estimate", icon: "ph-lightning-slash", run: () => {
       setSearching(false);
       const l = listings.find(x => x.noQe);

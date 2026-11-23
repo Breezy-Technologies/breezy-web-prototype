@@ -165,6 +165,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
     - Saved comps reports still open the old Comps report sheet. In comps mode the detail panel has no × (review): the comps panel's × closes comps.
   - Area comps come from Create comps (`AreaCompsPreview`, still the older full-screen view).
 - **Saved** (`Saved.tsx`, `SavedState.tsx`): save-search sheet, `SaveToggle`, the Saved sheet (opens from Home and Results).
+  - **Time windows and New matches (23 Nov, #ws-web with Feng):** the sheet's Search parameters list each status's time window as a chip ("Sold within 3 months", `timeWindows`). The alert engine can't filter by a window yet, so while New matches is on and a window is set, the window chips carry an ⓘ (hover: "Applies to results…") and the New matches card adds a row under a hairline: ⓘ *Alerts aren't limited to "Sold within 3 months".* (several windows: "…your time windows."). Remove once the backend supports windows. Dev menu → Saved data → "Save search: Sold within 3 months".
 - **Alerts panel**, "Set custom alerts":
   - "Any activity" with an Active / Turn on pill.
   - Price drop / bump use a % stepper ("Alert when · Price drops N% below current price").
