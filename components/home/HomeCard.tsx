@@ -55,7 +55,7 @@ function Tabs({ tab, onPick, bellS, bellP }: { tab: Tab; onPick: (t: Tab) => voi
       {(["For you", "Searches", "Properties"] as Tab[]).map(t => {
         const on = tab === t;
         return (
-          <button key={t} onClick={() => onPick(t)} style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", border: "none", borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", font: "400 15px/20px var(--font-sans)", transition: "background .16s,color .16s", background: on ? INK : "rgba(18,18,18,.06)", color: on ? "rgb(249,249,249)" : INK }}>
+          <button key={t} data-tour={`tab-${t}`} onClick={() => onPick(t)} style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", border: "none", borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", font: "400 15px/20px var(--font-sans)", transition: "background .16s,color .16s", background: on ? INK : "rgba(18,18,18,.06)", color: on ? "rgb(249,249,249)" : INK }}>
             {((t === "Searches" && bellS) || (t === "Properties" && bellP)) && <UnreadDot ring={on ? INK : undefined} />}<span>{t}</span>
           </button>
         );
@@ -195,13 +195,15 @@ function SavedError({ what, retrying, onRetry }: { what: string; retrying: boole
   );
 }
 
-export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals, cols = 1, maxCols = 1, onCols, savedState = null, onSavedRetry }: {
+export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSearch, onOpenProp, onStart, toast, picked = [], onSharePicked, onOpenSaved, onTab, onSignals, cols = 1, maxCols = 1, onCols, savedState = null, onSavedRetry, greeting, banner }: {
   name: string; area?: string; forYou: Listing[]; seen: Set<number>; picked?: SavedProp[]; onSharePicked?: () => void; onOpenSaved?: () => void;
   onTab?: (t: Tab) => void; onSignals?: (keys: OppType[]) => void;
   // Multi-column feed: shares the Results 1 / 2 / 3 setting (11 Nov review).
   cols?: number; maxCols?: number; onCols?: (n: number) => void;
   // Dev menu preview of the saved data states (BREEZY-7759): nothing saved, or the request failed.
   savedState?: "empty" | "error" | null; onSavedRetry?: () => void;
+  // Handoff (lib/handoff/profile.ts): "Welcome back" in place of "Hello", and a slot under the tabs (desk checklist).
+  greeting?: React.ReactNode; banner?: React.ReactNode;
   onOpen: (id: number) => void; onHover: (id: number | null) => void; onOpenSearch: (x: SavedSearch) => void; onOpenProp: (l: Listing) => void; onStart: () => void; toast: (text: string) => void;
 }) {
   const sv = useSaved();
@@ -268,7 +270,7 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
     : props.length === 0 && <SavedEmpty icon="house-line" title="No saved properties yet" body="Save a home to follow its price and status. We’ll let you know when something changes." cta="Find properties" onCta={onStart} />;
   const hello = (
     <>
-      <span style={{ font: "300 26px/1.26 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>Hello {name.split(" ")[0]}</span>
+      <span style={{ font: "300 26px/1.26 var(--font-sans)", letterSpacing: "-.5px", color: INK }}>{greeting ?? <>Hello {name.split(" ")[0]}</>}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 4, height: 18, font: "400 12px/18px var(--font-sans)", letterSpacing: ".25px", color: "rgb(98,90,89)" }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="rgb(98,90,89)" style={{ flex: "none" }}><path d="M21 3 3 10.5l7.5 2.6L13.2 21z" /></svg>
         {where}
@@ -279,13 +281,14 @@ export function HomeCard({ name, area, forYou, seen, onOpen, onHover, onOpenSear
   return (
     <>
       {!full ? (
-        <div ref={cardRef} style={{ ...card, flex: 1, minHeight: 0, animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) both" }}>
+        <div ref={cardRef} data-tour="home-card" style={{ ...card, flex: 1, minHeight: 0, animation: "panelDrop .26s cubic-bezier(.2,.8,.2,1) both" }}>
           <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 16, padding: 20 }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>{hello}</div>
               {tab === "For you" && maxCols > 1 && onCols && <ColsToggle value={cols} max={maxCols} onPick={onCols} />}
             </div>
             <div className="no-scrollbar" style={{ display: "flex", gap: 8, overflowX: "auto" }}><Tabs tab={tab} onPick={setTab} bellS={bellS} bellP={bellP} /></div>
+            {banner}
           </div>
           <div className="no-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24, padding: tab === "For you" ? "0 16px 16px" : "0 24px" }}>
             {tab === "For you" && <>

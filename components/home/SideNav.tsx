@@ -5,6 +5,7 @@ import { AllowanceRing, BillingDevPanel, TrialCard } from "../billing/Paywall";
 import { CreateButton, CreateStyle } from "./CreateMenu";
 import { Ring } from "./GetStarted";
 import { getStarted, useGetStarted } from "@/lib/getStarted";
+import { useHandoff } from "@/lib/handoff/profile";
 
 const MAIN: [string, string][] = [["Map", "/nav/map-iso.png"], ["Comps", "/nav/comps-iso.png"], ["Underbuilt", "/nav/radar.png"], ["AI Notes", "/nav/ai-notes-new.svg"], ["Assistant", "/nav/assistant.png"], ["Inman News", "ph-newspaper"]];
 // Plan-gated places (Nimbus pricing): a small lock shows on them while no trial / plan is active.
@@ -155,7 +156,9 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
    hairline separates it from the places. */
 function GettingStartedRow({ expanded }: { expanded: boolean }) {
   const gs = useGetStarted();
-  if (gs.all) return null;
+  const hs = useHandoff();
+  // Handoff, trial active: the 3-item desk checklist on the Home card replaces Getting started.
+  if (gs.all || (hs.on && hs.trial === "active")) return null;
   return (
     <>
       <button data-gs-open="" data-tour="getting-started" title="Getting started" onClick={() => getStarted.show(!gs.open)} className={gs.open ? "" : "btn-ghost"}

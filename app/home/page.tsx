@@ -36,7 +36,9 @@ import { Listing, OppType, listingForAddress } from "@/lib/fake";
 import { Filters, SortKey, fDef, fDims, homeOk, sortListings } from "@/lib/filters";
 import { Area, Place, areaSq, isCovered, resolveArea, searchPlaces, viewportPlace } from "@/lib/places";
 import { BBox, LngLat, hashStr, pointInRings, ringBBox } from "@/lib/geo";
-import { accessNow, paywall, reportKey, spend, useEntitlements } from "@/lib/billing";
+import { accessNow, billing, paywall, reportKey, spend, useEntitlements } from "@/lib/billing";
+import { PROFILE, TRIAL_STATES, handoffProfile, profileLastViewed, profilePlace, profileSaved, useHandoff } from "@/lib/handoff/profile";
+import { DeskChecklist, TrialBanner, endTip, firstPanelTip, tourSteps } from "@/components/home/Handoff";
 import { BillingHost } from "@/components/billing/Paywall";
 import { getStarted, taskOf, useGetStarted, type Task } from "@/lib/getStarted";
 import { Checklist, Coach, CoachStep, EarnedToast } from "@/components/home/GetStarted";
@@ -56,6 +58,8 @@ export default function HomeWeb() {
   const router = useRouter();
   const { map, ready, setInset, setAreaRings, offline, setHeat } = useMapCtx();
   const { place, rings, listings, picks, user, choosePlace, chooseAreas, areas, onboarded, restartOnboarding } = useApp();
+  // Logged in from the iPhone (app/login): the first web screen in context (lib/handoff/profile.ts).
+  const hs = useHandoff();
   const [navX, setNavX] = useState(false);
   const [view, setView] = useState<"home" | "results">("home");
   // Dev menu preview of saved searches / properties returning nothing or failing (BREEZY-7759).
@@ -153,13 +157,26 @@ export default function HomeWeb() {
   const fyOn = view === "home" && homeTab === "For you";
   const sigFilter = fyOn && fySignals.length > 0;
   const signalIds = useMemo(() => fyOn ? new Set(forYou.filter(l => (!sigFilter || fySignals.includes(l.opp)) && !seen.has(l.id)).map(l => l.id)) : undefined, [fyOn, sigFilter, fySignals, forYou, seen]);
-  const pinListings = useMemo(() => unsupOn ? [] : sigFilter ? shown.filter(l => fySignals.includes(l.opp)) : shown, [unsupOn, sigFilter, fySignals, shown]);
+  // Handoff: the homes saved on the phone are pinned even when the area's listings don't include them.
+  const hoPins = useMemo(() => hs.on ? profileSaved() : [], [hs.on]);
+  const hoExtra = useMemo(() => hoPins.filter(l => !listings.some(x => x.id === l.id)), [hoPins, listings]);
+  const pinListings = useMemo(() => unsupOn ? [] : sigFilter ? shown.filter(l => fySignals.includes(l.opp)) : hoExtra.length ? [...shown, ...hoExtra] : shown, [unsupOn, sigFilter, fySignals, shown, hoExtra]);
 
-  const openListing = (id: number) => {
+  // Handoff, trial dismissed (team, 23 Nov): the map, pins, heat and hover previews stay open;
+  // pressing a result (card, pin, parcel, saved home) stops on the trial offer instead of the
+  // property panel. Starting the trial opens the property they pressed.
+  const gate = (open: () => void) => {
+    if (!hs.on || ent.planOn) return open();
+    setHoverId(null);
+    paywall.open({ kind: "offer", feature: "comps", kicker: "Property details are part of Agents Pro", then: open });
+  };
+  const openListing = (id: number) => gate(() => openListingNow(id));
+  const openListingNow = (id: number): void => {
+    const l = listings.find(x => x.id === id);
+    if (!l) { const x = hoExtra.find(h => h.id === id); if (x) return openSavedNow(x); }
     if (id !== selId) alerts.close();
     setParcel(null); setSoloL(null); setSelId(id); setHoverId(null); setSearching(false);
     setSeen(s => new Set(s).add(id));
-    const l = listings.find(x => x.id === id);
     if (l) frameSel(l);
   };
   // Frame the selection in the free map space right of the detail panel (lib/map/frame.ts).
@@ -250,9 +267,10 @@ export default function HomeWeb() {
   const multi = areas.length > 1;
   const areaMeta = multi ? areas.map(a => a.label.split(",")[0]).slice(0, -1).join(", ") + " & " + areas[areas.length - 1].label.split(",")[0] : place.label;
   // Saved home: open it in place when it's in this area's listings, otherwise on its own.
-  const openSavedProp = (l: Listing) => {
+  const openSavedProp = (l: Listing) => gate(() => openSavedNow(l));
+  const openSavedNow = (l: Listing): void => {
     const hit = listings.find(x => propKey(x) === propKey(l));
-    if (hit) return openListing(hit.id);
+    if (hit) return openListingNow(hit.id);
     alerts.close(); setParcel(null); setSelId(null); setHoverId(null); setSoloL(l);
     frameSel(l);
   };
@@ -276,7 +294,7 @@ export default function HomeWeb() {
   const shareOne = (l: Listing) => { setShareL(l); sh.shareProp(l.id); };
   const shareItems = sh.only != null ? (shareL ? [shareL] : []) : picked.map(p => p.l);
   // A comps report that has already been run reopens on its result (sprint item).
-  const openFlow = (l: Listing, kind: FlowKind) => { setCompsCached(rp.has(l)); setFlow({ l, kind }); if (kind === "ub") getStarted.complete("underbuilt"); };
+  const openFlow = (l: Listing, kind: FlowKind) => { if (kind === "roi") handoffProfile.desk("roi", reportKey(l)); setCompsCached(rp.has(l)); setFlow({ l, kind }); if (kind === "ub") getStarted.complete("underbuilt"); };
   // Paywall, "Locked tile" lock style (Dev menu): a locked Max build / Profit potential tile
   // opens the upsell (or a credit confirmation) over the map instead of a veiled report.
   const ent = useEntitlements();
@@ -407,6 +425,7 @@ export default function HomeWeb() {
     wasLoading.current = false;
     if (!rp.has(sel)) { rp.save(sel); showToast("Report saved to Reports"); }
     getStarted.complete("comps");
+    if (sv.isSaved(sel)) handoffProfile.desk("comps");
   }, [cm.loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- "Search this area" (Expedia-style pill, top centre of the map under the filter bar) ----
@@ -566,10 +585,56 @@ export default function HomeWeb() {
   })();
   const coachPaused = buyerWiz || (searching && tour?.stage !== "search") || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || exportOn || gs.open || !!areaComps;
 
+  // ---- Handoff: the first web screen (lib/handoff/profile.ts, components/home/Handoff.tsx) ----
+  // Land in context: the phone's last area, its saved homes pinned and saved, then the walkthrough.
+  const [tourI, setTourI] = useState<number | null>(null);
+  useEffect(() => {
+    if (!hs.on || !hs.landing || !map || !ready) return;
+    handoffProfile.landed();
+    closeDetail(); setSearching(false); setView("home"); sv.setActive(null); setHomeTab("For you");
+    const p = profilePlace();
+    choosePlace(p).then(() => {
+      const bb = p.rings && p.rings.length ? ringBBox(p.rings) : p.bbox;
+      if (bb) map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { left: GAP + COL + GAP + 40, right: 120, top: 100, bottom: 60 }, duration: 900, maxZoom: 14.6 });
+    });
+    profileSaved().forEach(l => { if (!sv.isSaved(l)) sv.toggleProp(l); });
+    if (!hs.tourDone) setTimeout(() => setTourI(0), 1200);
+  }, [hs.on, hs.landing, map, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tourAll = hs.on && tourI != null ? tourSteps(hs.trial, PROFILE.saved.length) : null;
+  const endTour = () => {
+    setTourI(null); handoffProfile.endTour();
+    // Active trial / App Store: the last property viewed on the phone opens. Dismissed: nothing opens (gated).
+    if (hs.trial !== "dismissed") { const l = profileLastViewed(); if (l) setTimeout(() => openSavedNow(l), 300); }
+  };
+  const nextTour = () => { if (tourI == null || !tourAll) return; if (tourI + 1 >= tourAll.length) endTour(); else setTourI(tourI + 1); };
+  const tourPaused = searching || !!fs.fd || !!fs.dd || !!ss.open || !!flow || savedOpen || rp.open || !!sh.open || buyerWiz || detailOpen;
+  const tourCoach = tourAll && tourI != null && tourI < tourAll.length
+    ? [{ ...tourAll[tourI], count: `${tourI + 1} of ${tourAll.length}`, next: tourAll[tourI].next ?? "Next", onNext: nextTour, exit: "Skip tour" }] : null;
+  // A step whose target isn't on screen (no signal pin in view, say) is skipped.
+  useEffect(() => {
+    if (!tourAll || tourI == null || tourPaused) return;
+    const sel = tourAll[tourI].sel;
+    const t = setTimeout(() => {
+      const seen = Array.from(document.querySelectorAll(sel)).some(el => { const r = el.getBoundingClientRect(); return r.width > 4 && r.top >= 0 && r.top < innerHeight - 40 && r.left < innerWidth; });
+      if (!seen) nextTour();
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [tourI, tourPaused]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Active trial: one tooltip on the first property panel, pointing at Get comps.
+  const tipOn = hs.on && hs.trial === "active" && hs.tourDone && !hs.tipDone && detailOpen && !compsOn && tourI == null;
+  useEffect(() => { if (compsOn && hs.on && !hs.tipDone) endTip(); }, [compsOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hoGreeting = !hs.on ? undefined : hs.trial === "active" && ent.s.status === "trial" ? `Welcome back · day ${ent.s.trialDay} of ${ent.trialLength}` : `Welcome back, ${user.name.split(" ")[0]}`;
+
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
     { group: "Onboarding & activation", label: "Make Breezy yours: reset", icon: "ph-sparkle", run: () => { getStarted.reset(); getStarted.show(); } },
     { group: "Onboarding & activation", label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } },
+    // Scan-to-link handoff (app/login, app/link): the login screen and the first web screen per trial state.
+    { group: "Handoff (iPhone → web)", label: "Log in screen (QR)", icon: "ph-qr-code", run: () => router.push("/login") },
+    { group: "Handoff (iPhone → web)", label: "Replay first web screen", icon: "ph-arrow-counter-clockwise", run: () => handoffProfile.replay() },
+    ...TRIAL_STATES.map(t => ({ group: "Handoff (iPhone → web)", label: `${hs.on && hs.trial === t.id ? "● " : ""}${t.label}`, icon: "ph-device-mobile", run: () => { closeDetail(); handoffProfile.setTrial(t.id); if (!hs.on) handoffProfile.replay(); } })),
+    { group: "Handoff (iPhone → web)", label: "Phone: “Run this on your computer”", icon: "ph-desktop", run: () => window.open("/m/desk", "_blank") },
+    { group: "Handoff (iPhone → web)", label: "Leave handoff mode", icon: "ph-sign-out", run: () => { handoffProfile.leave(); billing.preset("trial"); } },
     { group: "Snackbars", label: "Snackbar: neutral", icon: "ph-info", run: () => showToast("No property found", "neutral") },
     { group: "Snackbars", label: "Snackbar: positive", icon: "ph-check-circle", run: () => showToast("Search saved", "positive") },
     { group: "Snackbars", label: "Snackbar: negative", icon: "ph-warning-circle", run: () => showToast("Couldn't save search. Try again.", "negative") },
@@ -633,7 +698,7 @@ export default function HomeWeb() {
               active={detailOpen ? null : active} onManage={() => openSheet(active)} onClearActive={clearActive} />
           </div>
           {searching ? null : view === "home"
-            ? <HomeCard name={user.name} area={place.label} forYou={forYou} seen={seen} onOpen={openListing} onHover={setHoverId} toast={showToast}
+            ? <HomeCard name={user.name} area={place.label} greeting={hoGreeting} banner={hs.on && hs.trial === "active" ? <DeskChecklist hs={hs} /> : undefined} forYou={forYou} seen={seen} onOpen={openListing} onHover={setHoverId} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
                 picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} cols={cols} maxCols={maxCols} onCols={pickCols}
                 onOpenSaved={() => { setSavedOut(false); setSavedOpen(true); }}
@@ -715,6 +780,7 @@ export default function HomeWeb() {
             Offline demo map
           </span>
         )}
+        {hs.on && !ent.planOn && tourI == null && !detailOpen && !compsOn && !flow && <TrialBanner days={ent.s.trialVariant} left={GAP + COL + GAP} right={120} />}
         {!onboarded && (
           <button onClick={() => router.push("/onboarding")} className="btn-soft" style={{ position: "absolute", right: 20, top: 72, height: 36, fontSize: 13, background: "var(--paper)", pointerEvents: "auto", boxShadow: "0 4px 12px rgba(40,26,20,.1)" }}>
             <i className="ph-bold ph-play" />Replay onboarding
@@ -726,19 +792,19 @@ export default function HomeWeb() {
       {compsShift && sel && cm.key && <CompRadius at={[sel.lng, sel.lat]} miles={cm.radius} handle onChange={cm.setRadius} custom={cm.custom} area={cm.area} />}
       {setup && <AreaDraw cs={cm} />}
       {exportOn && sel && cm.key && <CompsExport cs={cm} l={sel} navW={navW} user={user.name} onClose={() => setExportOn(false)} onToast={(t, tone) => showToast(t, tone)}
-        onSaved={() => { if (!rp.has(sel)) rp.save(sel); }} />}
+        onSaved={() => { if (!rp.has(sel)) rp.save(sel); }} onExported={() => handoffProfile.desk("export")} />}
       <PricePins signal={signalIds} listings={compsOn ? [] : pinListings} selId={selId} hoverId={hoverId} seen={seen} onPick={openListing}
         onHover={id => { clearTimeout(keepT.current); if (id == null) keepT.current = setTimeout(() => setHoverId(null), 160); else setHoverId(id); }} />
       {hover && hoverId !== selId && !compsOn && (
         <HoverCard l={hover} onKeep={() => clearTimeout(keepT.current)} onLeave={() => { keepT.current = setTimeout(() => setHoverId(null), 160); }} onOpen={() => openListing(hover.id)} />
       )}
-      <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => {
+      <ParcelLift suppressCard={hoverId != null} selected={parcel} onOpen={p => gate(() => {
         alerts.close(); setSearching(false); setSelId(null); setSoloL(null); setParcel(p);
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
         frameSel(p.listing, p.ring, [p.cx, p.cy]);
-      }} />
+      })} />
       {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached} onClose={() => setFlow(null)}
-        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); getStarted.complete("comps"); }} onShare={() => shareOne(flow.l)} onToast={showToast}
+        onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); getStarted.complete("comps"); if (sv.isSaved(flow.l)) handoffProfile.desk("comps"); }} onShare={() => shareOne(flow.l)} onToast={showToast}
         onComps={sel && sel.id === flow.l.id ? openCompsMode : undefined} />}
       {areaComps && <AreaCompsPreview key={areaComps.title + areaComps.comps.length} {...areaComps} saved={rp.hasArea(areaComps)} onClose={() => setAreaComps(null)}
         onSave={() => { rp.saveArea(areaComps); showToast("Report saved to Reports"); }} />}
@@ -746,6 +812,8 @@ export default function HomeWeb() {
       {sh.open && <ShareModal sh={sh} items={shareItems} toast={showToast} />}
       <Toast toast={toast} />
       <Coach steps={coachSteps} task={tour?.task} paused={coachPaused} onExit={getStarted.end} />
+      <Coach steps={tourCoach} paused={tourPaused} onExit={endTour} />
+      <Coach steps={tipOn ? [{ ...firstPanelTip, onNext: endTip }] : null} paused={!!flow || exportOn} onExit={endTip} />
       <Checklist left={navW + 12} onStart={startTask} />
       <EarnedToast onNext={startTask} />
     </>

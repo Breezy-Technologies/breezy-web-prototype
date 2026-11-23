@@ -53,8 +53,8 @@ const CLIENTS = [{ name: "Sofia Ramirez", email: "sofia.ramirez@gmail.com" }, { 
 const pct = (a: number[], q: number) => { const b = a.filter(v => v > 0).sort((x, y) => x - y); if (!b.length) return 0; const i = (b.length - 1) * q, lo = Math.floor(i); return b[lo] + (b[Math.min(b.length - 1, lo + 1)] - b[lo]) * (i - lo); };
 
 // ---------- the sheet ----------
-export function CompsExport({ cs, l, navW, user, onClose, onToast, onSaved }: {
-  cs: CompsSession; l: Listing; navW: number; user: string; onClose: () => void; onToast: (t: string, tone?: "positive" | "neutral" | "info") => void; onSaved: () => void;
+export function CompsExport({ cs, l, navW, user, onClose, onToast, onSaved, onExported }: {
+  cs: CompsSession; l: Listing; navW: number; user: string; onClose: () => void; onToast: (t: string, tone?: "positive" | "neutral" | "info") => void; onSaved: () => void; onExported?: () => void;
 }) {
   const [, bump] = useState(0);
   const st = store.get(cs.key) ?? (store.set(cs.key, fresh()), store.get(cs.key)!);
@@ -87,7 +87,7 @@ export function CompsExport({ cs, l, navW, user, onClose, onToast, onSaved }: {
 
   const steps = ["Price estimate", "Adjust comps", "Customize"];
   const last = step === steps.length - 1;
-  const download = () => { onToast("Report ready. Choose “Save as PDF” to download it.", "positive"); onSaved(); setTimeout(() => window.print(), 350); };
+  const download = () => { onToast("Report ready. Choose “Save as PDF” to download it.", "positive"); onSaved(); onExported?.(); setTimeout(() => window.print(), 350); };
 
   return createPortal(
     <>

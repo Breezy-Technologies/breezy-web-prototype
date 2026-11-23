@@ -151,7 +151,7 @@ export function Checklist({ left, onStart }: { left: number; onStart: (t: Task) 
 }
 
 // ---------------------------------------------------------------- coach marks
-export type CoachStep = { sel: string; title: string; sub: string; next?: string; onNext?: () => void };
+export type CoachStep = { sel: string; title: string; sub: string; next?: string; onNext?: () => void; /** "2 of 6" over the title (product tour). */ count?: string; /** Label for the exit button (default "Exit guide"). */ exit?: string };
 type Box = { x: number; y: number; w: number; h: number; r: number };
 
 /** The first step whose target is on screen and not covered (by a sheet, a modal…). */
@@ -245,11 +245,12 @@ export function Coach({ steps, task, paused, onExit }: { steps: CoachStep[] | nu
           </span>
         )}
         <span key={cur.s.title} style={{ position: "relative", display: "block", animation: "stepIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
+          {cur.s.count && <span style={{ display: "block", marginBottom: 4, font: "400 12px/16px var(--font-sans)", color: MUTED }}>{cur.s.count}</span>}
           <span style={{ display: "block", font: "700 15px/20px var(--font-sans)", color: INK }}>{cur.s.title}</span>
           <span style={{ display: "block", marginTop: 4, font: "400 13px/19px var(--font-sans)", color: "rgb(77,71,69)", textWrap: "pretty" } as React.CSSProperties}>{cur.s.sub}</span>
         </span>
         <span style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 14 }}>
-          <button onClick={onExit} className="btn-ghost" style={{ height: 28, padding: "0 8px", margin: "0 0 0 -8px", border: "none", borderRadius: 8, background: "none", font: "400 13px/16px var(--font-sans)", color: MUTED, cursor: "pointer" }}>Exit guide</button>
+          <button onClick={onExit} className="btn-ghost" style={{ height: 28, padding: "0 8px", margin: "0 0 0 -8px", border: "none", borderRadius: 8, background: "none", font: "400 13px/16px var(--font-sans)", color: MUTED, cursor: "pointer" }}>{cur.s.exit ?? "Exit guide"}</button>
           {cur.s.next && <button onClick={cur.s.onNext} className="btn-dark" style={{ height: 32, padding: "0 14px", fontSize: 13 }}>{cur.s.next}</button>}
         </span>
       </div>

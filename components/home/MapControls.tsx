@@ -46,7 +46,7 @@ export function MapControls({ onLocate, right = 20, left }: { onLocate: () => vo
         <button style={{ ...round, boxShadow: "none" }} title="Zoom out" onClick={() => map?.zoomOut({ duration: 400 }, { bzUser: true })}><i className="ph-bold ph-minus" /></button>
       </div>
       <div style={{ position: "relative" }} onMouseEnter={() => { clearTimeout(t.current); setOpen(true); }} onMouseLeave={() => { t.current = setTimeout(() => setOpen(false), 260); }}>
-        <button title="Map layers" onClick={() => setOpen(v => !v)} style={{ width: 84, height: 105, padding: 6, border: "none", borderRadius: 18, background: "var(--paper)", boxShadow: "0 2px 10px rgba(30,18,12,.14)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+        <button data-tour="layers" title="Map layers" onClick={() => setOpen(v => !v)} style={{ width: 84, height: 105, padding: 6, border: "none", borderRadius: 18, background: "var(--paper)", boxShadow: "0 2px 10px rgba(30,18,12,.14)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           <span style={{ width: 72, height: 56, borderRadius: 12, background: thumb }} />
           <span style={{ font: "700 13px/16px var(--font-sans)" }}>Layers</span>
           <span style={{ font: "400 11px/13px var(--font-sans)", color: "var(--fg-2)", whiteSpace: "nowrap" }}>{label}</span>
