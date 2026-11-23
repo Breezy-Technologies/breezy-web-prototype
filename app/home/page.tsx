@@ -1,5 +1,5 @@
 "use client";
-import { BuyerWizard, BuyerResult } from "@/components/home/BuyerWizard";
+import { BuyerWizard, BuyerResult, BuyerPick } from "@/components/home/BuyerWizard";
 import { CreateRun, TaskBar } from "@/components/home/TaskBar";
 import { resetCreateIntro } from "@/components/home/CreateMenu";
 import { resetTips, tipDone } from "@/components/HelpTip";
@@ -207,12 +207,38 @@ export default function HomeWeb() {
   const [buyerWiz, setBuyerWiz] = useState(false);
   const [buyerSave, setBuyerSave] = useState<BuyerResult | null>(null);
   const finishBuyer = async (r: BuyerResult) => {
-    setBuyerWiz(false);
+    setBuyerWiz(false); setRun(null); setBPick(null);
     if (r.buyer.isNew) sv.addContact(r.buyer.name);
-    fs.setF({ ...fDef(), ...r.f });
-    await commitAreas(r.areas);
+    // On the map (the "buyer" run) the areas are searched and the filters applied already.
+    if (Object.keys(r.f).length) fs.setF({ ...fDef(), ...r.f });
+    if (r.areas.length) await commitAreas(r.areas);
     setBuyerSave(r);
   };
+  // New buyer search on the map (review, 23 Nov: "re-use the existing UI"): 1 Location in the real
+  // search bar (coach-marked), 2 Buyer in the wizard, 3 Filters in the real All filters panel,
+  // 4 Review & save in the wizard. The TaskBar shows the steps with Back / Cancel.
+  const [bPick, setBPick] = useState<BuyerPick | null>(null);
+  const [bMode, setBMode] = useState<"buyer" | "review">("buyer");
+  const startBuyerRun = () => {
+    if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setBuyerWiz(false); setBPick(null);
+    setRun({ kind: "buyer", step: 0 }); setIntent("buyer"); setSearching(true);
+  };
+  const bEdit = (i: number) => {
+    setBuyerWiz(false);
+    if (i <= 0) { if (fs.fd) fs.closePanel(); setRun({ kind: "buyer", step: 0 }); setIntent("buyer"); setSearching(true); return; }
+    if (i === 1) { if (fs.fd) fs.closePanel(); setRun({ kind: "buyer", step: 1 }); setBMode("buyer"); setBuyerWiz(true); return; }
+    setRun({ kind: "buyer", step: 2 }); setTimeout(() => fs.openPanel(), 200);
+  };
+  const onBuyerPicked = (b: BuyerPick) => { setBPick(b); bEdit(2); };
+  // Filters done (Show homes, or closed): on to Review & save.
+  const bFd = useRef(false);
+  useEffect(() => {
+    if (fs.fd) { bFd.current = true; return; }
+    if (!bFd.current) return;
+    bFd.current = false;
+    const r = runRef.current;
+    if (r?.kind === "buyer" && r.step === 2) { setRun({ kind: "buyer", step: 3 }); setBMode("review"); setTimeout(() => setBuyerWiz(true), 250); }
+  }, [fs.fd]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const r = buyerSave;
     if (!r) return;
@@ -231,6 +257,8 @@ export default function HomeWeb() {
     if (!firstSearch) showToast(`Search saved for ${first} · ${results.length ? `${results.length} match${results.length === 1 ? "" : "es"}` : "no matches right now, we’ll alert you"}${r.notify ? ` · ${r.freq.toLowerCase()} alerts` : ""}${r.shareWithBuyer ? `, sent to ${first} too` : ""}`, "positive");
   }, [buyerSave]); // eslint-disable-line react-hooks/exhaustive-deps
   const afterBuyerSearch = (was: Intent) => {
+    // The buyer run: area picked in the search bar, on to the Buyer step.
+    if (runRef.current?.kind === "buyer") { setRun({ kind: "buyer", step: 1 }); setBMode("buyer"); setTimeout(() => setBuyerWiz(true), 450); return; }
     if (was === "buyer" && getStarted.get().tour?.task !== "buyer") setTimeout(() => openSheet(), 450);
     if (was === "underbuilt") { setRun(null); setHeat("ub"); fs.setF({ ...fs.f, ub: Math.max(fs.f.ub || 0, 40) }); showToast("Showing lots with 40%+ build potential", "positive"); }
   };
@@ -445,7 +473,7 @@ export default function HomeWeb() {
     setCompsAsk(null); setFlow(null); closeDetail(); compsNext.current = false; ubNext.current = false;
     setRun({ ...r, step: 0 }); setIntent(r.kind); setSearching(true);
   };
-  const runCancel = () => { setRun(null); compsNext.current = false; ubNext.current = false; setCompsAsk(null); setIntent(null); setSearching(false); };
+  const runCancel = () => { if (runRef.current?.kind === "buyer") { setBuyerWiz(false); setBPick(null); if (fs.fd) fs.closePanel(); } setRun(null); compsNext.current = false; ubNext.current = false; setCompsAsk(null); setIntent(null); setSearching(false); };
   // Frame once the session (and so its comps) exists.
   useEffect(() => { if (compsOn && !compsOut && sel && cm.key) frameComps(sel); }, [compsOn, cm.key]); // eslint-disable-line react-hooks/exhaustive-deps
   // New filters or radius: reframe once the new comps are known.
@@ -722,7 +750,7 @@ export default function HomeWeb() {
         if (gt) { if (!gs.isDone(gt) && !(gt === "comps" && !ent.planOn)) getStarted.go(gt, gt === "buyer" ? "wizard" : "search"); else getStarted.end(); }
         if (k === "Map") { closeDetail(); setView("home"); setSearching(false); if (rp.open) rp.close(); }
         // New buyer search (19 Nov, Jimsy): the buyer-first wizard, buyer → area → criteria → alerts.
-        if (k === "Buyer search") { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setSearching(false); setBuyerWiz(true); }
+        if (k === "Buyer search") startBuyerRun();
         // Reports (side-nav footer) opens the saved reports sheet over the left column.
         if (k === "Reports") { if (rp.open) rp.close(); else { fs.closePanel(); rp.show(); } }
         // Nimbus: Settings opens Plan & usage; Inman News is included with the plan; the AI
@@ -740,11 +768,19 @@ export default function HomeWeb() {
           else { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("comps"); setSearching(true); setRun({ kind: "comps", step: 0 }); }
         }
         if (k === "Underbuilt") { if (rp.open) rp.close(); sv.setActive(null); closeDetail(); setIntent("underbuilt"); setSearching(true); setRun({ kind: "underbuilt", step: 0 }); }
-        if (k === "Buyer search") setRun(null);
       }} />
       <BillingHost onToast={showToast} />
-      {run && !buyerWiz && tour?.task !== run.kind && <TaskBar run={run} left={navW} top={BAR_BOTTOM + 8} onBack={run.step > 0 && !(run.kind === "comps" && run.step === 2) ? runBack : undefined} onCancel={runCancel} />}
-      {buyerWiz && <BuyerWizard onClose={() => { setBuyerWiz(false); if (getStarted.get().tour?.task === "buyer") getStarted.step("buyer", "create", ["wizard"]); }} onDone={finishBuyer} />}
+      {run && !buyerWiz && (run.kind === "buyer" || tour?.task !== run.kind) && <TaskBar run={run} left={navW} top={BAR_BOTTOM + 8}
+        onBack={run.kind === "buyer" ? (run.step > 0 ? () => bEdit(run.step - 1) : undefined) : run.step > 0 && !(run.kind === "comps" && run.step === 2) ? runBack : undefined} onCancel={runCancel} />}
+      {buyerWiz && <BuyerWizard key={run?.kind === "buyer" ? bMode : "full"} mode={run?.kind === "buyer" ? bMode : "full"} pick={bPick}
+        areaLabels={run?.kind === "buyer" ? areas.map(a => a.label) : undefined} critChips={run?.kind === "buyer" ? searchCriteria(fs.f, "").chips.filter(Boolean) : undefined}
+        onBuyer={onBuyerPicked} onEdit={run?.kind === "buyer" ? bEdit : undefined}
+        onClose={() => { if (runRef.current?.kind === "buyer") runCancel(); setBuyerWiz(false); if (getStarted.get().tour?.task === "buyer") getStarted.step("buyer", "create", ["wizard"]); }} onDone={finishBuyer} />}
+      {/* New buyer search, step 1: the real search bar, coach-marked (review, 23 Nov). */}
+      <Coach steps={run?.kind === "buyer" && run.step === 0 ? [
+        { sel: `[data-tour="search-results"]`, count: "New buyer search · 1 of 4", title: "Pick the area", sub: "Pick one, then add more if your buyer is looking in several places.", exit: "Cancel" },
+        { sel: `[data-tour="search-field"]`, count: "New buyer search · 1 of 4", title: "Where is your buyer looking?", sub: "Type a neighbourhood, city or ZIP in the search bar.", exit: "Cancel" },
+      ] : null} paused={buyerWiz || !!fs.fd} onExit={runCancel} />
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none", transformOrigin: "0 50%",
           transition: "opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1),visibility 0s linear " + (compsShift ? ".55s" : "0s"),

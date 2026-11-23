@@ -32,13 +32,22 @@ const ST3: [string, StatusKey][] = [["Active", "Active"], ["Pending", "Pending"]
 const QUICK_AREAS = ["Silver Lake", "Echo Park", "Los Feliz"];
 const FREQ = ["Instant", "Daily digest", "Weekly"];
 
-export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: (r: BuyerResult) => void }) {
+/** On the map (review, 23 Nov: "re-use the existing UI"): Location happens in the real search
+ *  bar and Filters in the real All filters panel (app/home/page.tsx, the "buyer" TaskBar run), so
+ *  the wizard only opens for the Buyer step (`mode: "buyer"`) and Review & save (`mode: "review"`,
+ *  with the areas and filters already applied; Edit jumps back to that step on the map). */
+export type BuyerPick = { name: string; email: string; phone: string; isNew: boolean };
+export function BuyerWizard({ onClose, onDone, mode = "full", areaLabels, critChips, pick, onBuyer, onEdit }: {
+  onClose: () => void; onDone: (r: BuyerResult) => void;
+  mode?: "full" | "buyer" | "review"; areaLabels?: string[]; critChips?: string[];
+  pick?: BuyerPick | null; onBuyer?: (b: BuyerPick) => void; onEdit?: (step: number) => void;
+}) {
   const sv = useSaved();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(mode === "buyer" ? 1 : mode === "review" ? 3 : 0);
   // 1 · buyer
-  const [buyer, setBuyer] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [nb, setNb] = useState({ name: "", email: "", phone: "" });
+  const [buyer, setBuyer] = useState<string | null>(pick && !pick.isNew ? pick.name : null);
+  const [adding, setAdding] = useState(!!pick?.isNew);
+  const [nb, setNb] = useState({ name: pick?.isNew ? pick.name : "", email: pick?.email || "", phone: pick?.phone || "" });
   const [q, setQ] = useState("");
   // 2 · area
   const [areas, setAreas] = useState<Area[]>([]);
@@ -55,7 +64,7 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
   const [notify, setNotify] = useState(true), [freq, setFreq] = useState("Instant"), [share, setShare] = useState(true);
   const [alertTypes, setAlertTypes] = useState<SearchAlertKind[]>(DEFAULT_SEARCH_ALERTS.slice());
 
-  const first = (buyer || nb.name || "your buyer").split(" ")[0];
+  const first = (pick?.name || buyer || nb.name || "your buyer").split(" ")[0];
   const contacts = useMemo(() => {
     const all: [string, string][] = CONTACTS.concat(sv.newContacts.filter(n => !CONTACTS.some(c => c[0] === n)).map(n => [n, ""] as [string, string]));
     // Buyers first: they're who a buyer search is usually for.
@@ -76,26 +85,32 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
   const addArea = (a: Area) => { setAreas(l => l.some(x => x.label === a.label) ? l : [...l, a]); setAq(""); setSugg(null); };
 
   // Suggested name, until the agent edits it.
-  const areaName = areas.map(a => a.label.split(",")[0]).slice(0, 2).join(" & ") + (areas.length > 2 ? ` +${areas.length - 2}` : "");
+  const areaName = (areaLabels || areas.map(a => a.label)).map(l => l.split(",")[0]).slice(0, 2).join(" & ") + (areas.length > 2 ? ` +${areas.length - 2}` : "");
   useEffect(() => { if (!named) setName(`${first}'s search${areaName ? " · " + areaName : ""}`); }, [first, areaName, named]);
 
   const badPrice = price.priceMin != null && price.priceMax != null && price.priceMax < price.priceMin;
   const ok = [
-    areas.length > 0,
+    areas.length > 0 || !!areaLabels?.length,
     !!buyer || (adding && nb.name.trim().length > 1),
     !badPrice,
     name.trim().length > 0,
   ][step];
   const next = () => {
     if (!ok) return;
+    if (mode === "buyer") { onBuyer?.({ name: adding ? nb.name.trim() : buyer!, email: adding ? nb.email.trim() : "", phone: adding ? nb.phone.trim() : "", isNew: adding }); return; }
+    if (mode === "review") {
+      tipDone("buyer");
+      onDone({ buyer: { name: pick!.name, email: pick!.email || undefined, phone: pick!.phone || undefined, isNew: pick!.isNew }, areas: [], f: {}, name: name.trim(), notify, freq, shareWithBuyer: share, alertTypes });
+      return;
+    }
     if (step < 3) { if (step === 1 && adding) setBuyer(null); setStep(step + 1); return; }
     tipDone("buyer");
     const bName = adding ? nb.name.trim() : buyer!;
-    const pick = (m: Record<string, boolean>) => Object.fromEntries(Object.entries(m).filter(([, v]) => v));
+    const onlyOn = (m: Record<string, boolean>) => Object.fromEntries(Object.entries(m).filter(([, v]) => v));
     onDone({
       buyer: { name: bName, email: adding ? nb.email.trim() : undefined, phone: adding ? nb.phone.trim() : undefined, isNew: adding },
       areas,
-      f: { st: pick(st as Record<string, boolean>), tg: {}, priceMin: price.priceMin, priceMax: price.priceMax, bedMin: beds, bathMin: baths, types: pick(types), feats: pick(feats) },
+      f: { st: onlyOn(st as Record<string, boolean>), tg: {}, priceMin: price.priceMin, priceMax: price.priceMax, bedMin: beds, bathMin: baths, types: onlyOn(types), feats: onlyOn(feats) },
       name: name.trim(), notify, freq, shareWithBuyer: share, alertTypes,
     });
   };
@@ -138,7 +153,7 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {STEPS.map((s, i) => (
-              <button key={s} onClick={() => i < step && setStep(i)} disabled={i >= step} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, padding: 0, border: "none", background: "none", cursor: i < step ? "pointer" : "default", textAlign: "left" }}>
+              <button key={s} onClick={() => i < step && (onEdit ? onEdit(i) : setStep(i))} disabled={i >= step} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, padding: 0, border: "none", background: "none", cursor: i < step ? "pointer" : "default", textAlign: "left" }}>
                 <span style={{ height: 4, borderRadius: 9999, background: i <= step ? INK : "rgba(18,18,18,.1)", transition: "background .3s" }} />
                 <span style={{ font: `${i === step ? 700 : 400} 12px/16px var(--font-sans)`, color: i <= step ? INK : MUTED }}>{s}</span>
               </button>
@@ -268,9 +283,9 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
             <>
               <div style={{ display: "flex", flexDirection: "column", borderRadius: 16, boxShadow: `inset 0 0 0 1px ${LINE}` }}>
                 {([
-                  ["ph-map-pin", "Location", areas.map(a => a.label.split(",")[0]).join(", "), 0],
-                  ["ph-user", "Buyer", adding ? nb.name : buyer || "", 1],
-                  ["ph-sliders-horizontal", "Filters", crit.join(", "), 2],
+                  ["ph-map-pin", "Location", (areaLabels || areas.map(a => a.label)).map(l => l.split(",")[0]).join(", "), 0],
+                  ["ph-user", "Buyer", pick?.name || (adding ? nb.name : buyer || ""), 1],
+                  ["ph-sliders-horizontal", "Filters", (critChips || crit).join(", ") || "Any", 2],
                 ] as [string, string, string, number][]).map(([ic, t, v, to], i) => (
                   <div key={t} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i ? `1px solid ${LINE}` : "none" }}>
                     <i className={`ph ${ic}`} style={{ fontSize: 17, color: MUTED }} />
@@ -278,7 +293,7 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
                       <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>{t}</span>
                       <span style={{ font: "400 14px/18px var(--font-sans)", color: INK }}>{v}</span>
                     </span>
-                    <button onClick={() => setStep(to)} className="sv-ghost" style={{ flex: "none", height: 30, padding: "0 10px", border: "none", borderRadius: 9999, background: "none", cursor: "pointer", font: "700 13px/18px var(--font-sans)", color: INK }}>Edit</button>
+                    <button onClick={() => onEdit ? onEdit(to) : setStep(to)} className="sv-ghost" style={{ flex: "none", height: 30, padding: "0 10px", border: "none", borderRadius: 9999, background: "none", cursor: "pointer", font: "700 13px/18px var(--font-sans)", color: INK }}>Edit</button>
                   </div>
                 ))}
               </div>
@@ -298,11 +313,12 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
         </div>
         {/* Footer */}
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "14px 24px 20px" }}>
-          {step > 0 ? <button onClick={() => setStep(step - 1)} className="fb-grey" style={btn(false)}>Back</button> : <button onClick={onClose} className="fb-grey" style={btn(false)}>Cancel</button>}
+          {onEdit ? <button onClick={() => onEdit(step - 1)} className="fb-grey" style={btn(false)}>Back</button>
+            : step > 0 ? <button onClick={() => setStep(step - 1)} className="fb-grey" style={btn(false)}>Back</button> : <button onClick={onClose} className="fb-grey" style={btn(false)}>Cancel</button>}
           <span style={{ flex: 1 }} />
           {step === 2 && <button onClick={() => setStep(3)} className="sv-ghost" style={{ ...btn(false), background: "none" }}>Skip</button>}
           <button onClick={next} disabled={!ok} className="fb-dark" style={{ ...btn(true), opacity: ok ? 1 : 0.35, cursor: ok ? "pointer" : "default" }}>
-            {step === 3 ? "Save search" : step === 1 && adding ? "Add buyer & continue" : "Continue"}
+            {step === 3 ? "Save search" : step === 1 && adding ? "Add buyer & continue" : mode === "buyer" ? "Continue to filters" : "Continue"}
           </button>
         </div>
       </div>

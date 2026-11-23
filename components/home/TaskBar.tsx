@@ -1,15 +1,22 @@
 "use client";
 // Progress for the Create flows that run on the map (agent feedback, 23 Nov: "show a progress
-// indicator, allow Back and Cancel"). New buyer search has its own wizard (BuyerWizard); these two
-// happen on the map itself, so a slim bar sits at the top of the map while they run:
+// indicator, allow Back and Cancel"). These happen on the map itself, so a slim bar sits at the
+// top of the map while they run (New buyer search opens its wizard only for Buyer and Review):
 //   New comp               1 Subject property (search an address or click a home) → 2 Comp settings → 3 Run
 //   New underbuilt report  1 Address or parcel → 2 Run report
 // The help line under the steps stays until the flow has been finished once, or "Don't show again".
 import { TipFlow, useTipVisible } from "../HelpTip";
 
-export type CreateRun = { kind: "comps" | "underbuilt"; step: number };
+export type CreateRun = { kind: "buyer" | "comps" | "underbuilt"; step: number };
 
 const FLOWS: Record<CreateRun["kind"], { title: string; steps: string[]; hints: string[] }> = {
+  // Review (23 Nov): Location in the real search bar, Filters in the real All filters panel;
+  // the wizard only opens for the Buyer step and Review & save.
+  buyer: {
+    title: "New buyer search",
+    steps: ["Location", "Buyer", "Filters", "Review & save"],
+    hints: ["Search where your buyer is looking. Add as many areas as you like.", "Pick the contact this search is for, or add a new one.", "Set your buyer's criteria in the filters, then show the homes.", "Check it, name it, pick the alerts."],
+  },
   comps: {
     title: "New comp",
     steps: ["Subject property", "Comp settings", "Run"],
