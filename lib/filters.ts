@@ -11,6 +11,11 @@ export type RangeKey = "pLo" | "pHi" | "pdLo" | "pdHi" | "sdLo" | "sdHi" | "exLo
 export type Filters = {
   roi: number; ub: number;
   pLo: number; pHi: number; pdLo: number; pdHi: number; sdLo: number; sdHi: number; exLo: number; exHi: number; wdLo: number; wdHi: number;
+  // One price range for every status, in dollars; null = no limit (agent feedback, 23 Nov:
+  // the Zillow / Redfin pattern, typed min / max with presets, each clearable).
+  // DECISION: replaces the per-status price sliders (pLo…wdHi stay in the type so old
+  // saved searches still load; they're read once by `migrateF`, then ignored).
+  priceMin?: number | null; priceMax?: number | null;
   st: Partial<Record<StatusKey, boolean>>;
   tg: Partial<Record<StatusKey, string | null>>;
   drops: boolean;
@@ -26,6 +31,7 @@ export const fDef = (): Filters => ({
   roi: 0, ub: 0, pLo: 0, pHi: 100, pdLo: 0, pdHi: 100, sdLo: 0, sdHi: 100, exLo: 0, exHi: 100, wdLo: 0, wdHi: 100,
   // Relaxed defaults (review feedback): any status and any type, so the map
   // starts full; the canvas defaulted to Active + Single family.
+  priceMin: null, priceMax: null,
   st: {}, tg: {}, drops: false, types: {},
   bedMin: 0, bedMax: 0, bathMin: 0, bathMax: 0, szLo: 0, szHi: 100, lotMin: 0, lotMax: 0, lotUnit: "ac", styles: {}, feats: {},
 });
@@ -47,25 +53,19 @@ export const ST_ROWS: [string, StatusKey, string, RangeKey, RangeKey, string, st
   ["Expired", "Expired", "Last list price", "exLo", "exHi", "Expired within", MON_TAGS],
   ["Withdrawn", "Withdrawn", "Last list price", "wdLo", "wdHi", "Withdrawn within", MON_TAGS],
 ];
-const ROW_OF = Object.fromEntries(ST_ROWS.map(r => [r[1], r])) as Record<StatusKey, (typeof ST_ROWS)[number]>;
 
-// Active/pending can't be searched together with sold/expired/withdrawn.
-// Returns the new status map plus the blue info toast to show, if any.
+// Any mix of statuses can be searched together (agent feedback, 23 Nov: the old rule turned
+// Active / Pending off when Sold was picked, and the reverse, which agents read as a bug).
+// The toast is kept in the signature for callers; it's always null now.
 export function toggleStatus(st: Filters["st"], key: StatusKey): { st: Filters["st"]; toast: { t: string; m: string } | null } {
-  const ON: StatusKey[] = ["Active", "Pending"], OFF: StatusKey[] = ["Recently sold", "Expired", "Withdrawn"];
-  const nm: Record<StatusKey, string> = { Active: "Active", Pending: "Pending", "Recently sold": "Sold", Expired: "Expired", Withdrawn: "Withdrawn" };
-  const join = (a: StatusKey[]) => { const b = a.map((x, i) => i ? nm[x].toLowerCase() : nm[x]); return b.length < 2 ? b[0] : b.length === 2 ? b[0] + " and " + b[1] : b.slice(0, -1).join(", ") + " and " + b[b.length - 1]; };
-  const m = { ...st };
-  m[key] = !m[key];
-  let toast = null;
-  if (m[key]) {
-    const other = ON.includes(key) ? OFF : ON, killed = other.filter(x => m[x]);
-    if (killed.length) {
-      killed.forEach(x => { m[x] = false; });
-      toast = { t: join(killed) + " turned off", m: other === ON ? "Sold, expired, and withdrawn can’t be searched with active or pending." : "Active and pending can’t be searched with sold, expired, or withdrawn." };
-    }
-  }
-  return { st: m, toast };
+  return { st: { ...st, [key]: !st[key] }, toast: null };
+}
+
+// Saved searches from before the single price range: lift the old 0–100 slider units
+// ($50k steps, 100 = no max) into dollars.
+export function migrateF(F: Filters): Filters {
+  if (F.priceMin !== undefined || F.priceMax !== undefined) return F;
+  return { ...F, priceMin: F.pLo > 0 ? F.pLo * 50000 : null, priceMax: F.pHi < 100 ? F.pHi * 50000 : null };
 }
 
 // The listing's status as the filter sees it (the fake data has "Off market";
@@ -83,10 +83,8 @@ export function homeOk(l: Listing, F: Filters): boolean {
   if (l.ub < (F.ub || 0)) return false;
   const stOn = onKeys(F.st), sk = fStatus(l);
   if (stOn.length && !F.st[sk]) return false;
-  // price range: each status row has its own slider; with no status picked the Active one applies
-  const row = stOn.length ? ROW_OF[sk] : ROW_OF.Active;
-  const lo = F[row[3]], hi = F[row[4]];
-  if (l.price < lo * 50000 || (hi < 100 && l.price > hi * 50000)) return false;
+  if (F.priceMin != null && l.price < F.priceMin) return false;
+  if (F.priceMax != null && l.price > F.priceMax) return false;
   const tag = F.tg[sk];
   if (tag) {
     const n = Number(tag.replace(/[^0-9]/g, ""));
@@ -107,6 +105,10 @@ export function homeOk(l: Listing, F: Filters): boolean {
   return true;
 }
 
+export const priceLabel = (F: Filters) => F.priceMin == null ? (F.priceMax == null ? "Any price" : "Up to " + money(F.priceMax)) : F.priceMax == null ? money(F.priceMin) + "+" : money(F.priceMin) + "–" + money(F.priceMax);
+// Presets for the min / max fields (typing any other figure works too).
+export const PRICE_PRESETS = [250e3, 500e3, 750e3, 1e6, 1.25e6, 1.5e6, 2e6, 2.5e6, 3e6, 4e6, 5e6, 7.5e6, 10e6];
+
 export const money = (v: number) => v >= 1e6 ? "$" + String(+(v / 1e6).toFixed(2)) + "M" : "$" + Math.round(v / 1000) + "K";
 
 export type DimKey = "roi" | "ub" | "price" | "status" | "drops" | "types" | "beds" | "baths" | "size" | "lot" | "styles" | "feats";
@@ -122,14 +124,14 @@ export function fDims(F: Filters, drops = 0): Record<DimKey, Dim> {
   const stOn = onKeys(F.st), tOn = onKeys(F.types);
   const stNonDef = stOn.length > 0;
   const stOrd: string[] = [...stOn.filter(x => x !== "Active"), ...stOn.filter(x => x === "Active")];
-  const priced = F.pLo > 0 || F.pHi < 100;
-  const pLabel = F.pLo === 0 ? "Under " + money(F.pHi * 50000) : F.pHi === 100 ? money(F.pLo * 50000) + "+" : money(F.pLo * 50000) + "–" + money(F.pHi * 50000);
+  const priced = F.priceMin != null || F.priceMax != null;
+  const pLabel = priceLabel(F);
   const sz = (v: number) => (v * 100).toLocaleString();
   return {
     roi: { on: F.roi > 0, label: "ROI " + F.roi + "%+", clear: { roi: 0 } },
     ub: { on: (F.ub || 0) > 0, label: "Build potential " + F.ub + "%+", clear: { ub: 0 } },
-    price: { on: priced, label: pLabel, clear: { pLo: 0, pHi: 100 } },
-    status: { on: stNonDef || priced, label: multi(stOrd, "Any status") + (priced ? ": " + pLabel : ""), clear: { st: {}, pLo: 0, pHi: 100 } },
+    price: { on: priced, label: pLabel, clear: { priceMin: null, priceMax: null } },
+    status: { on: stNonDef || priced, label: multi(stOrd, "Any status") + (priced ? ": " + pLabel : ""), clear: { st: {}, priceMin: null, priceMax: null } },
     drops: { on: F.drops, label: "Price drops · " + drops, clear: { drops: false } },
     types: { on: tOn.length > 0, label: multi(tOn, "Any type"), clear: { types: d.types } },
     beds: { on: F.bedMin > 0 || F.bedMax > 0, label: range(F.bedMin, F.bedMax, "bd"), clear: { bedMin: 0, bedMax: 0 } },

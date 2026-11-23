@@ -12,8 +12,9 @@ import { css } from "@/lib/css";
 import { Listing } from "@/lib/fake";
 import {
   DimKey, F_FEATS, F_STYLES, F_TYPES, Filters, LOT_STEPS, RangeKey, ROOM_STEPS, ST_ROWS,
-  fDef, fDims, homeOk, toggleStatus,
+  PRICE_PRESETS, fDef, fDims, homeOk, migrateF, toggleStatus,
 } from "@/lib/filters";
+import { statusStyle } from "@/lib/status";
 
 type Patch = Partial<Filters> | ((g: Filters) => Partial<Filters>);
 type SetG = (p: Patch) => void;
@@ -24,8 +25,17 @@ const clone = (F: Filters): Filters => JSON.parse(JSON.stringify(F));
 
 // ---------- state ----------
 
+// The search's filters survive a reload (agent feedback: "filters were gone after saving /
+// reloading"), in sessionStorage like the rest of the demo state.
+const F_KEY = "bz-filters";
 export function useFilterState() {
   const [f, setFRaw] = useState<Filters>(fDef);
+  const restored = useRef(false);
+  useEffect(() => {
+    try { const s = JSON.parse(sessionStorage.getItem(F_KEY) || "null"); if (s) setFRaw(migrateF({ ...fDef(), ...s })); } catch {}
+    restored.current = true;
+  }, []);
+  useEffect(() => { if (restored.current) try { sessionStorage.setItem(F_KEY, JSON.stringify(f)); } catch {} }, [f]);
   const [fd, setFdRaw] = useState<Filters | null>(null);
   const [dd, setDd] = useState<{ key: DdKey; x: number; y: number } | null>(null);
   const [panelOut, setPanelOut] = useState(false);
@@ -75,7 +85,6 @@ function dragRange(setG: SetG, kLo: RangeKey, kHi: RangeKey, which: "lo" | "hi",
   mv(e);
 }
 
-const money = (lo: boolean) => (v: number) => lo ? (v === 0 ? "$ No min" : "$" + (v * 50000).toLocaleString()) : (v === 100 ? "$ No max" : "$" + (v * 50000).toLocaleString());
 const sqft = (lo: boolean) => (v: number) => lo ? (v === 0 ? "No min" : (v * 100).toLocaleString()) : (v === 100 ? "No max" : (v * 100).toLocaleString());
 
 // Grey slider with left-aligned value boxes (Budget, Home size).
@@ -99,60 +108,114 @@ function PlainSlider({ G, setG, kLo, kHi, fmt, gap }: { G: Filters; setG: SetG; 
   );
 }
 
-// Status rows (`_stRows`): a checkbox card per status; when on it shows a
-// price slider with dots, centred value boxes and DOM / "within" tags.
-function StatusRows({ G, setG, toast }: { G: Filters; setG: SetG; toast: (t: Toast | null) => void }) {
+// Status & price (agent feedback, 23 Nov). Statuses are equal multi-select tiles: Active,
+// Pending and Sold side by side, Expired and Withdrawn under them; any mix is allowed and
+// nothing is ever unticked for the agent. Each picked status keeps its time tag (DOM / Sold
+// within…). One price range below applies to all of them and never hides.
+function StatusRows({ G, setG }: { G: Filters; setG: SetG; toast?: (t: Toast | null) => void }) {
   const tg = G.tg || {};
-  const vbox = css("flex:1;min-width:0;display:flex;align-items:center;justify-content:center;height:40px;padding:0 12px;border-radius:8px;background:rgba(18,18,18,.06);box-shadow:inset 0 0 0 .25px rgb(168,163,162),0 0 0 .25px rgb(168,163,162);font:400 15px/20px var(--font-sans);color:rgb(98,90,89)");
+  const tile = (on: boolean) => css("position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:10px 12px;border:none;border-radius:14px;cursor:pointer;text-align:left;transition:background .16s,box-shadow .16s;"
+    + (on ? "background:rgba(13,12,12,.05);box-shadow:inset 0 0 0 1.5px rgb(17,16,16)" : "background:rgb(253,252,252);box-shadow:inset 0 0 0 1px rgba(13,12,12,.14)"));
+  const on = ST_ROWS.filter(r => G.st[r[1]]);
   return (
-    <div style={css("display:flex;flex-direction:column;gap:8px")}>
-      {ST_ROWS.map(([label, key, sub, kLo, kHi, tgLabel, opts]) => {
-        const on = !!G.st[key];
-        const lo = G[kLo], hi = G[kHi];
-        return (
-          <div key={key} style={css("display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:20px;background:rgb(253,252,252);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.16)")}>
-            <button onClick={() => { const r = toggleStatus(G.st, key); setG({ st: r.st }); toast(r.toast); }} style={css("display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:0;border:none;background:none;cursor:pointer;text-align:left")}>
-              <span style={css("flex:1;min-width:0;display:flex;flex-direction:column;gap:4px")}>
-                <span style={css("font:400 14px/1.26 var(--font-sans);color:rgb(18,18,18)")}>{label}</span>
-                <span style={css("font:400 12px/1.26 var(--font-sans);letter-spacing:.25px;color:rgb(73,67,65)")}>{sub}</span>
+    <div style={css("display:flex;flex-direction:column;gap:14px")}>
+      <div style={css("display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px")}>
+        {ST_ROWS.map(([label, key], i) => {
+          const sel = !!G.st[key], st = statusStyle(key === "Recently sold" ? "Sold" : key);
+          return (
+            <button key={key} role="checkbox" aria-checked={sel} onClick={() => setG(g => ({ st: toggleStatus(g.st, key).st }))} style={{ ...tile(sel), gridColumn: i < 3 ? "span 2" : "span 3" }}>
+              <span style={css("display:flex;align-items:center;gap:6px;font:700 14px/18px var(--font-sans);color:rgb(18,18,18)")}>
+                <span style={{ width: 8, height: 8, borderRadius: 9999, background: st.c }} />{label}
               </span>
-              <span style={css("flex:none;width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;transition:background .16s;" + (on ? "background:rgb(13,87,57)" : "background:rgb(253,252,252);box-shadow:inset 0 0 0 1.5px rgba(13,12,12,.35)"))}>
-                {on && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgb(255,255,255)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+              <span style={css("position:absolute;right:10px;top:10px;width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;" + (sel ? "background:rgb(18,18,18)" : "box-shadow:inset 0 0 0 1.5px rgba(13,12,12,.3)"))}>
+                {sel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgb(255,255,255)" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
               </span>
             </button>
-            {on && (
-              <div style={css("display:flex;flex-direction:column;gap:10px;animation:panelDrop .22s cubic-bezier(.2,.8,.2,1) both")}>
-                <div style={css("position:relative;height:48px;touch-action:none")}>
-                  <div style={css("position:absolute;left:8px;right:8px;top:20px;height:8px;border-radius:9999px;background:rgb(214,210,208)")} />
-                  <div style={css("position:absolute;left:" + at(lo) + ";width:calc((100% - 16px) * " + ((hi - lo) / 100) + ");top:20px;height:8px;border-radius:4px;background:rgb(18,18,18)")} />
-                  <div style={css("position:absolute;left:22px;right:22px;top:40px;display:flex;justify-content:space-between;pointer-events:none")}>
-                    {Array.from({ length: 9 }, (_, i) => <span key={i} style={css("width:4px;height:4px;border-radius:9999px;background:rgb(190,184,181)")} />)}
-                  </div>
-                  <span onPointerDown={e => dragRange(setG, kLo, kHi, "lo", e)} style={thumb(lo)} />
-                  <span onPointerDown={e => dragRange(setG, kLo, kHi, "hi", e)} style={thumb(hi)} />
-                </div>
-                <div style={css("display:flex;align-items:center;gap:12px")}>
-                  <span style={vbox}>{money(true)(lo)}</span>
-                  <span style={css("font:400 15px/20px var(--font-sans);color:rgb(17,16,16)")}>–</span>
-                  <span style={vbox}>{money(false)(hi)}</span>
-                </div>
-                <div style={css("display:flex;flex-direction:column;gap:8px;padding-top:6px")}>
-                  <span style={css("font:700 12px/16px var(--font-sans);letter-spacing:.25px;color:rgb(18,18,18)")}>{tgLabel}</span>
-                  <div style={css("display:flex;flex-wrap:wrap;gap:6px")}>
-                    {opts.map(o => {
-                      const sel = tg[key] === o;
-                      return (
-                        <button key={o} onClick={() => setG(g => ({ tg: { ...g.tg, [key]: g.tg[key] === o ? null : o } }))} style={css("height:32px;padding:0 12px;border:none;border-radius:9999px;cursor:pointer;white-space:nowrap;font:400 13px/16px var(--font-sans);transition:background .16s,color .16s,box-shadow .16s;"
-                          + (sel ? "background:rgb(17,16,16);color:rgb(249,249,249)" : "background:rgb(253,252,252);color:rgb(18,18,18);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.28)"))}>{o}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
+          );
+        })}
+      </div>
+      <span style={css("margin-top:-6px;font:400 12px/16px var(--font-sans);color:rgb(98,90,89)")}>{on.length ? `Showing ${on.map(r => r[0].toLowerCase()).join(", ").replace(/, ([^,]*)$/, " and $1")} homes.` : "None ticked: every status shows."}</span>
+      {on.map(([label, key, , , , tgLabel, opts]) => (
+        <div key={key} style={css("display:flex;flex-direction:column;gap:8px;animation:panelDrop .22s cubic-bezier(.2,.8,.2,1) both")}>
+          <span style={css("font:700 12px/16px var(--font-sans);letter-spacing:.25px;color:rgb(18,18,18)")}>{label} · {tgLabel}</span>
+          <div style={css("display:flex;flex-wrap:wrap;gap:6px")}>
+            {opts.map(o => {
+              const sel = tg[key] === o;
+              return (
+                <button key={o} onClick={() => setG(g => ({ tg: { ...g.tg, [key]: g.tg[key] === o ? null : o } }))} style={css("height:30px;padding:0 11px;border:none;border-radius:9999px;cursor:pointer;white-space:nowrap;font:400 13px/16px var(--font-sans);transition:background .16s,color .16s,box-shadow .16s;"
+                  + (sel ? "background:rgb(17,16,16);color:rgb(249,249,249)" : "background:rgb(253,252,252);color:rgb(18,18,18);box-shadow:inset 0 0 0 .5px rgba(18,18,18,.28)"))}>{o}</button>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      ))}
+      <div style={css("display:flex;flex-direction:column;gap:8px;padding-top:4px")}>
+        <span style={css("font:700 12px/16px var(--font-sans);letter-spacing:.25px;color:rgb(18,18,18)")}>Price</span>
+        <PriceRange G={G} setG={setG} />
+      </div>
+    </div>
+  );
+}
+
+// "$1.25m", "750k", "1,250,000" → dollars. Empty → null (no limit).
+export function parsePrice(t: string): number | null {
+  const s = t.trim().toLowerCase().replace(/[$,\s]/g, "");
+  if (!s) return null;
+  const m = s.match(/^(\d*\.?\d+)(k|m)?$/);
+  if (!m) return NaN;
+  return Math.round(Number(m[1]) * (m[2] === "m" ? 1e6 : m[2] === "k" ? 1e3 : 1));
+}
+const fmtPrice = (v: number | null | undefined) => v == null ? "" : "$" + v.toLocaleString("en-US");
+
+// Min / max price, Zillow / Redfin style: type any figure or pick a preset; each side
+// clears on its own. Nothing is clamped while typing; a max under the min is pointed
+// out, not corrected.
+export function PriceRange({ G, setG }: { G: Pick<Filters, "priceMin" | "priceMax">; setG: (p: Partial<Filters>) => void }) {
+  const bad = G.priceMin != null && G.priceMax != null && G.priceMax < G.priceMin;
+  return (
+    <div style={css("display:flex;flex-direction:column;gap:6px")}>
+      <div style={css("display:flex;align-items:center;gap:10px")}>
+        <PriceField label="Min" value={G.priceMin ?? null} onSet={v => setG({ priceMin: v })} />
+        <span style={css("font:400 15px/20px var(--font-sans);color:rgb(17,16,16)")}>–</span>
+        <PriceField label="Max" value={G.priceMax ?? null} onSet={v => setG({ priceMax: v })} />
+      </div>
+      {bad && <span style={css("font:400 12px/16px var(--font-sans);color:rgb(195,65,55)")}>The max is below the min, so nothing will match.</span>}
+    </div>
+  );
+}
+
+function PriceField({ label, value, onSet }: { label: string; value: number | null; onSet: (v: number | null) => void }) {
+  const [txt, setTxt] = useState(fmtPrice(value));
+  const [focus, setFocus] = useState(false);
+  const [err, setErr] = useState(false);
+  // Follows the filter while not being edited (a clear, a reset, a saved search opening).
+  useEffect(() => { if (!focus) setTxt(fmtPrice(value)); }, [value, focus]);
+  const commit = (t = txt) => {
+    const v = parsePrice(t);
+    if (Number.isNaN(v)) { setErr(true); return; }
+    setErr(false); onSet(v); setTxt(fmtPrice(v));
+  };
+  const box = useRef<HTMLDivElement>(null);
+  return (
+    <div ref={box} style={css("position:relative;flex:1;min-width:0")}
+      onBlur={e => { if (!box.current?.contains(e.relatedTarget as Node)) { setFocus(false); commit(); } }}>
+      <span style={css("display:flex;align-items:center;gap:4px;height:40px;padding:0 6px 0 12px;border-radius:8px;background:rgb(255,255,255);box-shadow:inset 0 0 0 " + (focus ? "1.5px rgb(18,18,18)" : err ? "1px rgb(195,65,55)" : "1px rgba(18,18,18,.2)"))}>
+        <input value={txt} inputMode="decimal" aria-label={label + " price"} placeholder={"No " + label.toLowerCase()}
+          onFocus={() => setFocus(true)} onChange={e => { setTxt(e.target.value); setErr(false); }}
+          onKeyDown={e => { if (e.key === "Enter") { commit(); (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") { setTxt(fmtPrice(value)); (e.target as HTMLInputElement).blur(); } }}
+          style={css("flex:1;min-width:0;border:none;outline:none;background:none;font:400 15px/20px var(--font-sans);color:rgb(18,18,18)")} />
+        {txt && <button title={"Clear " + label.toLowerCase()} onMouseDown={e => e.preventDefault()} onClick={() => { setTxt(""); setErr(false); onSet(null); }} style={css("flex:none;width:24px;height:24px;border:none;border-radius:9999px;background:rgba(13,12,12,.06);cursor:pointer;display:flex;align-items:center;justify-content:center")}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgb(18,18,18)" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>}
+      </span>
+      {focus && (
+        <div style={css("position:absolute;left:0;right:0;top:44px;z-index:5;max-height:220px;overflow-y:auto;padding:4px;border-radius:12px;background:rgb(255,255,255);box-shadow:0 12px 28px rgba(30,18,12,.16),0 0 0 .5px rgba(13,12,12,.12)")}>
+          <button tabIndex={-1} onMouseDown={e => e.preventDefault()} onClick={() => { setTxt(""); onSet(null); (document.activeElement as HTMLElement)?.blur(); }} className="fb-opt" style={css("display:block;width:100%;height:34px;padding:0 10px;border:none;border-radius:8px;background:none;text-align:left;cursor:pointer;font:400 14px/18px var(--font-sans);color:rgb(98,90,89)")}>No {label.toLowerCase()}</button>
+          {PRICE_PRESETS.map(v => (
+            <button key={v} tabIndex={-1} onMouseDown={e => e.preventDefault()} onClick={() => { onSet(v); setTxt(fmtPrice(v)); (document.activeElement as HTMLElement)?.blur(); }} className="fb-opt" style={css("display:block;width:100%;height:34px;padding:0 10px;border:none;border-radius:8px;text-align:left;cursor:pointer;font:400 14px/18px var(--font-sans);color:rgb(18,18,18);background:" + (value === v ? "rgb(238,236,235)" : "none"))}>{fmtPrice(v)}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -396,7 +459,7 @@ export function FilterDropdown({ fs, listings, count, noun }: { fs: FilterState;
           {key === "status" && <StatusRows G={F} setG={setF} toast={toast} />}
           {(key === "price" || key === "size") && (
             <div style={css("display:flex;flex-direction:column;gap:8px")}>
-              {key === "size" ? <PlainSlider G={F} setG={setF} kLo="szLo" kHi="szHi" fmt={sqft} gap={10} /> : <PlainSlider G={F} setG={setF} kLo="pLo" kHi="pHi" fmt={money} gap={10} />}
+              {key === "size" ? <PlainSlider G={F} setG={setF} kLo="szLo" kHi="szHi" fmt={sqft} gap={10} /> : <PriceRange G={F} setG={setF} />}
             </div>
           )}
           {key === "styles" && <PChips G={F} setG={setF} k="styles" list={F_STYLES} />}

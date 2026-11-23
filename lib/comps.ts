@@ -43,8 +43,8 @@ function lotPasses(lt: Lot, i: number, F: Filters): boolean {
   if (stOn.length && (lt.st === "S" ? !F.st["Recently sold"] : !F.st.Active && !F.st.Pending)) return false;
   const tag = lt.st === "S" ? F.tg["Recently sold"] : null;
   if (tag && (lt.sm || 12) > Number(tag.replace(/[^0-9]/g, ""))) return false;
-  const [lo, hi] = stOn.length && lt.st === "S" ? [F.sdLo, F.sdHi] : [F.pLo, F.pHi];
-  if (lt.price < lo * 50000 || (hi < 100 && lt.price > hi * 50000)) return false;
+  if (F.priceMin != null && lt.price < F.priceMin) return false;
+  if (F.priceMax != null && lt.price > F.priceMax) return false;
   if (lt.roi < F.roi || lt.ub < (F.ub || 0)) return false;
   if (lt.beds < F.bedMin || (F.bedMax && lt.beds > F.bedMax)) return false;
   if (lt.baths < F.bathMin || (F.bathMax && lt.baths > F.bathMax)) return false;
