@@ -33,6 +33,8 @@ export type BillingState = {
   store?: "apple";
   /** The holiday 50%-off offer is live (PRICING.holiday; Dev menu toggles it). */
   holiday?: boolean;
+  /** Which paywall the offer opens (Dev menu): the web two-panel sheet, or the mobile paywall adapted to web. */
+  paywallStyle?: "web" | "mobile";
   /** State version: 2 = locked tiles open the paywall only (17 Nov review). */
   v?: number;
 };
@@ -83,7 +85,7 @@ export const billing = {
   apply(next: Partial<BillingState>) { set({ ...next, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [] }); },
   preset(id: string) {
     const p = PRESETS.find(x => x.id === id); if (!p) return;
-    set({ ...BASE, store: undefined, holiday: undefined, unlimited: state.unlimited, lockStyle: state.lockStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
+    set({ ...BASE, store: undefined, holiday: undefined, unlimited: state.unlimited, lockStyle: state.lockStyle, paywallStyle: state.paywallStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
   },
   /** Mock purchase: adds the SKU's credits. */
   buy(id: string) {
@@ -154,7 +156,7 @@ export function useEntitlements() {
 // sheet without prop drilling.
 export type PaywallReq =
   | { kind: "upsell"; feature: Metered; then?: () => void }
-  | { kind: "offer"; feature?: Feature; kicker?: string; then?: () => void }
+  | { kind: "offer"; feature?: Feature; kicker?: string; then?: () => void; /** Dev menu preview: the trial version, nothing starts. */ preview?: boolean }
   | { kind: "appstore" }
   /** Trial days 11–13 (handoff, active): "Keep your reports and saved areas". */
   | { kind: "keep"; built: [string, number][] }

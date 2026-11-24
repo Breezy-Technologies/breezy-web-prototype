@@ -88,3 +88,29 @@ export const sku = (id: string) => PRICING.skus.find(s => s.id === id)!;
 export const money = (m: Money, period?: string) => `$${m.amount.toFixed(2)}${period ? `/${period}` : ""}`;
 /** Saving of a pack's per-report price against its single SKU, in whole percent. */
 export const saving = (s: Sku) => (s.vs && s.each ? Math.round((1 - s.each.amount / sku(s.vs).price.amount) * 100) : 0);
+
+/** The mobile paywall, adapted to web (24 Nov; Dev menu → Paywall: Mobile). The iPhone's three
+ *  screens: "How your free trial works" → the holiday gift → "One step away from closing more"
+ *  with Essential / Elite and Yearly / Monthly. Essential's figures are the mobile design's;
+ *  **Elite's are placeholders** until the mobile team shares them. `holiday` prices apply while
+ *  `BillingState.holiday` is on (the gift says "until March 31st"). */
+export const MOBILE_PAYWALL = {
+  press: ["HOUSINGWIRE", "Los Angeles Times", "inman", "Forbes"],
+  giftUntil: "March 31st",
+  giftShort: "until March",
+  plans: {
+    essential: {
+      name: "Essential",
+      features: [["Comps", "15/mo"], ["Underbuilt Radar", "5/mo"], ["Branded reports", "Breezy Theme"], ["AI Note Taker", "Unlimited"], ["AI Assistant", "Unlimited"], ["Pipeline", "Unlimited"]],
+      yearly: { mo: 32, total: 375, holiday: { mo: 16, total: 187.5 } },
+      monthly: { mo: 39.9, holiday: { mo: 19.95 } },
+    },
+    elite: {
+      name: "Elite",
+      features: [["Comps", "Unlimited"], ["Underbuilt Radar", "25/mo"], ["Branded reports", "Your brand"], ["AI Note Taker", "Unlimited"], ["AI Assistant", "Unlimited"], ["Pipeline", "Unlimited"]],
+      yearly: { mo: 64, total: 750, holiday: { mo: 32, total: 375 } },
+      monthly: { mo: 79.9, holiday: { mo: 39.95 } },
+    },
+  },
+} as const;
+export type MobileTier = keyof typeof MOBILE_PAYWALL.plans;
