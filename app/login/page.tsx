@@ -13,6 +13,7 @@ import { handoffProfile } from "@/lib/handoff/profile";
 import { useApp } from "@/components/AppState";
 import { Mark } from "@/components/handoff/BreezyEmail";
 import { useMapCtx } from "@/components/map/MapProvider";
+import { findPlace } from "@/lib/places";
 import mapboxgl from "mapbox-gl";
 
 type Mode = "qr" | "email" | "sent" | "code" | "approved";
@@ -69,76 +70,81 @@ export default function LoginPage() {
 
   const approved = mode === "approved";
   return (
-    <main className="bz-login" style={{ position: "fixed", inset: 0, zIndex: 100, overflowY: "auto", background: live ? "transparent" : "rgb(246,239,236)" }}>
+    <main className="bz-login" style={{ position: "fixed", inset: 0, zIndex: 100, background: live ? "transparent" : "rgb(246,239,236)", pointerEvents: "none" }}>
       <style>{LOGIN_CSS}</style>
       <Backdrop done={approved} live={live} />
-      {/* Logo lockup (Figma "Web experience 1.9", 5062:92652) */}
-      <header style={{ position: "absolute", left: 32, top: 28, zIndex: 2, display: "flex", alignItems: "center", gap: 8 }}>
-        <Mark size={30} color={INK} />
-        <span role="img" aria-label="Breezy" style={{ width: 60, height: 22, background: INK, WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat" }} />
-      </header>
 
-      <div className="bz-cols" style={{ position: "relative", zIndex: 1, minHeight: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "center", padding: "96px 32px 48px", boxSizing: "border-box" }}>
-        {/* Left: welcome + the other ways in */}
-        <section style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 28 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, maxWidth: 420, animation: "riseIn .5s cubic-bezier(.2,.8,.2,1) both" }}>
-            <h1 style={{ margin: 0, font: "300 48px/1.15 var(--font-sans)", letterSpacing: "-1.2px", color: INK, textWrap: "balance" } as React.CSSProperties}>
-              {approved ? <>Welcome back,<br />{first}</> : <>Welcome back<br />to Breezy</>}
-            </h1>
-            <p style={{ margin: 0, font: "400 17px/24px var(--font-sans)", color: INK, textWrap: "pretty" } as React.CSSProperties}>
-              {approved ? "Opening Silver Lake, with the homes you saved on your iPhone…" : "Your desk workspace for comps, ROI and reports. Log in with the iPhone you signed up on, no password."}
-            </p>
-          </div>
-          {!approved && (mode === "qr" ? (
-            <div style={{ width: 392, maxWidth: "100%", display: "flex", flexDirection: "column", gap: 10, animation: "riseIn .5s .08s cubic-bezier(.2,.8,.2,1) both" }}>
-              <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED, margin: "0 0 4px" }}>No phone nearby?</span>
-              <button onClick={() => setMode("email")} className="btn-dark" style={{ height: 44 }}><i className="ph-bold ph-envelope-simple" />Email me a link</button>
-              <button onClick={() => setMode("code")} className="btn-dark" style={{ height: 44 }}><i className="ph-bold ph-password" />Use a 6-digit code</button>
-              <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 10, font: "400 14px/20px var(--font-sans)", color: INK, cursor: "pointer", userSelect: "none" }}>
-                <input type="checkbox" checked={stay} onChange={e => setStay(e.target.checked)} style={{ width: 18, height: 18, accentColor: INK, margin: 0 }} />
-                Stay logged in on this browser
-              </label>
-              <span style={{ marginTop: 6, font: "400 15px/22px var(--font-sans)", color: INK }}>New to Breezy? <b>Get the app on your iPhone</b></span>
-            </div>
-          ) : (
-            <div style={{ width: 392, maxWidth: "100%", display: "flex", justifyContent: "center", textAlign: "left" }}>
-              {mode === "email" && <EmailForm onBack={() => setMode("qr")} onSent={(email, token) => { setSent({ email, token }); setMode("sent"); }} />}
-              {mode === "sent" && sent && <Sent {...sent} onBack={() => setMode("qr")} onRetry={() => setMode("email")} />}
-              {mode === "code" && <CodeForm onBack={() => setMode("qr")} onOk={who => succeed(who, "code")} />}
-            </div>
-          ))}
-        </section>
+      {/* On the map: where the phone left off (like the onboarding's step pill) */}
+      <div className="bz-maptag" style={{ position: "absolute", top: 32, zIndex: 1, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 10, height: 44, padding: "0 18px 0 12px", borderRadius: 9999, background: "rgba(253,252,252,.96)", boxShadow: "0 6px 20px rgba(40,26,20,.14)", font: "400 14px/20px var(--font-sans)", color: INK, whiteSpace: "nowrap", animation: "riseIn .5s .3s cubic-bezier(.2,.8,.2,1) both" }}>
+        <i className="ph-fill ph-device-mobile" style={{ fontSize: 18, color: CLAY }} />
+        <span><b>Silver Lake</b> · picked up from your iPhone</span>
+      </div>
 
-        {/* Right: the code, in the radar's rings */}
-        <section style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 640 }}>
-          <Rings done={approved} />
-          <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 18, textAlign: "center", animation: "riseIn .55s .1s cubic-bezier(.2,.8,.2,1) both" }}>
+      {/* The floating panel (the onboarding's card): welcome, the code, the other ways in */}
+      <section className="bz-panel" aria-label="Log in to Breezy" style={{ position: "absolute", left: 32, top: 32, bottom: 32, zIndex: 2, width: PANEL_W, display: "flex", flexDirection: "column", borderRadius: 32, background: PAPER, boxShadow: "0 24px 64px rgba(40,26,20,.18), 0 0 0 1px rgba(18,18,18,.04)", overflow: "hidden", pointerEvents: "auto", animation: "riseIn .5s cubic-bezier(.2,.8,.2,1) both" }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", padding: "32px 40px 24px" }}>
+          <header style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Mark size={28} color={INK} />
+            <span role="img" aria-label="Breezy" style={{ width: 56, height: 21, background: INK, WebkitMask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat", mask: "url(/brand/splash-wordmark.svg) left center/contain no-repeat" }} />
+          </header>
+          <h1 style={{ margin: "28px 0 8px", font: "300 38px/1.12 var(--font-sans)", letterSpacing: "-1px", color: INK, textWrap: "balance" } as React.CSSProperties}>
+            {approved ? `Welcome back, ${first}` : "Welcome back to Breezy"}
+          </h1>
+          <p style={{ margin: 0, font: "400 15px/22px var(--font-sans)", color: MUTED, textWrap: "pretty" } as React.CSSProperties}>
+            {approved ? "Opening Silver Lake, with the homes you saved on your iPhone…" : "Your desk workspace for comps, ROI and reports. Log in with the iPhone you signed up on, no password."}
+          </p>
+
+          {/* The stage: the code in the radar's rings, or the email / code form */}
+          <div style={{ position: "relative", flex: 1, minHeight: 330, margin: "24px 0 0", borderRadius: 24, background: "rgb(243,239,237)", overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: "28px 24px", textAlign: "center" }}>
+            {(mode === "qr" || approved) && <Rings done={approved} />}
             {approved ? (
-              <span role="status" className="bz-approve" style={{ width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: "rgba(241,233,230,.92)", display: "flex", alignItems: "center", justifyContent: "center", animation: "riseIn .4s cubic-bezier(.2,.8,.2,1) both" }}>
+              <span role="status" className="bz-approve" style={{ position: "relative", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: PAPER, display: "flex", alignItems: "center", justifyContent: "center", animation: "riseIn .4s cubic-bezier(.2,.8,.2,1) both" }}>
                 <span style={{ width: 88, height: 88, borderRadius: 9999, background: "rgb(49,140,96)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph-bold ph-check" style={{ fontSize: 44, color: "#fff" }} /></span>
               </span>
             ) : mode === "qr" ? <QrCard svg={qr.svg} left={qr.left} ttl={qr.ttl} k={qr.token} /> : (
-              <span style={{ width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: "rgba(241,233,230,.85)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <i className={`ph-bold ph-${mode === "code" ? "password" : "envelope-simple-open"}`} style={{ fontSize: 56, color: CLAY }} />
-              </span>
+              <div style={{ position: "relative", width: "100%", display: "flex", justifyContent: "center", textAlign: "left" }}>
+                {mode === "email" && <EmailForm onBack={() => setMode("qr")} onSent={(email, token) => { setSent({ email, token }); setMode("sent"); }} />}
+                {mode === "sent" && sent && <Sent {...sent} onBack={() => setMode("qr")} onRetry={() => setMode("email")} />}
+                {mode === "code" && <CodeForm onBack={() => setMode("qr")} onOk={who => succeed(who, "code")} />}
+              </div>
             )}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 340, padding: "12px 18px", borderRadius: 18, background: "rgba(253,251,250,.84)", backdropFilter: "blur(12px)", boxShadow: "0 8px 24px rgba(63,40,32,.12)" }}>
-              <span style={{ font: "400 18px/24px var(--font-sans)", color: INK }}>
-                {approved ? (by === EMAIL_LINK ? "Logged in with your email link" : `Approved on ${by}`) : mode === "qr" ? "Scan with your iPhone" : mode === "code" ? "Get the code on your iPhone" : "Check the email on your account"}
-              </span>
-              <span aria-live="polite" style={{ font: "400 14px/20px var(--font-sans)", color: declined && mode === "qr" ? CLAY : INK }}>
-                {approved ? "Your workspace is ready" : mode === "qr"
-                  ? (declined ? "Request declined on your iPhone. Here's a new code." : "Open Breezy, point the camera at this code and confirm with Face ID. It renews every minute.")
-                  : mode === "code" ? "In the app: Profile → Log in on a computer → Use a code." : "The link works once, for 15 minutes."}
-              </span>
-            </div>
+            {(mode === "qr" || approved) && (
+              <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4, maxWidth: 340 }}>
+                <span style={{ font: "700 17px/24px var(--font-sans)", color: INK }}>
+                  {approved ? (by === EMAIL_LINK ? "Logged in with your email link" : `Approved on ${by}`) : "Scan with your iPhone"}
+                </span>
+                <span aria-live="polite" style={{ font: "400 14px/20px var(--font-sans)", color: declined && !approved ? CLAY : MUTED, textWrap: "pretty" } as React.CSSProperties}>
+                  {approved ? "Your workspace is ready" : declined ? "Request declined on your iPhone. Here's a new code." : "Open Breezy, point the camera at the code and confirm with Face ID. It renews every minute."}
+                </span>
+              </div>
+            )}
           </div>
-        </section>
-      </div>
+        </div>
+
+        {/* Footer, pinned like the onboarding card's: the other ways in */}
+        {!approved && (
+          <footer style={{ flex: "none", borderTop: "1px solid rgba(18,18,18,.08)", padding: "18px 40px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+            {mode === "qr" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED, marginRight: 4 }}>No phone nearby?</span>
+                <button onClick={() => setMode("email")} className="btn-soft" style={{ height: 40, fontSize: 14 }}><i className="ph-bold ph-envelope-simple" />Email me a link</button>
+                <button onClick={() => setMode("code")} className="btn-soft" style={{ height: 40, fontSize: 14 }}><i className="ph-bold ph-password" />Use a code</button>
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, font: "400 14px/20px var(--font-sans)", color: INK, cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={stay} onChange={e => setStay(e.target.checked)} style={{ width: 18, height: 18, accentColor: INK, margin: 0 }} />
+                Stay logged in on this browser
+              </label>
+              <span style={{ font: "400 14px/20px var(--font-sans)", color: MUTED }}>New to Breezy? <b style={{ color: INK }}>Get the iPhone app</b></span>
+            </div>
+          </footer>
+        )}
+      </section>
 
       {/* Demo: approve from a simulated iPhone on this laptop (BroadcastChannel), or a real one on the same Wi-Fi in dev. */}
       {!approved && (
-        <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 120, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+        <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 120, pointerEvents: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
           {isLocal && lan && !phone && (
             <span title="Your iPhone must be on the same Wi-Fi" style={{ padding: "6px 12px", borderRadius: 9999, background: "rgba(253,252,252,.9)", boxShadow: "0 2px 8px rgba(40,26,20,.08)", font: "400 12px/16px var(--font-sans)", color: MUTED }}>
               Real iPhone: the QR opens <b style={{ color: INK }}>{lan.replace(/^https?:\/\//, "")}</b>
@@ -150,8 +156,8 @@ export default function LoginPage() {
         </div>
       )}
       {phone && (
-        // Over the left column, so the code stays in view.
-        <aside aria-label="Simulated iPhone" className="bz-sim" style={{ position: "fixed", bottom: 24, zIndex: 119, width: 390, height: "min(760px, calc(100vh - 48px))", borderRadius: 44, background: INK, padding: 10, boxShadow: "0 24px 60px rgba(30,18,12,.35)", animation: "riseIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
+        // Over the map on the right, so the code stays in view.
+        <aside aria-label="Simulated iPhone" className="bz-sim" style={{ position: "fixed", right: 20, bottom: 68, pointerEvents: "auto", zIndex: 119, width: 390, height: "min(760px, calc(100vh - 100px))", borderRadius: 44, background: INK, padding: 10, boxShadow: "0 24px 60px rgba(30,18,12,.35)", animation: "riseIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
           <iframe key={mode === "code" ? "code" : qr.token} title="Breezy on iPhone" src={mode === "code" ? `/link?mode=code&demo=1` : `/link?token=${qr.token}&demo=1`}
             style={{ width: "100%", height: "100%", border: 0, borderRadius: 34, background: PAPER }} />
         </aside>
@@ -160,102 +166,94 @@ export default function LoginPage() {
   );
 }
 
-/* ---------- The backdrop and the rings ----------
-   Figma "Web experience 1.9" (5062:92652): blush paper, the welcome on the left, the QR in
-   concentric rings on the right. Behind it all, full bleed, the Silver Lake map from the phone,
-   washed in blush and drifting slowly, with the signal pins popping in (Ann's activation
-   prototype: teardrop markers + label pills). The rings carry the radar sweep and pulse; on
-   approval the map leans in and the sweep speeds up. */
+/* ---------- The map and the rings ----------
+   24 Nov review: the onboarding's layout (step "What should Breezy look out for?"): one floating
+   panel on the left, the live map full bleed behind it. The map is the shared Mapbox map, flat,
+   framed on Silver Lake (the phone's last area) beside the panel, with the area's inner-glow
+   outline, the ROI heat and the signal pins of Ann's activation prototype (teardrop + label
+   pill). On approval it leans in. Offline, the static Silver Lake image and fixed pins stand in.
+   The radar sweep and pulse rings stay round the code, inside the panel. */
+const PANEL_W = "min(520px, calc(100vw - 32px))";
 const LOGIN_CSS = `
-@keyframes bzScanRing { 0% { transform: scale(1); opacity: .55 } 100% { transform: scale(1.3); opacity: 0 } }
-@keyframes bzPinIn { 0% { opacity: 0; transform: translate(-50%, -100%) translateY(10px) scale(.7) } 70% { opacity: 1; transform: translate(-50%, -100%) scale(1.05) } 100% { opacity: 1; transform: translate(-50%, -100%) scale(1) } }
-@keyframes bzDrift { from { transform: scale(1.06) translate(0, 0) } to { transform: scale(1.06) translate(-1.6%, -1.2%) } }
 @keyframes bzRingPulse { 0% { transform: translate(-50%, -50%) scale(.55); opacity: .5 } 100% { transform: translate(-50%, -50%) scale(1.25); opacity: 0 } }
 @keyframes bzMarkIn { 0% { opacity: 0; transform: translateY(10px) scale(.7) } 70% { opacity: 1; transform: scale(1.05) } 100% { opacity: 1; transform: none } }
+@keyframes bzPinPulse { 0% { transform: scale(.6); opacity: .55 } 100% { transform: scale(2.1); opacity: 0 } }
 @keyframes bzApprove { 0% { box-shadow: 0 0 0 0 rgba(49,140,96,.3) } 100% { box-shadow: 0 0 0 30px rgba(49,140,96,0) } }
 .bz-approve { animation: bzApprove 1.4s ease-out infinite }
-.bz-sim { left: 32px }
-@media (max-width: 960px) { .bz-cols { grid-template-columns: 1fr !important; gap: 24px } .bz-pins { display: none } .bz-sim { left: auto; right: 20px; bottom: 68px } }
+.bz-maptag { left: calc(32px + ${PANEL_W} + (100vw - 32px - ${PANEL_W}) / 2) }
+@media (max-width: 900px) { .bz-maptag, .bz-pins { display: none !important } .bz-panel { left: 16px !important; top: 16px !important; bottom: 16px !important } }
 @media (prefers-reduced-motion: reduce) { .bz-login * { animation-duration: .01ms !important; animation-iteration-count: 1 !important } }
 `;
-// Positions in % of the page, kept out of the two columns' content.
+const pinHtml = (f: string, t: string, delay: number) =>
+  `<div style="display:flex;flex-direction:column;align-items:center;animation:bzMarkIn .55s ${delay}s cubic-bezier(.2,.8,.2,1) both">`
+  + `<span style="position:relative;display:block;width:30px;height:33px"><span style="position:absolute;left:3px;top:1px;width:24px;height:24px;border-radius:9999px;background:rgba(147,89,75,.35);animation:bzPinPulse 2.4s ${delay + 0.6}s ease-out infinite"></span><img src="/pins/${f}.svg" alt="" style="position:relative;width:30px;height:33px;display:block"/></span>`
+  + `<span style="margin-top:2px;height:24px;padding:0 9px;display:flex;align-items:center;border-radius:9999px;background:${PAPER};box-shadow:0 2px 8px rgba(40,26,20,.16);font:700 12px/1 var(--font-sans);color:${INK};white-space:nowrap">${t}</span></div>`;
+// Offline only: positions in % of the page, right of the panel.
 const PINS: { x: number; y: number; f: string; t: string }[] = [
-  { x: 9, y: 22, f: "drop", t: "12% price drop" },
-  { x: 47, y: 13, f: "ub", t: "84% Underbuilt" },
-  { x: 92, y: 18, f: "roi", t: "$1.6m ROI" },
-  { x: 7, y: 78, f: "exp", t: "Expired 4 days ago" },
-  { x: 49, y: 88, f: "wd", t: "Withdrawn 3 days ago" },
-  { x: 93, y: 74, f: "comps", t: "$310k under comps" },
-  { x: 28, y: 92, f: "stale", t: "193 DOM" },
+  { x: 52, y: 24, f: "drop", t: "12% price drop" },
+  { x: 74, y: 16, f: "ub", t: "84% Underbuilt" },
+  { x: 90, y: 34, f: "roi", t: "$1.6m ROI" },
+  { x: 58, y: 62, f: "exp", t: "Expired 4 days ago" },
+  { x: 84, y: 70, f: "comps", t: "$310k under comps" },
+  { x: 66, y: 42, f: "stale", t: "193 DOM" },
+  { x: 72, y: 86, f: "wd", t: "Withdrawn 3 days ago" },
 ];
+// Live: real spots inside the Silver Lake outline.
+const MAP_PINS: { at: [number, number]; f: string; t: string }[] = [
+  { at: [-118.2795, 34.0825], f: "drop", t: "12% price drop" },
+  { at: [-118.2665, 34.1010], f: "ub", t: "84% Underbuilt" },
+  { at: [-118.2610, 34.0930], f: "roi", t: "$1.6m ROI" },
+  { at: [-118.2725, 34.0765], f: "exp", t: "Expired 4 days ago" },
+  { at: [-118.2640, 34.0840], f: "comps", t: "$310k under comps" },
+  { at: [-118.2810, 34.0900], f: "stale", t: "193 DOM" },
+  { at: [-118.2725, 34.0945], f: "wd", t: "Withdrawn 3 days ago" },
+];
+const SL_PLACE = findPlace("sl");
 
-/** The live map, full bleed (23 Nov review: "the map on full bleed in the background"): the
- *  shared Mapbox map from the root layout, on Silver Lake, tilted, ROI heat on, turning slowly,
- *  with the signal pins anchored on it; on approval it flies in. Offline (no token / style
- *  error) the static Silver Lake image stands in. Returns whether the live map is showing. */
-const SL: [number, number] = [-118.2712, 34.0868];
-// Offsets from the centre in degrees, on a ring round the code (the card covers the middle).
-const MAP_PINS: { d: [number, number]; f: string; t: string }[] = [
-  { d: [-0.0112, 0.0058], f: "drop", t: "12% price drop" },
-  { d: [0.0006, 0.0092], f: "ub", t: "84% Underbuilt" },
-  { d: [0.0118, 0.0052], f: "roi", t: "$1.6m ROI" },
-  { d: [-0.0128, -0.0028], f: "exp", t: "Expired 4 days ago" },
-  { d: [0.0132, -0.0034], f: "comps", t: "$310k under comps" },
-  { d: [-0.0068, -0.0086], f: "stale", t: "193 DOM" },
-  { d: [0.0062, -0.0094], f: "wd", t: "Withdrawn 3 days ago" },
-];
 function useLiveBackdrop(done: boolean) {
   const { map, ready, offline, setInset, setHeat, setAreaRings } = useMapCtx();
   const live = !!map && ready && !offline;
   useEffect(() => { setInset({ left: 0, top: 0, radius: 0 }); }, [setInset]);
   useEffect(() => {
     if (!live || !map) return;
-    setHeat("roi"); setAreaRings(null);
-    // Keep Silver Lake in the right half, behind the code; the welcome reads on the wash.
-    const pad = () => ({ left: Math.round(innerWidth * 0.34), right: 0, top: 0, bottom: 0 });
-    map.jumpTo({ center: SL, zoom: 14.1, pitch: 50, bearing: -24, padding: pad() });
+    setHeat("roi"); setAreaRings(SL_PLACE?.rings ?? null);
+    // Silver Lake fills the map beside the panel.
+    const frame = (duration = 0) => {
+      const panel = Math.min(520, innerWidth - 32) + 32;
+      const wide = innerWidth > 900;
+      map.fitBounds([[-118.2875, 34.0725], [-118.2515, 34.1095]], { padding: { left: wide ? panel + 48 : 24, right: 48, top: 96, bottom: 48 }, pitch: 0, bearing: 0, duration });
+    };
+    frame();
     const markers = MAP_PINS.map((p, k) => {
       const el = document.createElement("div");
-      el.style.cssText = "display:flex;flex-direction:column;align-items:center;pointer-events:none";
-      el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;animation:bzMarkIn .55s ${0.6 + k * 0.3}s cubic-bezier(.2,.8,.2,1) both"><img src="/pins/${p.f}.svg" alt="" style="width:30px;height:33px;display:block"/><span style="margin-top:2px;height:24px;padding:0 9px;display:flex;align-items:center;border-radius:9999px;background:${PAPER};box-shadow:0 2px 8px rgba(40,26,20,.16);font:700 12px/1 var(--font-sans);color:${INK};white-space:nowrap">${p.t}</span></div>`;
-      return new mapboxgl.Marker({ element: el, anchor: "bottom", occludedOpacity: 1 } as mapboxgl.MarkerOptions).setLngLat([SL[0] + p.d[0], SL[1] + p.d[1]]).addTo(map);
+      el.style.pointerEvents = "none";
+      el.innerHTML = pinHtml(p.f, p.t, 0.7 + k * 0.28);
+      return new mapboxgl.Marker({ element: el, anchor: "bottom", occludedOpacity: 1 } as mapboxgl.MarkerOptions).setLngLat(p.at).addTo(map);
     });
-    // The slow turn: a few degrees a second, paused while the tab is hidden.
-    let raf = 0, last = performance.now();
-    const spin = (t: number) => { const dt = Math.min(64, t - last); last = t; if (!map.isMoving()) map.setBearing(map.getBearing() + dt * 0.0024); raf = requestAnimationFrame(spin); };
-    raf = requestAnimationFrame(spin);
-    const onResize = () => map.setPadding(pad());
+    const onResize = () => frame();
     addEventListener("resize", onResize);
     return () => {
-      cancelAnimationFrame(raf); removeEventListener("resize", onResize);
+      removeEventListener("resize", onResize);
       markers.forEach(m => m.remove());
+      setAreaRings(null);
       map.jumpTo({ pitch: 0, bearing: 0, padding: { left: 0, right: 0, top: 0, bottom: 0 } });
     };
   }, [live, map]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Approved: the map leans in.
-  useEffect(() => { if (live && map && done) map.easeTo({ zoom: 15.4, pitch: 58, duration: 1800, easing: t => 1 - Math.pow(1 - t, 3) }); }, [live, map, done]);
+  // Approved: the map leans in on Silver Lake.
+  useEffect(() => { if (live && map && done) map.easeTo({ zoom: map.getZoom() + 0.9, pitch: 40, duration: 1600, easing: t => 1 - Math.pow(1 - t, 3) }); }, [live, map, done]);
   return live;
 }
 
 function Backdrop({ done, live }: { done: boolean; live: boolean }) {
+  if (live) return null;
   return (
     <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-      {!live && <div style={{ position: "absolute", inset: "-4%", transform: done ? "scale(1.14)" : undefined, transition: "transform 1.6s cubic-bezier(.2,.8,.2,1)" }}>
-        <div style={{ position: "absolute", inset: 0, background: "url(/map/silverlake.jpg) center/cover", filter: "saturate(.5) sepia(.14)", animation: "bzDrift 40s ease-in-out infinite alternate" }} />
-      </div>}
-      {/* The blush wash: under the welcome only; the map stays clear round the code */}
-      <div style={{ position: "absolute", inset: 0, background: live
-        ? "linear-gradient(90deg,rgba(247,240,237,.9) 0%,rgba(247,240,237,.8) 30%,rgba(247,240,237,.32) 50%,rgba(247,240,237,0) 64%)"
-        : "linear-gradient(90deg,rgba(247,240,237,.93) 0%,rgba(247,240,237,.86) 38%,rgba(243,233,229,.6) 62%,rgba(241,230,226,.52) 100%)" }} />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(248,242,240,.5) 0%,rgba(248,242,240,0) 22%,rgba(236,224,220,0) 78%,rgba(236,224,220,.5) 100%)" }} />
-      {!live && <div className="bz-pins">
+      <div style={{ position: "absolute", inset: "-4%", background: "url(/map/silverlake.jpg) center/cover", filter: "saturate(.6)", transform: done ? "scale(1.12)" : undefined, transition: "transform 1.6s cubic-bezier(.2,.8,.2,1)" }} />
+      <div className="bz-pins">
         {PINS.map((p, k) => (
-          <span key={p.t} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, display: "flex", flexDirection: "column", alignItems: "center", animation: `bzPinIn .55s ${0.5 + k * 0.35}s cubic-bezier(.2,.8,.2,1) both` }}>
-            <img src={`/pins/${p.f}.svg`} alt="" style={{ width: 30, height: 33, display: "block" }} />
-            <span style={{ marginTop: 2, height: 24, padding: "0 9px", display: "flex", alignItems: "center", borderRadius: 9999, background: PAPER, boxShadow: "0 2px 8px rgba(40,26,20,.14)", font: "700 12px/1 var(--font-sans)", color: INK, whiteSpace: "nowrap" }}>{p.t}</span>
-          </span>
+          <span key={p.t} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%,-100%)" }} dangerouslySetInnerHTML={{ __html: pinHtml(p.f, p.t, 0.5 + k * 0.3) }} />
         ))}
-      </div>}
+      </div>
     </div>
   );
 }
@@ -263,14 +261,13 @@ function Backdrop({ done, live }: { done: boolean; live: boolean }) {
 function Rings({ done }: { done: boolean }) {
   const ring = (d: number, bg: string): React.CSSProperties => ({ position: "absolute", left: "50%", top: "50%", width: d, height: d, transform: "translate(-50%,-50%)", borderRadius: 9999, background: bg });
   return (
-    <div aria-hidden style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0 }}>
-      {/* Glass rings over the map: a faint blush fill and a hairline each */}
-      <span style={{ ...ring(640, "radial-gradient(circle, rgba(253,248,246,0) 60%, rgba(253,248,246,.16) 100%)"), boxShadow: "inset 0 0 0 1px rgba(253,252,252,.55)" }} />
-      <span style={{ ...ring(528, "rgba(253,248,246,.12)"), boxShadow: "inset 0 0 0 1px rgba(253,252,252,.6)" }} />
-      <span style={{ ...ring(376, "rgba(253,248,246,.2)"), boxShadow: "inset 0 0 0 1px rgba(253,252,252,.7)", backdropFilter: "blur(2px)" }} />
-      {/* The radar sweep, inside the outer ring */}
-      <span style={{ ...ring(640, "conic-gradient(from 0deg, rgba(147,89,75,0) 0deg, rgba(147,89,75,0) 292deg, rgba(147,89,75,.22) 359deg, rgba(147,89,75,0) 360deg)"), animation: `sweep ${done ? 1.4 : 6}s linear infinite` }} />
-      {[0, 1.6].map(d => <span key={d} style={{ ...ring(640, "transparent"), boxShadow: "inset 0 0 0 1.5px rgba(147,89,75,.28)", animation: `bzRingPulse ${done ? 1.2 : 3.2}s ${d}s ease-out infinite` }} />)}
+    <div aria-hidden style={{ position: "absolute", left: "50%", top: "calc(50% - 34px)", width: 0, height: 0 }}>
+      <span style={{ ...ring(560, "transparent"), boxShadow: "inset 0 0 0 1px rgba(147,89,75,.12)" }} />
+      <span style={{ ...ring(430, "rgba(253,252,252,.35)"), boxShadow: "inset 0 0 0 1px rgba(147,89,75,.14)" }} />
+      <span style={{ ...ring(310, "rgba(253,252,252,.55)"), boxShadow: "inset 0 0 0 1px rgba(147,89,75,.16)" }} />
+      {/* The radar sweep */}
+      <span style={{ ...ring(560, "conic-gradient(from 0deg, rgba(147,89,75,0) 0deg, rgba(147,89,75,0) 292deg, rgba(147,89,75,.18) 359deg, rgba(147,89,75,0) 360deg)"), animation: `sweep ${done ? 1.4 : 6}s linear infinite` }} />
+      {[0, 1.6].map(d => <span key={d} style={{ ...ring(520, "transparent"), boxShadow: "inset 0 0 0 1.5px rgba(147,89,75,.24)", animation: `bzRingPulse ${done ? 1.2 : 3.2}s ${d}s ease-out infinite` }} />)}
     </div>
   );
 }
@@ -306,7 +303,7 @@ function useQrToken(on: boolean, lan: string | null) {
 function QrCard({ svg, left, ttl, k }: { svg: string; left: number; ttl: number; k: string }) {
   const R = 15, C = 2 * Math.PI * R;
   return (
-    <div style={{ position: "relative", flex: "none", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: "rgba(253,251,250,.94)", backdropFilter: "blur(14px)", boxShadow: "0 24px 60px rgba(63,40,32,.22),0 0 0 1px rgba(253,252,252,.8)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ position: "relative", flex: "none", width: QR_SIZE + 40, height: QR_SIZE + 40, borderRadius: 24, background: "rgba(253,251,250,.94)", backdropFilter: "blur(14px)", boxShadow: "0 12px 32px rgba(63,40,32,.14),0 0 0 1px rgba(18,18,18,.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       {svg ? (
         <div key={k} role="img" aria-label="QR code: scan it with the Breezy app on your iPhone to log in on this computer. Or use the email link or a 6-digit code below."
           style={{ width: QR_SIZE, height: QR_SIZE, animation: "fadeIn .5s ease both" }} dangerouslySetInnerHTML={{ __html: svg.replace("<svg", `<svg width="${QR_SIZE}" height="${QR_SIZE}"`) }} />
