@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Access, type BillingState, PRESETS, billing, paywall, trialLength, useBilling, useEntitlements, usePaywallReq } from "@/lib/billing";
 import { SettingsDialog } from "./SettingsDialog";
+import { MobilePaywall } from "./MobilePaywall";
 import { handoffProfile } from "@/lib/handoff/profile";
 import { type Feature, type Metered, PRICING, type Segment, money, saving, sku } from "@/lib/pricing.config";
 
@@ -461,12 +462,22 @@ export function BillingHost({ onToast }: { onToast: Toast }) {
   if (r.kind === "appstore" || (s.store === "apple" && (r.kind === "offer" || r.kind === "upsell"))) return <AppStoreSheet onClose={close} onToast={onToast} />;
   if (r.kind === "keep") return <KeepSheet built={r.built} onClose={close} />;
   if (r.kind === "done") return <DoneSheet what={r.what} onClose={() => { close(); r.then?.(); }} />;
-  if (r.kind === "offer") return <OfferSheet feature={r.feature} kicker={r.kicker} onClose={close} onDone={() => {
-    const trial = s.status === "none";
-    // Logged in from the iPhone: confirm it's on the phone too (no Restore Purchases).
-    if (handoffProfile.get().on) return paywall.open({ kind: "done", what: trial ? "trial" : "plan", then: r.then });
-    onToast(trial && s.segment === "new2" ? `Your ${s.trialVariant}-day trial has started` : `${P.name} started`, "positive"); close(); r.then?.();
-  }} />;
+  if (r.kind === "offer") {
+    const onDone = () => {
+      const trial = s.status === "none";
+      // Logged in from the iPhone: confirm it's on the phone too (no Restore Purchases).
+      if (handoffProfile.get().on) return paywall.open({ kind: "done", what: trial ? "trial" : "plan", then: r.then });
+      onToast(trial && s.segment === "new2" ? `Your ${s.trialVariant}-day trial has started` : `${P.name} started`, "positive"); close(); r.then?.();
+    };
+    // Dev menu → Paywall: Mobile (the iPhone's paywall, adapted to web).
+    if (s.paywallStyle === "mobile") {
+      const win = s.status === "none" ? winOffer(s.segment) : null;
+      const trial = r.preview || !!win || (s.status === "none" && s.segment === "new2");
+      return <MobilePaywall feature={r.feature} kicker={r.kicker} trial={trial} days={win ? win.trialDays : s.trialVariant} preview={r.preview} onClose={close}
+        onDone={r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone} />;
+    }
+    return <OfferSheet feature={r.feature} kicker={r.kicker} onClose={close} onDone={r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone} />;
+  }
   return <UpsellSheet feature={r.feature} then={r.then} onClose={close} onToast={onToast} />;
 }
 /** Trial days 11–13 (handoff, trial active): the trial-to-paid moment, at a desk. What the
@@ -690,6 +701,7 @@ export function BillingDevPanel({ left, onClose }: { left: number; onClose: () =
           );
         })}
       </div>
+      {seg("Paywall", s.paywallStyle ?? "web", [["web", "Web (two panels)"], ["mobile", "Mobile (plans)"]], v => billing.set({ paywallStyle: v }))}
       {seg("Lock style", s.lockStyle, [["partial", "Partial report"], ["blur", "Full blur"], ["tile", "Locked tile"]], v => billing.set({ lockStyle: v }))}
       {seg("New-user trial (A/B)", s.trialVariant, [[14, "14 days"], [30, "30 days"]], v => billing.set({ trialVariant: v, trialDay: Math.min(s.trialDay, v) }))}
       <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED }}>Mock billing, saved in this browser. Figures come from lib/pricing.config.ts.</span>

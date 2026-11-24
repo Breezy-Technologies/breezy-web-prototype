@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { billing, useEntitlements } from "@/lib/billing";
+import { billing, paywall, useEntitlements } from "@/lib/billing";
 import { AllowanceRing, BillingDevPanel, TrialCard } from "../billing/Paywall";
 import { CreateButton, CreateStyle } from "./CreateMenu";
 import { Ring } from "./GetStarted";
@@ -75,6 +75,8 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
   const devAll: DevAction[] = [
     ...dev,
     { group: "Plan & billing", label: "Plan state…", icon: "ph-credit-card", run: () => setPlanDev(true) },
+    { group: "Plan & billing", label: `Paywall: ${bill.paywallStyle === "mobile" ? "Mobile → switch to Web" : "Web → switch to Mobile"}`, icon: "ph-swap", run: () => billing.set({ paywallStyle: bill.paywallStyle === "mobile" ? "web" : "mobile" }) },
+    { group: "Plan & billing", label: "Preview the paywall (trial offer)", icon: "ph-eye", run: () => paywall.open({ kind: "offer", preview: true }) },
     { group: "Plan & billing", label: `Unlimited (internal): ${bill.unlimited ? "on" : "off"}`, icon: "ph-infinity", run: () => billing.set({ unlimited: !bill.unlimited }) },
     ...NAV_STYLES.map(([k, label, icon]) => ({ group: "Side nav", label: `${label}${k === navStyle ? " ✓" : ""}`, icon, run: () => setNavStyle(k) }))];
   return (
