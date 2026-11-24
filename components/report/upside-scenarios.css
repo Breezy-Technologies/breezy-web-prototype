@@ -1004,19 +1004,4 @@
     font-weight: 400
   }
 
-  & .foot {
-    flex: none;
-    padding: 16px;
-    border-top: 1px solid #F1E7E4
-  }
-
-  & .foot button {
-    width: 100%;
-    height: 48px;
-    border-radius: 9999px;
-    background: #121212;
-    color: #FDFCFC;
-    font-size: 16px;
-    font-weight: 700
-  }
 }

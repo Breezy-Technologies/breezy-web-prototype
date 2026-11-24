@@ -2,7 +2,8 @@
 // The property panel on the left of the ROI page (Figma "ROI · 03 Scenarios",
 // every desktop frame's left column, e.g. 6571:35737): photo with the status
 // and photo count, city and address, the specs row, Summary / Specs / Records /
-// Owners, listing history, features, owner, and "Get the report". Adjust
+// Owners, listing history, features and owner (no footer button: 24 Nov
+// review). Adjust
 // assumptions takes this column's place while it is open (UpsideReport).
 import { useState } from "react";
 import { fullPrice, listingDetail, type Listing } from "@/lib/fake";
@@ -20,7 +21,7 @@ const FEAT_IC: Record<string, string> = {
   Pool: "swimming-pool", "ADU potential": "house-simple", "City view": "city", Garage: "garage", "Landscaped garden": "plant", Solar: "solar-panel",
 };
 
-export function PropertyPanel({ l, onGetReport }: { l: Listing; onGetReport?: () => void }) {
+export function PropertyPanel({ l }: { l: Listing }) {
   const d = listingDetail(l);
   const [tab, setTab] = useState<Tab>("Summary");
   const [ph, setPh] = useState(0);
@@ -96,10 +97,6 @@ export function PropertyPanel({ l, onGetReport }: { l: Listing; onGetReport?: ()
             </div>
           </div>
         )}
-      </div>
-
-      <div className="foot">
-        <button type="button" onClick={onGetReport}>Get the report</button>
       </div>
     </section>
   );

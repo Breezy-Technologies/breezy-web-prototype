@@ -249,17 +249,12 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
                 </div>
               </div>
               <div style={{ flex: "none", width: 134, display: "flex", justifyContent: "flex-end" }}>
-                {onShare && (
-                  <button onClick={onShare} title="Share report" style={css("flex:none;height:40px;padding:0 16px;display:flex;align-items:center;gap:8px;border:none;border-radius:9999px;background:rgb(18,18,18);font:700 14px/18px var(--font-sans);color:rgb(249,249,249);cursor:pointer;white-space:nowrap")}>
-                    <span style={css("width:16px;height:16px;background:currentColor;-webkit-mask:url('/ui/share.svg') center/contain no-repeat;mask:url('/ui/share.svg') center/contain no-repeat")} />Share
-                  </button>
-                )}
               </div>
             </div>
             <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
               {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
               {kind === "ub" && <UBReport l={l} write={write} onComps={toComps} />}
-              {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} onGuidelines={() => pick("ub")} onGetReport={onShare} />}
+              {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} onGuidelines={() => pick("ub")} />}
               {locked && <LockVeil key={kind} access={acc} feature={feat ?? "comps"} clear={ent.s.lockStyle === "blur" ? 0 : "42%"} onUnlock={unlock} onToast={onToast} />}
             </div>
           </div>

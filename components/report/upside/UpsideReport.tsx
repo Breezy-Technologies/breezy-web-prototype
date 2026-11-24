@@ -136,7 +136,7 @@ function initialScenario(): string {
   try { return sessionStorage.getItem(SCEN_KEY) || "live"; } catch { return "live"; }
 }
 
-export function UpsideReport({ l, onComps, onGuidelines, onGetReport, write }: { l: Listing; onComps: () => void; onGuidelines?: () => void; onGetReport?: () => void; write?: boolean }) {
+export function UpsideReport({ l, onComps, onGuidelines, write }: { l: Listing; onComps: () => void; onGuidelines?: () => void; write?: boolean }) {
   const site = siteOf(l);
   const p0 = useMemo(() => paramsOf(l), [l]);
   const [scenId, setScenId] = useState(initialScenario);
@@ -473,7 +473,7 @@ export function UpsideReport({ l, onComps, onGuidelines, onGetReport, write }: {
           ? <AssumptionsPanel key={scenId} p={p} rec={nobuild ? dealRow(proj.S, p, a) : rec} a={a} onChange={setDeal} focus={focus}
             onFocused={() => setFocus(undefined)} onClose={() => setAdjusting(false)}
             lede={lede} estimate={estimate} project={projectGroup} saleFirst={state === "nocomps"} />
-          : <PropertyPanel l={l} onGetReport={onGetReport} />}
+          : <PropertyPanel l={l} />}
       </aside>
       <div className="bz-up-col">
       <div ref={scroller} className="rp-main no-scrollbar" style={{ overflowY: "auto", overscrollBehavior: "contain" }}>
