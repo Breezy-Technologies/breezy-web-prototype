@@ -17,7 +17,8 @@ import { Listing, shortPrice } from "@/lib/fake";
 import { css } from "@/lib/css";
 import { CompsReview } from "../home/CompsFlow";
 import { CompsReport } from "./CompsReport";
-import { UBReport } from "./UBReport";
+import { BuildGuidelines } from "./build/BuildGuidelines";
+import { RenovationComps } from "./reno/RenovationComps";
 import { compsFor } from "@/lib/comps";
 import { UpsideReport } from "./upside/UpsideReport";
 import { upsideOf } from "@/lib/roi";
@@ -25,21 +26,24 @@ import { reportKey, useEntitlements } from "@/lib/billing";
 import { PRICING } from "@/lib/pricing.config";
 import { LockVeil } from "../billing/Paywall";
 
-export type FlowKind = "comps" | "ub" | "roi";
+export type FlowKind = "comps" | "ub" | "roi" | "reno";
 
 const STEPS: Record<FlowKind, string[]> = {
   comps: ["Analyzing the subject property", "Finding potential comps", "Scoring the comps", "Researching the neighborhood", "Enriching the comp analysis", "Ranking the comps by match", "Preparing your results"],
   ub: ["Calculating lot coverage and floor area", "Checking height limit, parking and access", "Measuring front, rear and side setbacks", "Running slope check and density allowed", "Researching the neighborhood", "Analysing maximum size and buildable area", "Preparing your UnderBuilt score"],
   roi: ["Analyzing the subject property", "Finding comparable sales", "Calculating build scenarios", "Projecting return value", "Optimizing build sizes", "Modeling your investment", "Preparing your results"],
+  reno: ["Finding renovated sales nearby", "Matching size and finish", "Preparing your results"],
 };
 const THEME: Record<FlowKind, { bar: string; glow: string; dot: string }> = {
   comps: { bar: "linear-gradient(89.442deg,rgb(84,55,157) 0.06%,rgb(142,67,158) 97.94%)", glow: "rgb(206,196,218)", dot: "rgb(186,160,251)" },
   ub: { bar: "linear-gradient(180deg,rgba(234,215,210,.24) 0%,rgba(234,215,210,.44) 100%),linear-gradient(180deg,rgb(227,202,196) 0%,rgb(174,106,91) 100%)", glow: "rgb(227,202,196)", dot: "rgb(174,106,91)" },
   roi: { bar: "linear-gradient(89.442deg,rgb(13,87,57) 0.06%,rgb(70,155,112) 97.94%)", glow: "rgb(196,222,207)", dot: "rgb(70,155,112)" },
+  reno: { bar: "linear-gradient(89.442deg,rgb(84,55,157) 0.06%,rgb(142,67,158) 97.94%)", glow: "rgb(206,196,218)", dot: "rgb(186,160,251)" },
 };
 // No Comps tab (review, 13 Nov): comps live in the split view (comps interaction 2.0). A saved
-// comps report still opens here on its own, with these two tabs to move on.
-const TABS: [FlowKind, string, string][] = [["roi", "Upside analysis", "act-chart"], ["ub", "Build guidelines", "act-target"]];
+// comps report still opens here on its own, with these tabs to move on. Renovation comps
+// (24 Nov, Figma 7888:56954): the comps behind the ROI; its Get comps opens the split view.
+const TABS: [FlowKind, string, string][] = [["roi", "Upside analysis", "act-chart"], ["ub", "Build guidelines", "act-target"], ["reno", "Renovation comps", "act-files"]];
 const EASE = "cubic-bezier(.2,.8,.2,1)";
 const STEP_MS = 700, AUTO_MS = 6700;
 
@@ -138,7 +142,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   const ri = done ? rows.length - 1 : Math.min(step, n - 1);
   const upGross = useMemo(() => (kind === "roi" ? upsideOf(l).sc.rec.gross : 0), [l, kind]);
   const cps = compsFor(l);
-  const doneTitle = { comps: `${cps.sold.length} sold and ${cps.active.length} active\nproperties found`, ub: "Your report is ready", roi: `This property could\nbe worth ${shortPrice(upGross)}` }[kind];
+  const doneTitle = { comps: `${cps.sold.length} sold and ${cps.active.length} active\nproperties found`, ub: "Your report is ready", roi: `This property could\nbe worth ${shortPrice(upGross)}`, reno: "Your comps are ready" }[kind];
   const loading = phase === "run" || phase === "done";
 
   // Paywall (Nimbus): Max Build / ROI reports are metered per property. Opening one spends
@@ -253,7 +257,8 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
             </div>
             <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
               {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
-              {kind === "ub" && <UBReport l={l} write={write} onComps={toComps} />}
+              {kind === "ub" && <BuildGuidelines l={l} write={write} onComps={toComps} onToast={onToast} />}
+              {kind === "reno" && <RenovationComps l={l} write={write} onComps={toComps} />}
               {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} onGuidelines={() => pick("ub")} />}
               {locked && <LockVeil key={kind} access={acc} feature={feat ?? "comps"} clear={ent.s.lockStyle === "blur" ? 0 : "42%"} onUnlock={unlock} onToast={onToast} />}
             </div>

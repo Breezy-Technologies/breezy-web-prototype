@@ -76,14 +76,17 @@ export default function HomeWeb() {
   const [hoverId, setHoverId] = useState<number | null>(null);
   // The report sheet (Comps / Build guidelines / Upside analysis) for a property.
   const [flow, setFlow] = useState<{ l: Listing; kind: FlowKind } | null>(null);
-  // Deep link for reviews: /home?report=roi (or ub) opens that report on one of Pedro's
+  // Deep link for reviews: /home?report=roi (or ub, reno) opens that report on one of Pedro's
   // Silver Lake lots (?lot=<index>, default 1467 Occidental Blvd); the Upside analysis
   // also reads ?scenario=<id> (components/report/upside/scenarios.ts).
   useEffect(() => {
     const q = new URLSearchParams(window.location.search), r = q.get("report");
-    if (r !== "roi" && r !== "ub") return;
+    if (r !== "roi" && r !== "ub" && r !== "reno") return;
     const i = Number(q.get("lot") ?? 820), lot = LOTS[i] ? i : 820;
-    setFlow({ l: lotListing(LOTS[lot], lot), kind: r });
+    const l = lotListing(LOTS[lot], lot);
+    // the property is open behind the sheet, so the reports' Get comps reaches the split view
+    setSoloL(l);
+    setFlow({ l, kind: r });
   }, []);
   // Share (picked set, share modal) and saved Reports; see Share.tsx / Reports.tsx.
   const sh = useShare();

@@ -30,7 +30,7 @@ export const avg = (a: number[]) => { const b = a.filter(v => v > 0); return b.l
 // Estimates the user set, per property, for the session.
 export const myEstimates = new Map<string, number>();
 
-function Carousel({ photos, h, radius, children, onClickPhoto }: { photos: string[]; h: number | string; radius: number; children?: React.ReactNode; onClickPhoto?: () => void }) {
+export function Carousel({ photos, h, radius, children, onClickPhoto }: { photos: string[]; h: number | string; radius: number; children?: React.ReactNode; onClickPhoto?: () => void }) {
   const [i, setI] = useState(0);
   const n = photos.length;
   const go = (d: number) => (e: React.MouseEvent) => { e.stopPropagation(); setI(v => (v + d + n) % n); };

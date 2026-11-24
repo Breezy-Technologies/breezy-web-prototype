@@ -6,15 +6,21 @@
 // /home?report=roi&scenario=<id>.
 import { useEffect, useRef, useState } from "react";
 import { Ic } from "./Ic";
-import { SCENARIOS, scenarioById } from "./scenarios";
+import { SCENARIOS as ROI_SCENARIOS } from "./scenarios";
 
 const FIGMA = "https://www.figma.com/design/MDKJ642qmZXRU8eCnDua8Q/Project-Nimbus--Core-?node-id=";
 
-export function ScenarioBar({ id, onChange }: { id: string; onChange: (id: string) => void }) {
+type Scen = { id: string; group: string; label: string; figma?: string };
+
+/** `list` / `title` / `matrix`: another report's scenarios (Build guidelines); the ROI list by default. */
+export function ScenarioBar({ id, onChange, list = ROI_SCENARIOS, title = "ROI scenarios", matrix = "6571-35708" }: {
+  id: string; onChange: (id: string) => void; list?: Scen[]; title?: string; matrix?: string;
+}) {
+  const SCENARIOS = list;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  const i = SCENARIOS.findIndex(s => s.id === id);
-  const cur = scenarioById(id);
+  const i = Math.max(0, SCENARIOS.findIndex(s => s.id === id));
+  const cur = SCENARIOS[i];
   const step = (d: number) => onChange(SCENARIOS[(i + d + SCENARIOS.length) % SCENARIOS.length].id);
 
   useEffect(() => {
@@ -31,7 +37,7 @@ export function ScenarioBar({ id, onChange }: { id: string; onChange: (id: strin
     <div className="rp-scen" ref={box}>
       {open && (
         <div className="menu" role="menu" aria-label="Scenarios">
-          <p className="hd">ROI scenarios · Figma matrix<a href={`${FIGMA}6571-35708`} target="_blank" rel="noreferrer">Open in Figma ↗</a></p>
+          <p className="hd">{title} · Figma matrix<a href={`${FIGMA}${matrix}`} target="_blank" rel="noreferrer">Open in Figma ↗</a></p>
           {groups.map(g => (
             <div key={g} className="grp">
               <p className="g">{g}</p>
