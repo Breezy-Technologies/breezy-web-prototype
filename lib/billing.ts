@@ -29,6 +29,10 @@ export type BillingState = {
   /** On the $9.90 save offer after trying to cancel. */
   saved: boolean;
   lockStyle: LockStyle;
+  /** The holiday 50%-off offer is live (PRICING.holiday; Dev menu toggles it). */
+  holiday?: boolean;
+  /** Which paywall the offer opens (Dev menu): the web two-panel sheet, or the mobile paywall adapted to web. */
+  paywallStyle?: "web" | "mobile";
   /** State version: 2 = locked tiles open the paywall only (17 Nov review). */
   v?: number;
 };
@@ -77,7 +81,7 @@ export const billing = {
   set,
   preset(id: string) {
     const p = PRESETS.find(x => x.id === id); if (!p) return;
-    set({ ...BASE, unlimited: state.unlimited, lockStyle: state.lockStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
+    set({ ...BASE, holiday: undefined, unlimited: state.unlimited, lockStyle: state.lockStyle, paywallStyle: state.paywallStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
   },
   /** Mock purchase: adds the SKU's credits. */
   buy(id: string) {
@@ -148,7 +152,7 @@ export function useEntitlements() {
 // sheet without prop drilling.
 export type PaywallReq =
   | { kind: "upsell"; feature: Metered; then?: () => void }
-  | { kind: "offer"; feature?: Feature }
+  | { kind: "offer"; feature?: Feature; kicker?: string; then?: () => void; /** Dev menu preview: the trial version, nothing starts. */ preview?: boolean }
   | { kind: "plan"; tab?: string }
   | { kind: "winback" }
   | { kind: "news" }
