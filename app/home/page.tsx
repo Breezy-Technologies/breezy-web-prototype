@@ -326,7 +326,17 @@ export default function HomeWeb() {
   // Comps follow the search's own filters (fs.f): the filter bar slides left with the
   // detail panel and stays above it, so editing a filter edits the comps too.
   const cm = useComps(compsOn && sel ? sel : null, compsReveal, fs.f);
-  const compsShift = compsOn && !compsOut;
+  const compsShift0 = compsOn && !compsOut;
+  // A report docked beside the detail panel (25 Nov, William): Build guidelines, Renovation
+  // comps and Upside analysis open in one panel that fills the width right of the property
+  // (slid left, as in comps), over the map; the property panel can collapse to the compact
+  // card and the report can be minimised to show the map. Saved comps reports keep the sheet.
+  const rptDock = !!flow && flow.kind !== "comps" && !!sel && sel.id === flow.l.id && sel.addr === flow.l.addr;
+  const [rptMin, setRptMin] = useState(false);
+  const rptShift = rptDock && !compsOn;
+  // Everything that slides the property left (comps, or a docked report).
+  const compsShift = compsShift0;
+  const leftShift = compsShift0 || rptShift;
   // Manual comps, still setting up: the filters hang under the compact subject card, the
   // map shows the area (radius or a drawn shape) and there's no comps panel until
   // "Find n comps".
@@ -337,7 +347,7 @@ export default function HomeWeb() {
   // The subject collapsed to a compact card (SubjectMini, exploration 17 Nov). Starts
   // collapsed on windows wider than 1440, where the list gets its third column.
   const [subjMin, setSubjMin] = useState(false);
-  const subjMini = compsShift && (subjMin || setup);
+  const subjMini = (compsShift && (subjMin || setup)) || (rptShift && subjMin);
   // Comps list columns: 3 on windows wider than 1440 (17 Nov) while the subject is the
   // compact card (or the window fits the full panel too), 2 from 1360, else 1.
   // The comps panel's width (17 Nov review: more room for the cards, and resizable). By
@@ -353,14 +363,19 @@ export default function HomeWeb() {
   const saveSideW = (w: number | null) => { setSideUser(w); try { if (w == null) localStorage.removeItem("bz-comps-w"); else localStorage.setItem("bz-comps-w", String(Math.round(w))); } catch {} };
   // Comps mode: the map controls sit on the left, anchored to the subject card / panel.
   const SUBJ_RIGHT = GAP + (subjMini ? MINI_W : 420) + GAP;
-  const DETAIL_X = compsShift ? GAP : GAP + COL + GAP;
+  const DETAIL_X = leftShift ? GAP : GAP + COL + GAP;
+  // The docked report's left edge: right of the property panel (or its compact card).
+  const RPT_LEFT = GAP + (subjMini ? MINI_W : 420) + GAP;
   // Comps mode: the detail panel (now the subject) drops under the filter bar.
   const DETAIL_TOP = compsShift && !setup ? BAR_BOTTOM : GAP;
   const fCount = useMemo(() => { const d = fDims(fs.f); return (Object.keys(d) as (keyof typeof d)[]).filter(k => d[k].on && !(k === "price" && d.status.on)).length; }, [fs.f]);
   const compCount = (F: Filters) => { if (!sel) return 0; const x = compsFor(asReviewed(sel), cm.radius, F, cm.area); return x.sold.length + x.active.length; };
   const selKey = sel ? `${sel.id}|${sel.addr}` : "";
   // Another property (pin, parcel, saved home) leaves comps.
-  useEffect(() => { setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(null); setSubjMin(false); }, [selKey]);
+  useEffect(() => {
+    setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(null); setSubjMin(false); setRptMin(false);
+    if (flow && flow.kind !== "comps" && (!sel || sel.id !== flow.l.id || sel.addr !== flow.l.addr)) setFlow(null);
+  }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // A resized comps panel reframes the comps once the new width has rendered.
   const [reframe, setReframe] = useState(0);
   useEffect(() => { if (reframe && compsShift && sel && cm.key) frameComps(sel); }, [reframe]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -657,8 +672,8 @@ export default function HomeWeb() {
       {buyerWiz && <BuyerWizard onClose={() => { setBuyerWiz(false); if (getStarted.get().tour?.task === "buyer") getStarted.step("buyer", "create", ["wizard"]); }} onDone={finishBuyer} />}
       <div data-maparea="" style={{ position: "fixed", top: 0, right: 0, bottom: 0, left: navW, pointerEvents: "none", zIndex: 30, transition: "left .45s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)" }}>
         <div style={{ position: "absolute", left: GAP, top: GAP, bottom: GAP, width: COL, display: "flex", flexDirection: "column", gap: GAP, pointerEvents: "none", transformOrigin: "0 50%",
-          transition: "opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1),visibility 0s linear " + (compsShift ? ".55s" : "0s"),
-          ...(compsShift ? { opacity: 0, transform: "translateX(-28px) scale(.97)", visibility: "hidden" as const } : {}) }}>
+          transition: "opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1),visibility 0s linear " + (leftShift ? ".55s" : "0s"),
+          ...(leftShift ? { opacity: 0, transform: "translateX(-28px) scale(.97)", visibility: "hidden" as const } : {}) }}>
           <div style={{ pointerEvents: "auto" }}>
             {/* Entering the search step (`onSearchFocus`) closes dropdowns and the detail panel, as the canvas step change does. */}
             <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : areaSq(fieldAreas.map(a => a.label))} near={place.center}
@@ -708,8 +723,8 @@ export default function HomeWeb() {
                 <AllFiltersPanel fs={fs} embedded title="Comps filters" listings={listings} count={compCount} cta={n => n === 0 ? "No comps match" : `Find ${n} comp${n === 1 ? "" : "s"}`}
                   onApply={() => cm.find()} />
               </div>
-            ) : subjMini ? <SubjectMini l={sel!} cs={cm} onExpand={() => setSubjMin(false)} onClose={closeDetail} /> :
-            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openReport(sel!, k)} onCollapse={compsShift ? () => setSubjMin(true) : undefined}
+            ) : subjMini ? <SubjectMini l={sel!} cs={rptShift ? null : cm} onExpand={() => setSubjMin(false)} onClose={closeDetail} /> :
+            <DetailPanel key={sel!.id + (parcel ? parcel.key : "")} l={sel!} onClose={closeDetail} onGetComps={openCompsMode} comps={compsOn && cm.key ? cm : null} onFlow={k => openReport(sel!, k)} onCollapse={compsShift || rptShift ? () => setSubjMin(true) : undefined}
               alertN={alerts.count(sel)} onBell={() => ent.planOn ? alerts.open(sel!) : paywall.open({ kind: "offer", feature: "alerts" })} onShare={() => shareOne(sel!)} onToast={showToast} />}
           </div>
         )}
@@ -739,13 +754,13 @@ export default function HomeWeb() {
           </div>
         )}
         {/* In comps mode the bar slides left with the detail panel and sits above it, led by the comps radius. */}
-        <FilterBar fs={fs} left={compsShift ? GAP : detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} right={compsShift ? SIDE_W + GAP * 2 : 10} hidden={setup}
+        <FilterBar fs={fs} left={compsShift ? GAP : detailOpen ? GAP + COL + GAP + 420 + GAP : GAP + COL + 20} right={compsShift ? SIDE_W + GAP * 2 : 10} hidden={setup || rptShift}
           lead={compsShift && cm.key ? <RadiusChip miles={cm.radius} custom={cm.custom} onChange={r => { if (cm.custom) cm.setCustom(false); cm.setRadius(r); }} /> : undefined} />
         <FilterDropdown fs={fs} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? ["comp", "comps"] : undefined} />
         {!setup && <AllFiltersPanel fs={fs} top={compsShift ? DETAIL_TOP : view === "results" ? 88 : 76} listings={listings} count={compsShift ? compCount : undefined} noun={compsShift ? "comps" : undefined}
           onApply={() => { if (view === "home" && !compsShift) { closeDetail(); setView("results"); } }} />}
         {sortOpen && view === "results" && <SortMenu value={sortBy} onPick={k => { setSortBy(k); setSortOpen(false); }} onClose={() => setSortOpen(false)} left={GAP + COL - 49} top={72} />}
-        <div style={{ pointerEvents: "auto" }}><MapControls right={20} left={compsShift ? (subjMini && !setup ? GAP : SUBJ_RIGHT + 8) : undefined} onLocate={() => fit(GAP + COL + GAP)} /></div>
+        <div style={{ pointerEvents: "auto" }}><MapControls right={20} left={compsShift ? (subjMini && !setup ? GAP : SUBJ_RIGHT + 8) : rptShift ? SUBJ_RIGHT + 8 : undefined} onLocate={() => fit(GAP + COL + GAP)} /></div>
         {offline && (
           <span style={{ position: "absolute", right: 120, bottom: 22, height: 28, padding: "0 12px", borderRadius: 9999, background: "rgba(253,252,252,.92)", font: "400 12px/28px var(--font-sans)", color: "var(--fg-2)", pointerEvents: "auto" }} title="Add NEXT_PUBLIC_MAPBOX_TOKEN to load live Mapbox tiles">
             Offline demo map
@@ -773,7 +788,9 @@ export default function HomeWeb() {
         // Centre the clicked parcel in the visible map, between the left column and the detail panel.
         frameSel(p.listing, p.ring, [p.cx, p.cy]);
       }} />
-      {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached} onClose={() => setFlow(null)}
+      {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached}
+        dock={rptDock ? { left: RPT_LEFT, top: GAP, min: rptMin, onMin: setRptMin } : undefined}
+        onClose={() => { const was = rptShift; setFlow(null); setRptMin(false); if (was) { if (!compsOn) setSubjMin(false); if (sel) setTimeout(() => frameSel(sel), 60); } }}
         onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); getStarted.complete("comps"); }} onShare={() => shareOne(flow.l)} onToast={showToast}
         onComps={sel && sel.id === flow.l.id ? openCompsMode : undefined} />}
       {areaComps && <AreaCompsPreview key={areaComps.title + areaComps.comps.length} {...areaComps} saved={rp.hasArea(areaComps)} onClose={() => setAreaComps(null)}

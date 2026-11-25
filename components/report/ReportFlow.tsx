@@ -53,8 +53,14 @@ const gotKey = (l: Listing, k: FlowKind) => `${k}:${l.addr}|${l.lng.toFixed(5)},
 
 type Phase = "review" | "choose" | "run" | "done" | "report";
 
-export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onShare, onToast, onComps }: {
-  l: Listing; kind: FlowKind; navW: number; cached?: boolean;
+/** Docked (25 Nov, William): the report sits beside the property's own detail panel
+ *  (slid left, as in the comps split view) and fills the rest of the width over the map,
+ *  instead of a sheet repeating the property. `left` is its left edge from the side nav;
+ *  `min` hides it to show the map (a pill brings it back). */
+export type Dock = { left: number; top: number; min: boolean; onMin: (m: boolean) => void };
+
+export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onShare, onToast, onComps, dock }: {
+  l: Listing; kind: FlowKind; navW: number; cached?: boolean; dock?: Dock;
   onClose: () => void; onDone?: (k: FlowKind) => void; onShare?: () => void;
   onToast?: (text: string, tone?: "positive" | "neutral" | "negative") => void;
   /** "See comps" in a report: drop the sheet and open the comps split view instead. */
@@ -78,7 +84,9 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   const gcLeft = useRef(AUTO_MS), gcAt = useRef(0);
   const short = l.addr.split(",")[0];
   // The sheet is up once we're past the review modal, until it closes.
-  const tilt = (phase !== "review" || raised) && !leaving;
+  const tilt = !dock && (phase !== "review" || raised) && !leaving;
+  const [dIn, setDIn] = useState(false);
+  useEffect(() => { if (!dock) return; const id = requestAnimationFrame(() => setDIn(true)); return () => cancelAnimationFrame(id); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rise on the next frame so the transition runs; tilt the workspace with it.
   useEffect(() => {
@@ -92,7 +100,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
     if (leaving) return;
     setLeaving(true); setUp(false);
     document.documentElement.removeAttribute("data-flow");
-    setTimeout(onClose, raised ? 700 : 0);
+    setTimeout(onClose, dock ? 380 : raised ? 700 : 0);
   };
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented && phase !== "review") close(); };
@@ -135,6 +143,10 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
     setPhase(start(k));
   };
 
+  // The detail panel's Max build / Profit potential tiles switch the docked report's tab.
+  const firstKind = useRef(true);
+  useEffect(() => { if (firstKind.current) { firstKind.current = false; return; } pick(kind0); if (dock?.min) dock.onMin(false); }, [kind0]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const th = THEME[kind], steps = STEPS[kind], n = steps.length;
   const done = phase === "done";
   const prog = phase === "report" ? 1 : phase === "run" ? 0.06 + 0.86 * Math.min(step, n) / n : done ? 1 : 0;
@@ -167,6 +179,69 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
     const a = ent.spend(feat, pk);
     if (a === "credit" || was === "credit") onToast?.(`${PRICING.names[feat]} unlocked · 1 credit used`, "positive");
   };
+
+  const tabs = (
+    <div className="no-scrollbar" style={{ maxWidth: "100%", display: "flex", alignItems: "center", gap: 4, height: 48, padding: 4, boxSizing: "border-box", borderRadius: 999, background: "rgb(255,255,255)", overflowX: "auto" }}>
+      {TABS.map(([k, label, ico]) => {
+        const on = k === kind;
+        return (
+          <button key={k} onClick={() => pick(k)} style={css("flex:none;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 6px;border:none;border-radius:9999px;cursor:pointer;white-space:nowrap;font:700 15px/20px var(--font-sans);transition:background .25s ease,color .25s ease;"
+            + (on ? "background:rgb(17,16,16);color:rgb(253,252,252)" : "background:none;color:rgb(17,16,16)"))}>
+            <span style={css("flex:none;width:28px;height:28px;border-radius:9999px;display:flex;align-items:center;justify-content:center;background:" + (on ? "rgba(253,252,252,.14)" : "rgb(245,240,238)"))}>
+              <span style={css("width:14px;height:14px;background:" + (on ? "rgb(253,252,252)" : "rgb(74,45,37)") + `;-webkit-mask:url('/ui/${ico}.svg') center/contain no-repeat;mask:url('/ui/${ico}.svg') center/contain no-repeat`)} />
+            </span>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+  const body = (
+    <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
+      {kind === "ub" && <BuildGuidelines l={l} write={write} onComps={toComps} onToast={onToast} />}
+      {kind === "reno" && <RenovationComps l={l} write={write} onComps={toComps} />}
+      {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} onGuidelines={() => pick("ub")} />}
+      {locked && <LockVeil key={kind} access={acc} feature={feat ?? "comps"} clear={ent.s.lockStyle === "blur" ? 0 : "42%"} onUnlock={unlock} onToast={onToast} />}
+    </div>
+  );
+
+  if (dock) {
+    const shown = dIn && !leaving && !dock.min;
+    const label = TABS.find(t => t[0] === kind)?.[1] ?? "Report";
+    const round: React.CSSProperties = { flex: "none", width: 40, height: 40, border: "none", borderRadius: 9999, background: "rgb(245,240,238)", color: "rgb(17,16,16)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+    return (
+      <>
+        {/* The consolidated report panel: from the property panel's right edge to the screen's, over the map. */}
+        <div className="rp-docked" style={{
+          position: "fixed", left: navW + dock.left, right: 12, top: dock.top, bottom: 12, zIndex: 60, borderRadius: 24, overflow: "hidden", background: "rgb(255,255,255)",
+          display: "flex", flexDirection: "column", boxShadow: "inset 0 0 0 1px rgb(245,240,238),0 14px 36px rgba(40,26,20,.14)",
+          transition: `transform .55s ${EASE},opacity .35s ease,left .6s ${EASE}`,
+          ...(shown ? { transform: "none", opacity: 1 } : { transform: "translateX(calc(100% + 24px))", opacity: dock.min && !leaving ? 1 : 0, pointerEvents: "none" }),
+        }}>
+          {phase === "report" && (
+            <div key={kind} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", animation: `flowRise .5s ${EASE} both` }}>
+              <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 12, padding: "12px 12px 12px 16px", boxShadow: "inset 0 -1px 0 rgba(13,12,12,.06)" }}>
+                <div style={{ flex: 1, minWidth: 0, display: "flex" }}>{tabs}</div>
+                <button onClick={() => dock.onMin(true)} title="Minimize · show the map" aria-label="Minimize the report" className="btn-soft" style={round}><i className="ph-bold ph-arrows-in-simple" style={{ fontSize: 16 }} /></button>
+                <button onClick={close} title="Close the report" aria-label="Close the report" className="btn-soft" style={round}><i className="ph-bold ph-x" style={{ fontSize: 16 }} /></button>
+              </div>
+              {body}
+            </div>
+          )}
+        </div>
+        {/* Minimized: a pill at the top right of the map brings the report back. */}
+        {dock.min && !leaving && (
+          <div style={{ position: "fixed", right: 20, top: dock.top + 8, zIndex: 60, display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 9999, background: "rgb(253,252,252)", boxShadow: "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 6px 18px rgba(30,18,12,.18)", animation: `panelDrop .28s ${EASE} both` }}>
+            <button onClick={() => dock.onMin(false)} style={{ height: 40, display: "flex", alignItems: "center", gap: 8, padding: "0 16px 0 12px", border: "none", borderRadius: 9999, background: "rgb(17,16,16)", color: "rgb(253,252,252)", font: "700 14px/18px var(--font-sans)", cursor: "pointer", whiteSpace: "nowrap" }}>
+              <i className="ph-bold ph-arrows-out-simple" style={{ fontSize: 15 }} />{label}
+            </button>
+            <button onClick={close} title="Close the report" aria-label="Close the report" style={{ ...round, background: "none" }}><i className="ph-bold ph-x" style={{ fontSize: 15 }} /></button>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -237,31 +312,12 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
             <div style={{ flex: "none", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", padding: "16px 20px", boxShadow: "inset 0 -1px 0 rgba(13,12,12,.06)" }}>
               <BackToMap onClick={close} style={{ flex: "none", width: 134, justifyContent: "center" }} />
               <div style={{ flex: "1 1 420px", minWidth: 0, display: "flex", justifyContent: "center" }}>
-                <div className="no-scrollbar" style={{ maxWidth: "100%", display: "flex", alignItems: "center", gap: 4, height: 48, padding: 4, boxSizing: "border-box", borderRadius: 999, background: "rgb(255,255,255)", overflowX: "auto" }}>
-                  {TABS.map(([k, label, ico]) => {
-                    const on = k === kind;
-                    return (
-                      <button key={k} onClick={() => pick(k)} style={css("flex:none;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 6px;border:none;border-radius:9999px;cursor:pointer;white-space:nowrap;font:700 15px/20px var(--font-sans);transition:background .25s ease,color .25s ease;"
-                        + (on ? "background:rgb(17,16,16);color:rgb(253,252,252)" : "background:none;color:rgb(17,16,16)"))}>
-                        <span style={css("flex:none;width:28px;height:28px;border-radius:9999px;display:flex;align-items:center;justify-content:center;background:" + (on ? "rgba(253,252,252,.14)" : "rgb(245,240,238)"))}>
-                          <span style={css("width:14px;height:14px;background:" + (on ? "rgb(253,252,252)" : "rgb(74,45,37)") + `;-webkit-mask:url('/ui/${ico}.svg') center/contain no-repeat;mask:url('/ui/${ico}.svg') center/contain no-repeat`)} />
-                        </span>
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {tabs}
               </div>
               <div style={{ flex: "none", width: 134, display: "flex", justifyContent: "flex-end" }}>
               </div>
             </div>
-            <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
-              {kind === "ub" && <BuildGuidelines l={l} write={write} onComps={toComps} onToast={onToast} />}
-              {kind === "reno" && <RenovationComps l={l} write={write} onComps={toComps} />}
-              {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} onGuidelines={() => pick("ub")} />}
-              {locked && <LockVeil key={kind} access={acc} feature={feat ?? "comps"} clear={ent.s.lockStyle === "blur" ? 0 : "42%"} onUnlock={unlock} onToast={onToast} />}
-            </div>
+            {body}
           </div>
         )}
       </div>

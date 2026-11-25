@@ -14,10 +14,12 @@ import type { CompsSession } from "./useComps";
 
 export const MINI_W = 360;
 
-export function SubjectMini({ l, cs, onExpand, onClose, setup }: { l: Listing; cs: CompsSession; onExpand?: () => void; onClose: () => void; setup?: boolean }) {
-  const s = cs.subject ?? l;
-  const est = cs.mine ?? (cs.homePrice > 0 ? Math.round(cs.homePrice / 1000) * 1000 : 0);
-  const label = cs.mine ? "Your estimate" : cs.lotMode ? "Lot price estimate" : "Home price estimate";
+export function SubjectMini({ l, cs, onExpand, onClose, setup }: { l: Listing; cs?: CompsSession | null; onExpand?: () => void; onClose: () => void; setup?: boolean }) {
+  // Without a comps session (a report docked beside it, 25 Nov) the card shows the
+  // property's own figures and no estimate row.
+  const s = cs?.subject ?? l;
+  const est = cs ? cs.mine ?? (cs.homePrice > 0 ? Math.round(cs.homePrice / 1000) * 1000 : 0) : 0;
+  const label = cs?.mine ? "Your estimate" : cs?.lotMode ? "Lot price estimate" : "Home price estimate";
   const photos = l.photos.slice(0, 8), n = photos.length;
   const [gi, setGi] = useState(0);
   const gal = useRef<HTMLDivElement>(null);
@@ -52,7 +54,7 @@ export function SubjectMini({ l, cs, onExpand, onClose, setup }: { l: Listing; c
           </>}
           <span title="Lot size">{k(Math.round(s.lotAc * 43560))}{ft}{!(s.sqft > 0) && <span style={{ color: MUTED }}> lot</span>}</span>
         </span>
-        {!setup && (
+        {!setup && cs && (
           <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, paddingTop: 10, boxShadow: "inset 0 1px 0 rgb(245,240,238)" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 5, font: "400 13px/18px var(--font-sans)", color: MUTED }}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="rgb(132,98,196)"><path d="M12 0c.8 6.4 5.6 11.2 12 12-6.4.8-11.2 5.6-12 12-.8-6.4-5.6-11.2-12-12C6.4 11.2 11.2 6.4 12 0z" /></svg>{label}

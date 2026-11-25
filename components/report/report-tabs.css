@@ -354,3 +354,10 @@
 @media (prefers-reduced-motion: reduce) {
   .bz-bg .bg-plan .tilt, .bg-full .bg-plan .tilt { transition: none }
 }
+
+/* Docked beside the detail panel (25 Nov): the property is the real panel on its left, so
+   the report's own property column goes (Adjust assumptions still opens in its place), and
+   the page breathes a little less in the narrower panel. */
+.rp-docked .bz-up-left[aria-label="Property"] { display: none }
+.rp-docked .bz-up { --wrap-pad: 48px; --card-pad: 40px }
+@media (max-width: 1399px) { .rp-docked .bz-up { --wrap-pad: 32px; --card-pad: 32px } }
