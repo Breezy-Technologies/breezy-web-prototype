@@ -333,6 +333,7 @@ export default function HomeWeb() {
   // card and the report can be minimised to show the map. Saved comps reports keep the sheet.
   const rptDock = !!flow && flow.kind !== "comps" && !!sel && sel.id === flow.l.id && sel.addr === flow.l.addr;
   const [rptMin, setRptMin] = useState(false);
+  const [rptLeaving, setRptLeaving] = useState(false);
   const rptShift = rptDock && !compsOn;
   // Everything that slides the property left (comps, or a docked report).
   const compsShift = compsShift0;
@@ -412,6 +413,12 @@ export default function HomeWeb() {
     if (manual) fs.openPanel(); else if (fs.fd) fs.closePanel();
     alerts.close(); setHoverId(null); fs.setDd(null); setSortOpen(false); setAreaPill(false);
     setCompsReveal(!rp.has(sel) && !manual); setCompsOut(false); setCompsOn(true);
+    // A report docked beside the property (any tab, any Get comps: the report's or the detail
+    // panel's) slides away now that the comps parameters are set, revealing the split view.
+    if (flow && flow.kind !== "comps") {
+      setRptLeaving(true);
+      setTimeout(() => { setFlow(null); setRptLeaving(false); setRptMin(false); }, 560);
+    }
   };
   // Create → Run comps: the property just picked opens, then slides into comps.
   useEffect(() => {
@@ -789,7 +796,7 @@ export default function HomeWeb() {
         frameSel(p.listing, p.ring, [p.cx, p.cy]);
       }} />
       {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached}
-        dock={rptDock ? { left: RPT_LEFT, top: GAP, min: rptMin, onMin: setRptMin } : undefined}
+        dock={rptDock ? { left: RPT_LEFT, top: GAP, min: rptMin, onMin: setRptMin, leaving: rptLeaving } : undefined}
         onClose={() => { const was = rptShift; setFlow(null); setRptMin(false); if (was) { if (!compsOn) setSubjMin(false); if (sel) setTimeout(() => frameSel(sel), 60); } }}
         onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); getStarted.complete("comps"); }} onShare={() => shareOne(flow.l)} onToast={showToast}
         onComps={sel && sel.id === flow.l.id ? openCompsMode : undefined} />}

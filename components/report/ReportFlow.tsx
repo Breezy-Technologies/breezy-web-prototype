@@ -57,7 +57,9 @@ type Phase = "review" | "choose" | "run" | "done" | "report";
  *  (slid left, as in the comps split view) and fills the rest of the width over the map,
  *  instead of a sheet repeating the property. `left` is its left edge from the side nav;
  *  `min` hides it to show the map (a pill brings it back). */
-export type Dock = { left: number; top: number; min: boolean; onMin: (m: boolean) => void };
+export type Dock = { left: number; top: number; min: boolean; onMin: (m: boolean) => void;
+  /** Comps have started (the subject reviewed, AI or manual picked): the panel slides away to reveal them. */
+  leaving?: boolean };
 
 export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onShare, onToast, onComps, dock }: {
   l: Listing; kind: FlowKind; navW: number; cached?: boolean; dock?: Dock;
@@ -172,7 +174,9 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
     const n = ent.left(feat) - 1;
     onToast?.(`${PRICING.names[feat]} · ${n} of ${PRICING.allowance[feat]} left this month`, "neutral");
   }, [phase, kind, acc]); // eslint-disable-line react-hooks/exhaustive-deps
-  const toComps = () => { if (onComps) { close(); onComps(); } else pick("comps"); };
+  // Docked: the report stays while the comps review / choice runs over it; the page slides it
+  // away once comps start (dock.leaving), and Cancel leaves it as it was.
+  const toComps = () => { if (onComps) { if (!dock) close(); onComps(); } else pick("comps"); };
   const unlock = () => {
     if (!feat) return;
     const was = ent.access(feat, pk);
@@ -207,7 +211,8 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   );
 
   if (dock) {
-    const shown = dIn && !leaving && !dock.min;
+    const gone = leaving || !!dock.leaving;
+    const shown = dIn && !gone && !dock.min;
     const label = TABS.find(t => t[0] === kind)?.[1] ?? "Report";
     const round: React.CSSProperties = { flex: "none", width: 40, height: 40, border: "none", borderRadius: 9999, background: "rgb(245,240,238)", color: "rgb(17,16,16)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
     return (
@@ -217,7 +222,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
           position: "fixed", left: navW + dock.left, right: 12, top: dock.top, bottom: 12, zIndex: 60, borderRadius: 24, overflow: "hidden", background: "rgb(255,255,255)",
           display: "flex", flexDirection: "column", boxShadow: "inset 0 0 0 1px rgb(245,240,238),0 14px 36px rgba(40,26,20,.14)",
           transition: `transform .55s ${EASE},opacity .35s ease,left .6s ${EASE}`,
-          ...(shown ? { transform: "none", opacity: 1 } : { transform: "translateX(calc(100% + 24px))", opacity: dock.min && !leaving ? 1 : 0, pointerEvents: "none" }),
+          ...(shown ? { transform: "none", opacity: 1 } : { transform: "translateX(calc(100% + 24px))", opacity: dock.min && !gone ? 1 : 0, pointerEvents: "none" }),
         }}>
           {phase === "report" && (
             <div key={kind} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", animation: `flowRise .5s ${EASE} both` }}>
@@ -231,7 +236,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
           )}
         </div>
         {/* Minimized: a pill at the top right of the map brings the report back. */}
-        {dock.min && !leaving && (
+        {dock.min && !gone && (
           <div style={{ position: "fixed", right: 20, top: dock.top + 8, zIndex: 60, display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 9999, background: "rgb(253,252,252)", boxShadow: "0 0 0 .5px rgba(30,18,12,.06),0 1px 2px rgba(30,18,12,.10),0 6px 18px rgba(30,18,12,.18)", animation: `panelDrop .28s ${EASE} both` }}>
             <button onClick={() => dock.onMin(false)} style={{ height: 40, display: "flex", alignItems: "center", gap: 8, padding: "0 16px 0 12px", border: "none", borderRadius: 9999, background: "rgb(17,16,16)", color: "rgb(253,252,252)", font: "700 14px/18px var(--font-sans)", cursor: "pointer", whiteSpace: "nowrap" }}>
               <i className="ph-bold ph-arrows-out-simple" style={{ fontSize: 15 }} />{label}
