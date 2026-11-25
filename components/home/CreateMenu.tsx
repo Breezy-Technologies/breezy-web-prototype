@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { taskOf, useGetStarted } from "@/lib/getStarted";
+import { getStarted, taskOf, useGetStarted } from "@/lib/getStarted";
 import { EarnChip } from "./GetStarted";
 
 /* New navigation exploration (14 Nov, agents' feedback: "where do I create something?").
@@ -46,8 +46,9 @@ export function CreateButton({ variant, expanded, navW, locked, onPick }: { vari
   const [top, setTop] = useState(80);
   const btn = useRef<HTMLButtonElement>(null);
   const place = () => { const r = btn.current?.getBoundingClientRect(); if (r) setTop(r.top); };
-  const toggle = () => { place(); setOpen(o => !o); };
-  useCreateShortcut(() => { place(); setOpen(true); });
+  // opening Create closes the Make Breezy yours checklist (it sits in the same spot)
+  const toggle = () => { place(); getStarted.show(false); setOpen(o => !o); };
+  useCreateShortcut(() => { place(); getStarted.show(false); setOpen(true); });
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest("[data-create]")) setOpen(false); };

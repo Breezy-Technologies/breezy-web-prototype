@@ -34,11 +34,15 @@ const NAV_STYLES: [NavStyle, string, string][] = [
 // search step, then offers Save search once an area is picked.
 const ACTIONS: [string, string, string][] = [["Comps", "Run comps", "/nav/comps-iso.png"], ["Underbuilt", "Find underbuilt", "/nav/radar.png"], ["Buyer search", "New buyer search", "/ui/pin-3d.png"]];
 const PLACES = MAIN.filter(([k]) => !ACTIONS.some(a => a[0] === k));
-const NAV_STYLE_KEY = "bz-nav-style";
+// Default (25 Nov, William): the card flyout (clay "+" Create). A style picked in the Dev
+// menu lasts for the session only (sessionStorage), so every new visit, and every reset,
+// starts on the flyout.
+export const NAV_STYLE_KEY = "bz-nav-style";
+const DEFAULT_NAV: NavStyle = "create-flyout";
 function useNavStyle(): [NavStyle, (s: NavStyle) => void] {
-  const [v, setV] = useState<NavStyle>("create-menu");
-  useEffect(() => { try { const s = localStorage.getItem(NAV_STYLE_KEY); if (NAV_STYLES.some(n => n[0] === s)) setV(s as NavStyle); } catch {} }, []);
-  return [v, (n: NavStyle) => { setV(n); try { localStorage.setItem(NAV_STYLE_KEY, n); } catch {} }];
+  const [v, setV] = useState<NavStyle>(DEFAULT_NAV);
+  useEffect(() => { try { localStorage.removeItem(NAV_STYLE_KEY); const s = sessionStorage.getItem(NAV_STYLE_KEY); if (NAV_STYLES.some(n => n[0] === s)) setV(s as NavStyle); } catch {} }, []);
+  return [v, (n: NavStyle) => { setV(n); try { sessionStorage.setItem(NAV_STYLE_KEY, n); } catch {} }];
 }
 
 function NavIcon({ k, ic, size = 28, locked }: { k: string; ic: string; size?: number; locked?: boolean }) {

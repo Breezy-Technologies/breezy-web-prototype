@@ -4,7 +4,8 @@
 // is earned whenever it's done (guided or not): a saved buyer search, an owner contacted,
 // a first comps report, a Max build looked at. `tour` is the guided version in progress
 // (coach marks, components/home/GetStarted.tsx); its stage moves with the app
-// (app/home/page.tsx). Progress lives in localStorage (`bz-get-started`); earned credits
+// (app/home/page.tsx). Progress lives in sessionStorage (`bz-get-started`; 25 Nov: every new
+// visit starts at 0 / 4, as a first-time user); earned credits
 // go into the mock billing state as contact credits.
 import { useSyncExternalStore } from "react";
 import { billing } from "./billing";
@@ -40,11 +41,11 @@ const subs = new Set<() => void>();
 function load() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
-  try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && Array.isArray(s.done)) state = { ...state, done: s.done }; } catch {}
+  try { localStorage.removeItem(KEY); const s = JSON.parse(sessionStorage.getItem(KEY) || "null"); if (s && Array.isArray(s.done)) state = { ...state, done: s.done }; } catch {}
 }
 function set(next: Partial<State>) {
   state = { ...state, ...next };
-  try { localStorage.setItem(KEY, JSON.stringify({ done: state.done })); } catch {}
+  try { sessionStorage.setItem(KEY, JSON.stringify({ done: state.done })); } catch {}
   subs.forEach(f => f());
 }
 const snap = () => { load(); return state; };

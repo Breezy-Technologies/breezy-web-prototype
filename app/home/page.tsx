@@ -48,6 +48,18 @@ const COL_W = [388, 388, 664, 940];
 // Window width needed for 2 and 3 columns (the map still keeps ~800 px next to them).
 const colsFit = (w: number) => (w >= 2100 ? 3 : w >= 1600 ? 2 : 1);
 const COLS_KEY = "bz-results-cols";
+const NUDGE_KEY = "bz-gs-nudged";
+// Dev menu → Reset prototype (25 Nov): back to a first visit. Everything the prototype
+// keeps (session and local "bz-" keys: onboarding, picks, nav style, Make Breezy yours,
+// saved data, plan state) is cleared and the page reloads on /onboarding, so the defaults
+// apply: the Create flyout, onboarding first, then the Make Breezy yours nudge.
+function resetPrototype() {
+  try {
+    sessionStorage.clear();
+    Object.keys(localStorage).filter(k => k.startsWith("bz-")).forEach(k => localStorage.removeItem(k));
+  } catch {}
+  window.location.href = "/onboarding";
+}
 // Top of the visible map below the filter bar (search-this-area pill and viewport box).
 const BAR_BOTTOM = 70;
 
@@ -509,6 +521,16 @@ export default function HomeWeb() {
   // it's done; the guided version dims the screen round the next thing to press (Coach).
   const gs = useGetStarted();
   const tour = gs.tour;
+  // The nudge (25 Nov, William): the prototype always plays as a first visit, onboarding
+  // first, then Home opens with the Make Breezy yours checklist beside the nav, so the
+  // actions to discover are the first thing seen. Once per session (and again after a
+  // reset or Restart onboarding); not on review deep links (?report=).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("report")) return;
+    try { if (sessionStorage.getItem(NUDGE_KEY)) return; sessionStorage.setItem(NUDGE_KEY, "1"); } catch {}
+    const t = setTimeout(() => { const g = getStarted.get(); if (!g.tour && g.done.length < 4) getStarted.show(true); }, 1100);
+    return () => clearTimeout(t);
+  }, []);
   // Earned: a new saved search, an owner contacted (comps and Max build: see openFlow / the comps save).
   const nSearches = sv.searches.length, prevSearches = useRef(nSearches);
   useEffect(() => { if (nSearches > prevSearches.current) getStarted.complete("buyer"); prevSearches.current = nSearches; }, [nSearches]);
@@ -581,8 +603,9 @@ export default function HomeWeb() {
 
   // Developer menu: preview each UX state on demand (snackbars, search errors / empty, no estimate).
   const devActions: DevAction[] = [
+    { group: "Onboarding & activation", label: "Reset prototype (first visit)", icon: "ph-arrow-clockwise", run: resetPrototype },
     { group: "Onboarding & activation", label: "Make Breezy yours: reset", icon: "ph-sparkle", run: () => { getStarted.reset(); getStarted.show(); } },
-    { group: "Onboarding & activation", label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); router.push("/onboarding"); } },
+    { group: "Onboarding & activation", label: "Restart onboarding", icon: "ph-arrow-counter-clockwise", run: () => { restartOnboarding(); getStarted.reset(); try { sessionStorage.removeItem(NUDGE_KEY); } catch {} router.push("/onboarding"); } },
     { group: "Snackbars", label: "Snackbar: neutral", icon: "ph-info", run: () => showToast("No property found", "neutral") },
     { group: "Snackbars", label: "Snackbar: positive", icon: "ph-check-circle", run: () => showToast("Search saved", "positive") },
     { group: "Snackbars", label: "Snackbar: negative", icon: "ph-warning-circle", run: () => showToast("Couldn't save search. Try again.", "negative") },
