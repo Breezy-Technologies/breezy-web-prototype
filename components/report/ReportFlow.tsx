@@ -59,7 +59,9 @@ type Phase = "review" | "choose" | "run" | "done" | "report";
  *  `min` hides it to show the map (a pill brings it back). */
 export type Dock = { left: number; top: number; min: boolean; onMin: (m: boolean) => void;
   /** Comps have started (the subject reviewed, AI or manual picked): the panel slides away to reveal them. */
-  leaving?: boolean };
+  leaving?: boolean;
+  /** The tab shown, so the page can bring the same tab back after comps. */
+  onKind?: (k: FlowKind) => void };
 
 export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onShare, onToast, onComps, dock }: {
   l: Listing; kind: FlowKind; navW: number; cached?: boolean; dock?: Dock;
@@ -139,6 +141,7 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
   const compsNow = () => { got.add(gotKey(l, "comps")); setReveal(true); setPhase("report"); onDone?.("comps"); };
   const pick = (k: FlowKind) => {
     if (k === kind && phase === "report") return;
+    dock?.onKind?.(k);
     prev.current = { kind, phase };
     setWrite(fresh(k));
     setKind(k); gcLeft.current = AUTO_MS; setGcPaused(false);

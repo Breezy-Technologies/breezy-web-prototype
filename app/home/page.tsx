@@ -334,6 +334,8 @@ export default function HomeWeb() {
   const rptDock = !!flow && flow.kind !== "comps" && !!sel && sel.id === flow.l.id && sel.addr === flow.l.addr;
   const [rptMin, setRptMin] = useState(false);
   const [rptLeaving, setRptLeaving] = useState(false);
+  // The report Get comps slid away (its tab, for its property): closing comps brings it back.
+  const rptBack = useRef<{ kind: FlowKind; key: string } | null>(null);
   const rptShift = rptDock && !compsOn;
   // Everything that slides the property left (comps, or a docked report).
   const compsShift = compsShift0;
@@ -374,7 +376,7 @@ export default function HomeWeb() {
   const selKey = sel ? `${sel.id}|${sel.addr}` : "";
   // Another property (pin, parcel, saved home) leaves comps.
   useEffect(() => {
-    setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(null); setSubjMin(false); setRptMin(false);
+    setCompsOn(false); setCompsOut(false); setExportOn(false); setCompsAsk(null); setSubjMin(false); setRptMin(false); rptBack.current = null;
     if (flow && flow.kind !== "comps" && (!sel || sel.id !== flow.l.id || sel.addr !== flow.l.addr)) setFlow(null);
   }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // A resized comps panel reframes the comps once the new width has rendered.
@@ -416,6 +418,7 @@ export default function HomeWeb() {
     // A report docked beside the property (any tab, any Get comps: the report's or the detail
     // panel's) slides away now that the comps parameters are set, revealing the split view.
     if (flow && flow.kind !== "comps") {
+      rptBack.current = { kind: flow.kind, key: `${sel.id}|${sel.addr}` };
       setRptLeaving(true);
       setTimeout(() => { setFlow(null); setRptLeaving(false); setRptMin(false); }, 560);
     }
@@ -438,6 +441,10 @@ export default function HomeWeb() {
     setCompsOut(true); cm.setHoverC(null); if (fs.fd) fs.closePanel();
     if (sel) frameSel(sel);
     setTimeout(() => { setCompsOn(false); setCompsOut(false); }, 380);
+    // Comps opened from a docked report: the report comes back on the tab it was on (it has
+    // run, so it reopens whole, and an unlocked report doesn't spend again).
+    const back = rptBack.current; rptBack.current = null;
+    if (back && sel && back.key === `${sel.id}|${sel.addr}`) setTimeout(() => { setRptMin(false); setFlow({ l: sel, kind: back.kind }); }, 300);
   };
   // Escape leaves comps (a dialog inside claims Escape first, in the capture phase).
   useEffect(() => {
@@ -796,7 +803,7 @@ export default function HomeWeb() {
         frameSel(p.listing, p.ring, [p.cx, p.cy]);
       }} />
       {flow && <ReportFlow key={flow.l.id + flow.l.addr} l={flow.l} kind={flow.kind} navW={navW} cached={compsCached}
-        dock={rptDock ? { left: RPT_LEFT, top: GAP, min: rptMin, onMin: setRptMin, leaving: rptLeaving } : undefined}
+        dock={rptDock ? { left: RPT_LEFT, top: GAP, min: rptMin, onMin: setRptMin, leaving: rptLeaving, onKind: k => setFlow(f => f && f.kind !== k ? { ...f, kind: k } : f) } : undefined}
         onClose={() => { const was = rptShift; setFlow(null); setRptMin(false); if (was) { if (!compsOn) setSubjMin(false); if (sel) setTimeout(() => frameSel(sel), 60); } }}
         onDone={k => { if (k !== "comps") return; if (!rp.has(flow.l)) showToast("Report saved to Reports"); rp.save(flow.l); getStarted.complete("comps"); }} onShare={() => shareOne(flow.l)} onToast={showToast}
         onComps={sel && sel.id === flow.l.id ? openCompsMode : undefined} />}
