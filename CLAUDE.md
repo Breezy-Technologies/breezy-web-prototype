@@ -79,6 +79,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Recent searches are stored in localStorage. Several areas can be picked as chips.
 - Results use `searchPlacesStrict`.
 - **An address opens its own parcel (18 Nov review):** `listingForAddress` in `lib/fake.ts` matches house number + street name against Pedro's lots, then the county parcels in the heat circle (`public/data/sl-parcels.json`, fetched once), then the parcel holding the point, before falling back to the nearest lot / a generated home (the geocoded point often sits in the street, which used to open a neighbour).
+- **An address shows only its property (25 Nov, William):** under the search field, a "1 property · Matching <address>" card with that one home (`AddressResult` in `LeftPanel.tsx`, `addrHit` in `app/home/page.tsx`) replaces the Home card / results list, and its panel opens beside it. The field keeps the address after the panel closes; × clears both; any area search, saved search, Search this area or Clear goes back to the usual lists.
 - Error rows with Retry: "Unable to load search. Please retry." and "Search service timed out".
 - Empty state uses `/iso/empty-search.png` with "No recent searches".
 - When a property is open, the field shows its address with an × that deselects it.

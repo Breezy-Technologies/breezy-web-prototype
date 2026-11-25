@@ -34,6 +34,22 @@ export function ListingCard({ l, onOpen, onHover, fresh = l.isNew, dense }: { l:
   );
 }
 
+/** An address search (25 Nov, William): the one property matching the address sits under
+ *  the search field, in place of the results list. Opening it opens the property panel. */
+export function AddressResult({ l, query, onOpen, onHover }: { l: Listing; query: string; onOpen: () => void; onHover: (on: boolean) => void }) {
+  return (
+    <div style={{ ...card, flex: "none" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "20px 16px 12px" }}>
+        <span style={{ font: "700 19px/24px var(--font-sans)" }}>1 property</span>
+        <span style={{ font: "400 14px/18px var(--font-sans)", color: "var(--fg-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Matching {query}</span>
+      </div>
+      <div style={{ padding: "4px 16px 16px" }}>
+        <ListingCard l={l} fresh={false} onOpen={onOpen} onHover={onHover} />
+      </div>
+    </div>
+  );
+}
+
 // Sort button (`onSortToggle`) and the "No matches found" state (`isNoMatch`:
 // `onShowNearest`, `onFilterReset`) are ported from the canvas results column.
 // Footer: "Save search" / "Manage search" (`onFooterSearch`), or, once homes are

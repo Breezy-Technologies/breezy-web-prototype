@@ -6,7 +6,7 @@ import { useMapCtx } from "@/components/map/MapProvider";
 import { useApp } from "@/components/AppState";
 import { SideNav, NAV_W, DevAction } from "@/components/home/SideNav";
 import { SearchBar, previewSearchState } from "@/components/home/SearchBar";
-import { ResultsPanel, SortMenu } from "@/components/home/LeftPanel";
+import { AddressResult, ResultsPanel, SortMenu } from "@/components/home/LeftPanel";
 import { AllFiltersPanel, FilterBar, FilterDropdown, useFilterState } from "@/components/home/Filters";
 import { HomeCard } from "@/components/home/HomeCard";
 import { Toast, useToast } from "@/components/home/Toast";
@@ -237,7 +237,7 @@ export default function HomeWeb() {
   };
   // Comps intent: once the picked property is open, go straight into comps.
   const compsNext = useRef(false);
-  const goPlace = async (p: Place) => { setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
+  const goPlace = async (p: Place) => { setAddrHit(null); setAreaPill(false); closeDetail(); setSearching(false); setUnsup(null); setView("results"); await choosePlace(p); };
   // `_commitAreas`: results for the field's area(s); leaves the active saved search.
   // Each chip resolves to a Place (live geocoding / gazetteer; "Current location" via
   // geolocation), then they go to `chooseAreas` together (outlines + listings for all).
@@ -245,7 +245,7 @@ export default function HomeWeb() {
     let wasBuyer = intentRef.current; setIntent(null);
     // Make Breezy yours: the guide moves on to the results' next step.
     getStarted.step("buyer", "filters", ["search", "create"]); getStarted.step("underbuilt", "pick", ["search", "create"]);
-    sv.setActive(null); closeDetail(); setSearching(false); setView("results"); setUnsup(null); setAreaPill(false);
+    sv.setActive(null); closeDetail(); setAddrHit(null); setSearching(false); setView("results"); setUnsup(null); setAreaPill(false);
     const ps = await Promise.all(list.map(a => resolveArea(a, place.center)));
     const ok = ps.filter((p): p is Place => !!p);
     const missed = list.filter((_, k) => !ps[k]);
@@ -257,6 +257,9 @@ export default function HomeWeb() {
   };
   // An address suggestion opens that property on its own (`_openSolo`). Outside
   // coverage there's no property data: neutral "No property found" toast (sprint item).
+  // An address search (25 Nov, William): its one matching property shows under the search
+  // field instead of the results list (AddressResult), until another search or ×.
+  const [addrHit, setAddrHit] = useState<{ l: Listing; q: string } | null>(null);
   const pickAddress = async (p: Place) => {
     sv.setActive(null);
     // Guided comps (18 Nov review): the property opens on its own; the guide then points at Get comps.
@@ -267,11 +270,14 @@ export default function HomeWeb() {
     const l = isCovered(p) ? await listingForAddress("addr:" + p.id, p.name || p.label, p.center, p.label.split(", ").slice(1, 2).join("")) : null;
     if (!l) { compsNext.current = false; return showToast("No property found", "info"); }
     // A real lot keeps its own spot and address; a generated home takes the searched ones.
-    openSavedProp(l.apn ? l : { ...l, lng, lat, addr: p.name });
+    const hit = l.apn ? l : { ...l, lng, lat, addr: p.name };
+    setAddrHit({ l: hit, q: p.name || p.label.split(",")[0] });
+    setSearching(false); setAreaPill(false);
+    openSavedProp(hit);
   };
   // `onClearSearch` from the search step: back to Home with no area query.
-  const clearSearch = () => { setAreaPill(false); sv.setActive(null); closeDetail(); setUnsup(null); setView("home"); setSortOpen(false); setSavedOpen(false); };
-  const fieldAreas: Area[] = view !== "results" ? [] : unsup && !unsup.placed ? [{ label: unsup.label }] : areas.map(p => ({ label: p.label, place: p }));
+  const clearSearch = () => { setAddrHit(null); setAreaPill(false); sv.setActive(null); closeDetail(); setUnsup(null); setView("home"); setSortOpen(false); setSavedOpen(false); };
+  const fieldAreas: Area[] = view !== "results" || addrHit ? [] : unsup && !unsup.placed ? [{ label: unsup.label }] : areas.map(p => ({ label: p.label, place: p }));
   const multi = areas.length > 1;
   const areaMeta = multi ? areas.map(a => a.label.split(",")[0]).slice(0, -1).join(", ") + " & " + areas[areas.length - 1].label.split(",")[0] : place.label;
   // Saved home: open it in place when it's in this area's listings, otherwise on its own.
@@ -283,14 +289,14 @@ export default function HomeWeb() {
   };
   // `openSearch`: results for the search's area and filters, with it as the active search.
   const openSearch = async (x: SavedSearch) => {
-    sv.setActive(x.id);
+    setAddrHit(null); sv.setActive(x.id);
     fs.setF(x.f || seedFilters(x.params));
     if (x.place) return goPlace(x.place);
     const r = await searchPlaces(x.sq);
     if (r[0]) goPlace(r[0]); else { setView("results"); showToast("No results for " + x.sq, "info"); }
   };
   // `onClearActive`
-  const clearActive = () => { sv.setActive(null); ss.close(); closeDetail(); setView("home"); setSortOpen(false); setSavedOpen(false); };
+  const clearActive = () => { setAddrHit(null); sv.setActive(null); ss.close(); closeDetail(); setView("home"); setSortOpen(false); setSavedOpen(false); };
   // `onSaveSearch` / `onFooterSearch` / `onManageSearch`: the sheet replaces any open dropdown, panel or sort menu.
   const openSheet = (s?: SavedSearch | null) => {
     fs.setDd(null); if (fs.fd) fs.closePanel(); setSortOpen(false); setSavedOpen(false);
@@ -515,6 +521,7 @@ export default function HomeWeb() {
   }, [map]);
   const searchThisArea = () => {
     if (!map) return;
+    setAddrHit(null);
     const r = visRect();
     const a = map.unproject([r.x0, r.y0]), b = map.unproject([r.x1, r.y1]);
     const bb: BBox = [Math.min(a.lng, b.lng), Math.min(a.lat, b.lat), Math.max(a.lng, b.lng), Math.max(a.lat, b.lat)];
@@ -690,14 +697,17 @@ export default function HomeWeb() {
           ...(leftShift ? { opacity: 0, transform: "translateX(-28px) scale(.97)", visibility: "hidden" as const } : {}) }}>
           <div style={{ pointerEvents: "auto" }}>
             {/* Entering the search step (`onSearchFocus`) closes dropdowns and the detail panel, as the canvas step change does. */}
-            <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : areaSq(fieldAreas.map(a => a.label))} near={place.center}
+            <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : addrHit ? addrHit.q : areaSq(fieldAreas.map(a => a.label))} near={place.center}
               areas={fieldAreas} searching={searching} prompt={intent ? INTENT_PROMPT[intent] : undefined}
               onSearching={on => { setSearching(on); if (!on) setTimeout(() => setIntent(null), 0); if (on) { fs.setDd(null); setSortOpen(false); closeDetail(); } }}
               onCommit={commitAreas} onPickAddress={pickAddress} onClearAll={clearSearch}
-              onClear={() => { if (detailOpen) closeDetail(); else { setView("home"); setUnsup(null); } }}
+              onClear={() => { if (addrHit) { setAddrHit(null); closeDetail(); return; } if (detailOpen) closeDetail(); else { setView("home"); setUnsup(null); } }}
               active={detailOpen ? null : active} onManage={() => openSheet(active)} onClearActive={clearActive} />
           </div>
-          {searching ? null : view === "home"
+          {searching ? null : addrHit
+            ? <AddressResult l={addrHit.l} query={addrHit.q} onOpen={() => openSavedProp(addrHit.l)}
+                onHover={on => { const x = listings.find(y => propKey(y) === propKey(addrHit.l)); setHoverId(on && x ? x.id : null); }} />
+            : view === "home"
             ? <HomeCard name={user.name} area={place.label} forYou={forYou} seen={seen} onOpen={openListing} onHover={setHoverId} toast={showToast}
                 onOpenSearch={openSearch} onOpenProp={openSavedProp} onStart={() => (document.querySelector("input") as HTMLInputElement | null)?.focus()}
                 picked={picked} onSharePicked={() => sh.sharePicked()} onTab={setHomeTab} onSignals={setFySignals} cols={cols} maxCols={maxCols} onCols={pickCols}
