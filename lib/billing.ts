@@ -152,7 +152,8 @@ export function useEntitlements() {
 // sheet without prop drilling.
 export type PaywallReq =
   | { kind: "upsell"; feature: Metered; then?: () => void }
-  | { kind: "offer"; feature?: Feature; kicker?: string; then?: () => void; /** Dev menu preview: the trial version, nothing starts. */ preview?: boolean }
+  | { kind: "offer"; feature?: Feature; kicker?: string; then?: () => void; /** Dev menu preview: the trial version, nothing starts. */ preview?: boolean;
+      /** Dev menu → View paywall: open this version directly, whatever the paywall setting. */ version?: "web" | "mobile" | "holiday" }
   | { kind: "plan"; tab?: string }
   | { kind: "winback" }
   | { kind: "news" }

@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Access, type BillingState, PRESETS, billing, paywall, trialLength, useBilling, useEntitlements, usePaywallReq } from "@/lib/billing";
 import { SettingsDialog } from "./SettingsDialog";
-import { MobilePaywall } from "./MobilePaywall";
+import { HolidayPaywall, MobilePaywall } from "./MobilePaywall";
 import { type Feature, type Metered, PRICING, type Segment, money, saving, sku } from "@/lib/pricing.config";
 
 const INK = "rgb(18,18,18)", MUTED = "rgb(98,90,89)", CLAY = "rgb(147,89,75)", SOFT = "rgb(245,240,238)", PAPER = "rgb(253,252,252)";
@@ -445,12 +445,21 @@ export function BillingHost({ onToast }: { onToast: Toast }) {
   if (r.kind === "winback") return <WinBack onClose={close} onToast={onToast} />;
   if (r.kind === "news") return <News onClose={close} onToast={onToast} />;
   if (r.kind === "offer") {
-    const onDone = () => { const trial = s.status === "none"; onToast(trial && s.segment === "new2" ? `Your ${s.trialVariant}-day trial has started` : `${P.name} started`, "positive"); close(); r.then?.(); };
+    const onDone = () => {
+      const trial = s.status === "none";
+      onToast(trial && s.segment === "new2" ? `Your ${s.trialVariant}-day trial has started` : `${P.name} started`, "positive"); close(); r.then?.();
+    };
+    const pv = r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone;
+    // Dev menu → View paywall opens one version directly; otherwise the journey's setting
+    // (Dev menu → Plan & billing → Paywall in the journey) decides.
+    const version = r.version ?? s.paywallStyle ?? "web";
+    // The holiday paywall (26 Nov): Essential / Unlimited; the 50% only on the iPhone (QR).
+    if (version === "holiday") return <HolidayPaywall trial days={s.trialVariant} preview={r.preview} onClose={close} onDone={pv} />;
     // Dev menu → Paywall: Mobile (the iPhone's paywall, adapted to web).
-    if (s.paywallStyle === "mobile") {
+    if (version === "mobile") {
       const win = s.status === "none" ? winOffer(s.segment) : null;
       const trial = r.preview || !!win || (s.status === "none" && s.segment === "new2");
-      return <MobilePaywall feature={r.feature} kicker={r.kicker} trial={trial} days={win ? win.trialDays : s.trialVariant} preview={r.preview} onClose={close}
+      return <MobilePaywall feature={r.feature} kicker={r.kicker} trial={trial} days={win ? win.trialDays : s.trialVariant} preview={r.preview} holiday={r.version ? false : undefined} onClose={close}
         onDone={r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone} />;
     }
     return <OfferSheet feature={r.feature} kicker={r.kicker} onClose={close} onDone={r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone} />;
