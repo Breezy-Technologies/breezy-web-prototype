@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Access, type BillingState, PRESETS, billing, paywall, trialLength, useBilling, useEntitlements, usePaywallReq } from "@/lib/billing";
 import { SettingsDialog } from "./SettingsDialog";
-import { MobilePaywall } from "./MobilePaywall";
+import { HolidayPaywall, MobilePaywall } from "./MobilePaywall";
 import { handoffProfile } from "@/lib/handoff/profile";
 import { type Feature, type Metered, PRICING, type Segment, money, saving, sku } from "@/lib/pricing.config";
 
@@ -469,11 +469,16 @@ export function BillingHost({ onToast }: { onToast: Toast }) {
       if (handoffProfile.get().on) return paywall.open({ kind: "done", what: trial ? "trial" : "plan", then: r.then });
       onToast(trial && s.segment === "new2" ? `Your ${s.trialVariant}-day trial has started` : `${P.name} started`, "positive"); close(); r.then?.();
     };
+    const pv = r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone;
+    // Dev menu → View paywall: one version directly (the setting below stays as it was).
+    const version = r.version ?? (s.paywallStyle === "mobile" ? "mobile" : "web");
+    // The holiday paywall (26 Nov): Essential / Unlimited, both 50% off.
+    if (version === "holiday") return <HolidayPaywall trial days={s.trialVariant} preview={r.preview} onClose={close} onDone={pv} />;
     // Dev menu → Paywall: Mobile (the iPhone's paywall, adapted to web).
-    if (s.paywallStyle === "mobile") {
+    if (version === "mobile") {
       const win = s.status === "none" ? winOffer(s.segment) : null;
       const trial = r.preview || !!win || (s.status === "none" && s.segment === "new2");
-      return <MobilePaywall feature={r.feature} kicker={r.kicker} trial={trial} days={win ? win.trialDays : s.trialVariant} preview={r.preview} onClose={close}
+      return <MobilePaywall feature={r.feature} kicker={r.kicker} trial={trial} days={win ? win.trialDays : s.trialVariant} preview={r.preview} holiday={r.version ? false : undefined} onClose={close}
         onDone={r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone} />;
     }
     return <OfferSheet feature={r.feature} kicker={r.kicker} onClose={close} onDone={r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone} />;

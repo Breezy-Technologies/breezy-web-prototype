@@ -114,3 +114,29 @@ export const MOBILE_PAYWALL = {
   },
 } as const;
 export type MobileTier = keyof typeof MOBILE_PAYWALL.plans;
+
+/** The holiday paywall (26 Nov, Figma "Onboarding redesign" 2CKvKeUl6XgruMBITGkHbt, section
+ *  1800:12372 "New experience (new users)"), adapted to web. Two plans for the holiday season,
+ *  **Essential and Unlimited, both 50% off**: half off monthly through March 31, or half off the
+ *  first year on annual. Essential's figures are the design's; **Unlimited's are placeholders**
+ *  (the design still says Elite) until pricing confirms them. */
+export const HOLIDAY_PAYWALL = {
+  press: ["AXIOS", "HOUSINGWIRE", "Los Angeles Times", "inman"],
+  pct: 50,
+  until: "March 31",
+  plans: {
+    essential: {
+      name: "Essential",
+      features: [["Comps", "15/mo"], ["Underbuilt Radar", "5/mo"], ["Branded reports", "Breezy Theme"], ["AI Note Taker", "Unlimited"], ["AI Assistant", "Unlimited"], ["Pipeline", "Unlimited"]],
+      yearly: { mo: 32, total: 384, now: { mo: 16, total: 192 } },
+      monthly: { mo: 39.9, now: { mo: 19.95 } },
+    },
+    unlimited: {
+      name: "Unlimited",
+      features: [["Comps", "Unlimited"], ["Underbuilt Radar", "Unlimited"], ["Branded reports", "Your brand"], ["AI Note Taker", "Unlimited"], ["AI Assistant", "Unlimited"], ["Pipeline", "Unlimited"]],
+      yearly: { mo: 64, total: 768, now: { mo: 32, total: 384 } },
+      monthly: { mo: 79.9, now: { mo: 39.95 } },
+    },
+  },
+} as const;
+export type HolidayTier = keyof typeof HOLIDAY_PAYWALL.plans;

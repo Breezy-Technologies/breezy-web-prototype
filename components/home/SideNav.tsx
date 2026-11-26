@@ -75,8 +75,11 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
   const devAll: DevAction[] = [
     ...dev,
     { group: "Plan & billing", label: "Plan state…", icon: "ph-credit-card", run: () => setPlanDev(true) },
-    { group: "Plan & billing", label: `Paywall: ${bill.paywallStyle === "mobile" ? "Mobile → switch to Web" : "Web → switch to Mobile"}`, icon: "ph-swap", run: () => billing.set({ paywallStyle: bill.paywallStyle === "mobile" ? "web" : "mobile" }) },
-    { group: "Plan & billing", label: "Preview the paywall (trial offer)", icon: "ph-eye", run: () => paywall.open({ kind: "offer", preview: true }) },
+    // View each paywall directly (26 Nov, William: for the team to compare; nothing changes in the
+    // background and nothing is started). The default for real paywall moments stays in Plan state….
+    { group: "Plan & billing", label: "View paywall: Web (two panels)", icon: "ph-eye", run: () => paywall.open({ kind: "offer", preview: true, version: "web" }) },
+    { group: "Plan & billing", label: "View paywall: Mobile (imported)", icon: "ph-device-mobile", run: () => paywall.open({ kind: "offer", preview: true, version: "mobile" }) },
+    { group: "Plan & billing", label: "View paywall: Holiday 50% off", icon: "ph-gift", run: () => paywall.open({ kind: "offer", preview: true, version: "holiday" }) },
     { group: "Plan & billing", label: `Unlimited (internal): ${bill.unlimited ? "on" : "off"}`, icon: "ph-infinity", run: () => billing.set({ unlimited: !bill.unlimited }) },
     ...NAV_STYLES.map(([k, label, icon]) => ({ group: "Side nav", label: `${label}${k === navStyle ? " ✓" : ""}`, icon, run: () => setNavStyle(k) }))];
   return (
