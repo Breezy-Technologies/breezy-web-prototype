@@ -83,7 +83,7 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
     // started, no setting changes), so the team can compare them; Use in the journey picks the
     // version every real paywall moment opens (locked reports, Contact owner, Get comps, upgrades…).
     ...PAYWALL_VERSIONS.map(([k, label, icon]) => ({ group: "Paywall", label: `View: ${label}`, icon, run: () => paywall.open({ kind: "offer", preview: true, version: k }) })),
-    ...PAYWALL_VERSIONS.map(([k, label]) => ({ group: "Paywall", label: `Use in the journey: ${label}${(bill.paywallStyle ?? "web") === k ? " ✓" : ""}`, icon: "ph-signpost", run: () => billing.set({ paywallStyle: k }) })),
+    ...PAYWALL_VERSIONS.map(([k, label]) => ({ group: "Paywall", label: `Use in the journey: ${label}${(bill.paywallStyle === "holiday" ? "holiday" : "web") === k ? " ✓" : ""}`, icon: "ph-signpost", run: () => billing.set({ paywallStyle: k }) })),
     // Log in with the iPhone (27 Nov, William): the scan-to-link login (QR, email link, 6-digit
     // code) and the simulated iPhone. "Simulate phone" on the login screen approves the QR here.
     { group: "Log in (QR)", label: "Log in screen (scan the QR)", icon: "ph-qr-code", run: () => location.assign("/login") },

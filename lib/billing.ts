@@ -13,8 +13,8 @@ export type Status = "trial" | "active" | "expired" | "none";
 export type LockStyle = "partial" | "blur" | "tile";
 /** One use of a metered feature: what, on which property (`reportKey`), when, paid how. */
 export type UseLog = { f: Metered; key: string; at: number; via: "allowance" | "credit" };
-export type PaywallVersion = "web" | "mobile" | "holiday";
-export const PAYWALL_VERSIONS: [PaywallVersion, string, string][] = [["web", "Web (two panels)", "ph-browser"], ["mobile", "Mobile (imported)", "ph-device-mobile"], ["holiday", "Holiday (50% off on iPhone)", "ph-gift"]];
+export type PaywallVersion = "web" | "holiday";
+export const PAYWALL_VERSIONS: [PaywallVersion, string, string][] = [["web", "Web (two panels)", "ph-browser"], ["holiday", "Holiday (50% off on iPhone)", "ph-gift"]];
 export type BillingState = {
   unlimited: boolean;
   status: Status;
@@ -31,10 +31,8 @@ export type BillingState = {
   /** On the $9.90 save offer after trying to cancel. */
   saved: boolean;
   lockStyle: LockStyle;
-  /** The holiday 50%-off offer is live (PRICING.holiday; Dev menu toggles it). */
-  holiday?: boolean;
   /** Which paywall every offer in the journey opens (Dev menu → Paywall → Use in the journey):
-   *  the web two-panel sheet, the mobile paywall adapted to web, or the holiday paywall. */
+   *  the web two-panel sheet or the holiday paywall (27 Nov: the mobile import is off main). */
   paywallStyle?: PaywallVersion;
   /** State version: 2 = locked tiles open the paywall only (17 Nov review). */
   v?: number;
@@ -84,7 +82,7 @@ export const billing = {
   set,
   preset(id: string) {
     const p = PRESETS.find(x => x.id === id); if (!p) return;
-    set({ ...BASE, holiday: undefined, unlimited: state.unlimited, lockStyle: state.lockStyle, paywallStyle: state.paywallStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
+    set({ ...BASE, unlimited: state.unlimited, lockStyle: state.lockStyle, paywallStyle: state.paywallStyle, used: { ...ZERO }, credits: { ...ZERO }, owned: [], log: [], ...p.state });
   },
   /** Mock purchase: adds the SKU's credits. */
   buy(id: string) {
