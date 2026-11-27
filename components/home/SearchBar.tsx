@@ -67,8 +67,9 @@ const icon = (city: boolean) => {
 };
 const keepFocus = (e: React.MouseEvent) => e.preventDefault();
 
-export function SearchBar({ prompt, value, areas, searching, onSearching, onCommit, onPickAddress, onClear, onClearAll, near, active, onManage, onClearActive }: {
+export function SearchBar({ lead, prompt, value, areas, searching, onSearching, onCommit, onPickAddress, onClear, onClearAll, near, active, onManage, onClearActive }: {
   prompt?: string; // placeholder override (side nav "New buyer search")
+  lead?: React.ReactNode; // before the text: the buyers a guided buyer search is for
   value: string; // field text when not searching
   areas: Area[]; // committed areas (results), restored as chips when searching
   searching: boolean; onSearching: (on: boolean) => void;
@@ -211,6 +212,7 @@ export function SearchBar({ prompt, value, areas, searching, onSearching, onComm
   return (
     <div style={css("display:flex;flex-direction:column;gap:8px")}>
       <div data-tour="search-field" style={css(FIELD)}>
+        {lead}
         <div onClick={() => input.current?.focus()} style={css("flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 4px")}>
           {chips.map(c => (
             <span key={c.label} style={css("flex:none;max-width:100%;box-sizing:border-box;display:flex;align-items:center;gap:6px;height:32px;padding:0 4px 0 10px;border-radius:9999px;background:rgb(255,255,255);box-shadow:inset 0 0 0 1px rgba(18,18,18,.24);font:400 14px/18px var(--font-sans);color:rgb(18,18,18);white-space:nowrap;animation:fadeIn .2s ease both")}>

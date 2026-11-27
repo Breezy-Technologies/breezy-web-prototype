@@ -34,11 +34,15 @@ const FREQ = ["Instant", "Daily digest", "Weekly"];
 export type BuyerPick = BuyerResult["buyer"];
 
 export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose: () => void; onDone?: (r: BuyerResult) => void;
-  /** Only the contact step; Continue hands the buyer to `onBuyer`. */ contactOnly?: boolean; onBuyer?: (b: BuyerPick) => void }) {
+  /** Only the contact step, one or several buyers (27 Nov review); Continue hands them to `onBuyer`. */ contactOnly?: boolean; onBuyer?: (b: BuyerPick[]) => void }) {
   const sv = useSaved();
   const [step, setStep] = useState(0);
   // 1 · buyer
   const [buyer, setBuyer] = useState<string | null>(null);
+  // contactOnly: several buyers can share a search (a couple, family members).
+  const [picked, setPicked] = useState<string[]>([]);
+  const togglePick = (n: string) => setPicked(p => p.includes(n) ? p.filter(x => x !== n) : [...p, n]);
+  const addNew = () => { const n = nb.name.trim(); if (n.length < 2) return; sv.addContact(n); setPicked(p => p.includes(n) ? p : [...p, n]); setAdding(false); setQ(""); setNb({ name: "", email: "", phone: "" }); };
   const [adding, setAdding] = useState(false);
   const [nb, setNb] = useState({ name: "", email: "", phone: "" });
   const [q, setQ] = useState("");
@@ -80,14 +84,14 @@ export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose
   useEffect(() => { if (!named) setName(`${first}'s search${areaName ? " · " + areaName : ""}`); }, [first, areaName, named]);
 
   const ok = [
-    !!buyer || (adding && nb.name.trim().length > 1),
+    contactOnly ? (adding ? nb.name.trim().length > 1 : picked.length > 0) : !!buyer || (adding && nb.name.trim().length > 1),
     areas.length > 0,
     !(hi && lo && BUDGET[hi] <= BUDGET[lo]),
     name.trim().length > 0,
   ][step];
   const next = () => {
     if (!ok) return;
-    if (contactOnly) { onBuyer?.({ name: adding ? nb.name.trim() : buyer!, email: adding ? nb.email.trim() : undefined, phone: adding ? nb.phone.trim() : undefined, isNew: adding }); return; }
+    if (contactOnly) { if (adding) return addNew(); onBuyer?.(picked.map(name => ({ name, isNew: false }))); return; }
     if (step < 3) { if (step === 0 && adding) setBuyer(null); setStep(step + 1); return; }
     const bName = adding ? nb.name.trim() : buyer!;
     const pick = (m: Record<string, boolean>) => Object.fromEntries(Object.entries(m).filter(([, v]) => v));
@@ -110,7 +114,7 @@ export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose
     ...Object.keys(types).filter(k => types[k]), ...Object.keys(feats).filter(k => feats[k]),
   ].filter(Boolean);
   const titles = [
-    ["Who's this search for?", contactOnly ? "Start with your buyer. Then we'll show you where to set their area, criteria and alerts on the map." : "Start with your buyer. Their search, alerts and matches stay together."],
+    ["Who's this search for?", contactOnly ? "Pick one or more buyers. Then we'll show you where to set their area, criteria and alerts on the map." : "Start with your buyer. Their search, alerts and matches stay together."],
     [`Where is ${first} looking?`, "Add one or more areas."],
     [`What does ${first} need?`, "Everything is optional. You can fine-tune the filters later."],
     ["How should we keep you posted?", `We'll watch for new listings that match ${first}'s criteria.`],
@@ -153,6 +157,16 @@ export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose
           {step === 0 && (!adding ? (
             <>
               <Field icon="ph-magnifying-glass" value={q} onChange={setQ} placeholder="Search your contacts" autoFocus />
+              {contactOnly && picked.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: -6 }}>
+                  {picked.map(n => (
+                    <span key={n} style={{ display: "flex", alignItems: "center", gap: 6, height: 30, padding: "0 4px 0 4px", borderRadius: 9999, background: SOFT, font: "400 13px/16px var(--font-sans)", color: INK }}>
+                      <Avatar name={n} size={22} />{n}
+                      <button onClick={() => togglePick(n)} title={`Remove ${n}`} className="sv-ghost" style={{ width: 22, height: 22, border: "none", borderRadius: 9999, background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph ph-x" style={{ fontSize: 12, color: INK }} /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
               <div style={{ display: "flex", flexDirection: "column", gap: 2, margin: "-6px -8px 0" }}>
                 <button onClick={() => { setAdding(true); setBuyer(null); setNb(n => ({ ...n, name: q.trim() && !contacts.length ? q.trim() : n.name })); }} className="hover-row" style={row(false)}>
                   <span style={{ width: 36, height: 36, borderRadius: 9999, background: SOFT, display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph ph-user-plus" style={{ fontSize: 18, color: INK }} /></span>
@@ -160,13 +174,15 @@ export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose
                   <i className="ph ph-caret-right" style={{ fontSize: 14, color: MUTED }} />
                 </button>
                 {contacts.map(([n, tag]) => (
-                  <button key={n} onClick={() => setBuyer(n)} onDoubleClick={() => { setBuyer(n); setStep(1); }} className="hover-row" style={row(buyer === n)}>
+                  <button key={n} onClick={() => contactOnly ? togglePick(n) : setBuyer(n)} onDoubleClick={() => { if (!contactOnly) { setBuyer(n); setStep(1); } }} className="hover-row" style={row(contactOnly ? picked.includes(n) : buyer === n)}>
                     <Avatar name={n} size={36} />
                     <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
                       <span style={{ font: "400 14px/18px var(--font-sans)", color: INK }}>{n}</span>
                       {tag && <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>{tag}</span>}
                     </span>
-                    <span style={{ width: 20, height: 20, borderRadius: 9999, boxShadow: buyer === n ? "none" : `inset 0 0 0 1.5px ${LINE}`, background: buyer === n ? INK : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{buyer === n && <i className="ph-bold ph-check" style={{ fontSize: 11, color: "rgb(253,252,252)" }} />}</span>
+                    {(() => { const on = contactOnly ? picked.includes(n) : buyer === n; return (
+                      <span style={{ width: 20, height: 20, borderRadius: contactOnly ? 6 : 9999, boxShadow: on ? "none" : `inset 0 0 0 1.5px ${LINE}`, background: on ? INK : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{on && <i className="ph-bold ph-check" style={{ fontSize: 11, color: "rgb(253,252,252)" }} />}</span>
+                    ); })()}
                   </button>
                 ))}
               </div>
@@ -179,7 +195,7 @@ export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose
                 <Label t="Email" opt><Field value={nb.email} onChange={v => setNb({ ...nb, email: v })} placeholder="jordan@email.com" /></Label>
                 <Label t="Phone" opt><Field value={nb.phone} onChange={v => setNb({ ...nb, phone: v })} placeholder="(323) 555-0100" /></Label>
               </div>
-              <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>Saved to your contacts, so you can send them matches.</span>
+              <span style={{ font: "400 12px/16px var(--font-sans)", color: MUTED }}>Saved to your contacts, so you can send them matches.{contactOnly ? " You can pick more buyers after." : ""}</span>
             </div>
           ))}
 
@@ -272,7 +288,7 @@ export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose
           <span style={{ flex: 1 }} />
           {step === 2 && <button onClick={() => setStep(3)} className="sv-ghost" style={{ ...btn(false), background: "none" }}>Skip</button>}
           <button onClick={next} disabled={!ok} className="fb-dark" style={{ ...btn(true), opacity: ok ? 1 : 0.35, cursor: ok ? "pointer" : "default" }}>
-            {step === 3 ? "Save & see matches" : step === 0 && adding ? (contactOnly ? "Add buyer" : "Add buyer & continue") : "Continue"}
+            {step === 3 ? "Save & see matches" : step === 0 && adding ? (contactOnly ? "Add buyer" : "Add buyer & continue") : contactOnly && picked.length > 1 ? `Continue with ${picked.length} buyers` : "Continue"}
           </button>
         </div>
       </div>
@@ -284,7 +300,7 @@ export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose
 const row = (on: boolean): React.CSSProperties => ({ display: "flex", alignItems: "center", gap: 12, width: "100%", minHeight: 52, padding: "8px", border: "none", borderRadius: 12, background: on ? SOFT : "none", cursor: "pointer", textAlign: "left" });
 const btn = (dark: boolean): React.CSSProperties => ({ height: 44, padding: "0 20px", border: "none", borderRadius: 9999, background: dark ? INK : "rgba(13,12,12,.06)", color: dark ? "rgb(253,252,252)" : INK, font: "700 15px/20px var(--font-sans)", cursor: "pointer", whiteSpace: "nowrap" });
 
-function Avatar({ name, size }: { name: string; size: number }) {
+export function Avatar({ name, size }: { name: string; size: number }) {
   const ph = CLIENT_PHOTOS[name];
   return <span style={{ flex: "none", width: size, height: size, borderRadius: 9999, background: ph ? `url(${ph}) center/cover` : "rgb(228,214,208)", display: "flex", alignItems: "center", justifyContent: "center", font: `700 ${Math.round(size * 0.36)}px/1 var(--font-sans)`, color: INK }}>{!ph && initials(name || "?")}</span>;
 }

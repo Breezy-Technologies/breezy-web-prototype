@@ -1,5 +1,5 @@
 "use client";
-import { BuyerWizard, BuyerResult, type BuyerPick } from "@/components/home/BuyerWizard";
+import { Avatar, BuyerWizard, BuyerResult, type BuyerPick } from "@/components/home/BuyerWizard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMapCtx } from "@/components/map/MapProvider";
@@ -212,11 +212,23 @@ export default function HomeWeb() {
   // picks the buyer; then the guided overlay (Coach) takes over on the map: the search field
   // ("Where is Maya looking?"), the suggestions, All filters, Save search, whose sheet opens with
   // the buyer already in "For". Every time, not only for Make Breezy yours' first one.
-  const [buyerFor, setBuyerFor] = useState<BuyerPick | null>(null);
-  const buyerFirst = buyerFor ? buyerFor.name.split(" ")[0] : "your buyer";
-  const pickBuyer = (b: BuyerPick) => {
-    if (b.isNew) sv.addContact(b.name);
-    setBuyerFor(b); setBuyerWiz(false);
+  // One or several buyers (27 Nov review): their faces sit in the search field while the guide
+  // runs, the copy names them ("Where are Maya and Steve looking?"), the sheet lists them all.
+  const [buyerFor, setBuyerFor] = useState<BuyerPick[] | null>(null);
+  const bFirsts = (buyerFor || []).map(b => b.name.split(" ")[0]);
+  const buyerFirst = !bFirsts.length ? "your buyer" : bFirsts.length === 1 ? bFirsts[0] : bFirsts.length === 2 ? `${bFirsts[0]} and ${bFirsts[1]}` : `${bFirsts[0]}, ${bFirsts[1]} and ${bFirsts.length - 2} more`;
+  const buyerIs = bFirsts.length > 1 ? "are" : "is";
+  const buyerPoss = bFirsts.length > 2 ? "your buyers'" : `${buyerFirst}'s`;
+  const buyerShort = bFirsts.length > 1 ? bFirsts.slice(0, 2).join(" & ") + (bFirsts.length > 2 ? ` +${bFirsts.length - 2}` : "") : buyerFirst;
+  const buyerFaces = buyerFor && buyerFor.length > 0 ? (
+    <span title={buyerFor.map(b => b.name).join(", ")} style={{ flex: "none", display: "flex", alignItems: "center", marginLeft: 2 }}>
+      {buyerFor.slice(0, 3).map((b, i) => <span key={b.name} style={{ marginLeft: i ? -5 : 0, borderRadius: 9999, boxShadow: "0 0 0 2px rgb(249,249,249)", display: "flex" }}><Avatar name={b.name} size={28} /></span>)}
+      {buyerFor.length > 3 && <span style={{ marginLeft: -5, width: 28, height: 28, borderRadius: 9999, boxShadow: "0 0 0 2px rgb(249,249,249)", background: "rgb(18,18,18)", color: "rgb(253,252,252)", display: "flex", alignItems: "center", justifyContent: "center", font: "700 11px/1 var(--font-sans)" }}>+{buyerFor.length - 3}</span>}
+    </span>
+  ) : null;
+  const pickBuyer = (bs: BuyerPick[]) => {
+    bs.forEach(b => { if (b.isNew) sv.addContact(b.name); });
+    setBuyerFor(bs); setBuyerWiz(false);
     sv.setActive(null); closeDetail(); setIntent("buyer");
     getStarted.go("buyer", "search", true);
     setTimeout(() => setSearching(true), 60);
@@ -318,7 +330,7 @@ export default function HomeWeb() {
   // `onSaveSearch` / `onFooterSearch` / `onManageSearch`: the sheet replaces any open dropdown, panel or sort menu.
   const openSheet = (s?: SavedSearch | null) => {
     fs.setDd(null); if (fs.fd) fs.closePanel(); setSortOpen(false); setSavedOpen(false);
-    if (s) ss.openManage(s); else ss.openNew(buyerFor ? [buyerFor.name] : [], buyerFor ? `${buyerFirst}'s search · ${fieldAreas.map(a => a.label.split(",")[0]).slice(0, 2).join(" & ") || place.label.split(",")[0]}` : "");
+    if (s) ss.openManage(s); else ss.openNew(buyerFor ? buyerFor.map(b => b.name) : [], buyerFor ? `${bFirsts.length > 1 ? buyerShort : buyerShort + "'s search"} · ${fieldAreas.map(a => a.label.split(",")[0]).slice(0, 2).join(" & ") || place.label.split(",")[0]}` : "");
   };
 
   // Share (`onShareProp` / `onSharePicked`): one property, or the picked set from the saved store.
@@ -630,14 +642,14 @@ export default function HomeWeb() {
       }
       case "search": {
         // The search step (18 Nov review): the field first, then the suggestions once typed.
-        const q = { buyer: [`Where is ${buyerFirst} looking?`, `Search the neighbourhood, city or ZIP ${buyerFirst} wants.`, "Pick the area", "Choose one; you can add more areas after."],
+        const q = { buyer: [`Where ${buyerIs} ${buyerFirst} looking?`, `Search the neighbourhood, city or ZIP ${buyerFirst} ${bFirsts.length > 1 ? "want" : "wants"}.`, "Pick the area", "Choose one; you can add more areas after."],
           underbuilt: ["Where should we look?", "Search a neighbourhood, city or ZIP.", "Pick the area", "We'll show its lots with room to build."],
           comps: ["Enter the address", "Type the address of the home you want to price.", "Select the property", "Pick its address to open the property."] } as Record<string, string[]>;
         const [t1, s1, t2, s2] = q[tour.task] || q.buyer;
         return [{ sel: `[data-tour="search-results"]`, title: t2, sub: s2 }, { sel: `[data-tour="search-field"]`, title: t1, sub: s1 }];
       }
-      case "filters": return [{ sel: `[data-tour="all-filters"]`, title: buyerFor ? `Add ${buyerFirst}'s criteria` : "Add your client's criteria", sub: buyerFor ? `Set ${buyerFirst}'s budget, beds and must-haves.` : "Set their budget, beds and must-haves.", next: "Next", onNext: () => getStarted.step("buyer", "save") }];
-      case "save": return [{ sel: `[data-tour="save-search"]`, title: buyerFor ? `Save ${buyerFirst}'s search` : "Save this search", sub: buyerFor ? `Get alerted the moment new matches come up for ${buyerFirst}.` : "Get alerted the moment new matches come up." }];
+      case "filters": return [{ sel: `[data-tour="all-filters"]`, title: buyerFor ? `Add ${buyerPoss} criteria` : "Add your client's criteria", sub: buyerFor ? `Set ${buyerPoss} budget, beds and must-haves.` : "Set their budget, beds and must-haves.", next: "Next", onNext: () => getStarted.step("buyer", "save") }];
+      case "save": return [{ sel: `[data-tour="save-search"]`, title: buyerFor ? `Save ${buyerPoss} search` : "Save this search", sub: buyerFor ? `Get alerted the moment new matches come up for ${buyerFirst}.` : "Get alerted the moment new matches come up." }];
       case "pick":
         if (tour.task === "underbuilt") return [{ sel: `[data-tour-card]`, title: "Pick a lot with room to build", sub: "The Underbuilt heat is on, and only lots with 40%+ build potential show. Open one." }];
         return [
@@ -716,7 +728,7 @@ export default function HomeWeb() {
           <div style={{ pointerEvents: "auto" }}>
             {/* Entering the search step (`onSearchFocus`) closes dropdowns and the detail panel, as the canvas step change does. */}
             <SearchBar value={sel ? `${sel.addr}${sel.city ? ", " + sel.city : ""}` : addrHit ? addrHit.q : areaSq(fieldAreas.map(a => a.label))} near={place.center}
-              areas={fieldAreas} searching={searching} prompt={intent === "buyer" && buyerFor ? `Where is ${buyerFirst} looking?` : intent ? INTENT_PROMPT[intent] : undefined}
+              areas={fieldAreas} searching={searching} lead={buyerFaces} prompt={intent === "buyer" && buyerFor ? (bFirsts.length > 1 ? "Where are they looking?" : `Where is ${buyerFirst} looking?`) : intent ? INTENT_PROMPT[intent] : undefined}
               onSearching={on => { setSearching(on); if (!on) setTimeout(() => setIntent(null), 0); if (on) { fs.setDd(null); setSortOpen(false); closeDetail(); } }}
               onCommit={commitAreas} onPickAddress={pickAddress} onClearAll={clearSearch}
               onClear={() => { if (addrHit) { setAddrHit(null); closeDetail(); return; } if (detailOpen) closeDetail(); else { setView("home"); setUnsup(null); } }}
