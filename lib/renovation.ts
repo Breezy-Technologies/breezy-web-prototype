@@ -18,7 +18,9 @@ export type Renovation = {
   /** Today: pre-renovation comps, median $/ft², size, value (lots: per ft² of lot). */
   pre: { n: number; ppsf: number; size: number; value: number; lot: boolean };
   /** After the build: the target size, the post-renovation comps, median $/ft², value. */
-  post: { comps: RenoComp[]; ppsf: number; size: number; value: number };
+  post: { comps: RenoComp[]; ppsf: number; size: number; value: number;
+    /** Every renovated sale considered, best first (the ROI's confidence reads it). */
+    pool: RenoComp[] };
 };
 
 const STYLES = ["Traditional", "Contemporary", "Spanish", "Craftsman", "Mid century", "Modern"];
@@ -59,11 +61,12 @@ export function renovationOf(l: Listing): Renovation {
       mi, score, st: "S", sm: lt.sm, photo: lotListing(lt, i).photos[0], remodel, style: STYLES[Math.floor(h / 8) % STYLES.length],
     });
   });
-  const comps = cands.sort((a, b) => b.score - a.score).slice(0, 4);
+  const pool = cands.sort((a, b) => b.score - a.score).slice(0, 12);
+  const comps = pool.slice(0, 4);
   const postPpsf = median(comps.map(c => c.ppsf));
   const out: Renovation = {
     pre: { n: pre.length, ppsf: Math.round(prePpsf), size: preSize, value: Math.round((prePpsf * preSize) / 1000) * 1000, lot: vacant },
-    post: { comps, ppsf: Math.round(postPpsf), size, value: Math.round(postPpsf * size) },
+    post: { comps, ppsf: Math.round(postPpsf), size, value: Math.round(postPpsf * size), pool },
   };
   cache.set(key, out);
   return out;

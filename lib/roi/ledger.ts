@@ -1,6 +1,6 @@
 import { setupOf, withOverrides } from './deal';
 import type { Assumptions, NumberKey } from './deal';
-import { JOBS, evaluate, scenariosOf, sizeGrid, sweep } from './model';
+import { evaluate, jobsOf, scenariosOf, sizeGrid, sweep } from './model';
 import type { EvalRow, Job, Params, Scenarios } from './types';
 
 /**
@@ -31,7 +31,7 @@ export const FINANCE = {
   ltvPurchase: 0.8,
   ratePurchase: 0.0665,
   amortYears: 30,
-  /** Share of construction the project loan covers. Soft costs stay cash. */
+  /** Share of construction the project loan covers. Soft costs stay cash, except under Params.apiRules. */
   ltvProject: 0.8,
   rateProject: 0.0725,
   /** Discount rate for "worth $X today". */
@@ -127,12 +127,17 @@ export function ledger(p: Params, r: EvalRow, a: Assumptions = {}): Ledger {
   const buyLoan = !owner && T.ltvPurchase > 0;
   const buildLoan = construction === 'finance';
   const years = x.months / 12;
+  /* The production API's rules (Params.apiRules): the project loan covers the
+     soft costs too, and an owner carries no holding costs of the house. */
+  const api = !!q.apiRules;
+  const ownerHolds = !(api && owner);
 
   const share = (k: keyof typeof CARRY_SPLIT) => (x.carry * CARRY_SPLIT[k]) / SPLIT_TOTAL;
-  const holding = (k: HoldingKey) => (a[k] === undefined ? share(k) : a[k] * years);
+  const holding = (k: HoldingKey) => (!ownerHolds ? 0 : a[k] === undefined ? share(k) : a[k] * years);
 
   const purchaseLoan = buyLoan ? q.Aq * T.ltvPurchase : 0;
-  const projectLoan = buildLoan ? x.build * T.ltvProject : 0;
+  const softLoan = buildLoan && api ? x.soft * T.ltvProject : 0;
+  const projectLoan = buildLoan ? x.build * T.ltvProject + softLoan : 0;
   const repaid = principalPaid(purchaseLoan, T.ratePurchase, T.amortYears, x.months);
   // fees follow the loan's size, interest its size and rate
   const purchaseFees = buyLoan ? share('purchaseFees') * (T.ltvPurchase / FINANCE.ltvPurchase) : 0;
@@ -155,14 +160,16 @@ export function ledger(p: Params, r: EvalRow, a: Assumptions = {}): Ledger {
     ]),
     {
       label: buildLoan ? 'Construction, cash share' : 'Construction, all cash',
-      value: x.build - projectLoan,
+      value: x.build - (projectLoan - softLoan),
       ...(buildLoan ? { field: 'ltvProject' as const } : {}),
     },
-    { label: 'Soft costs', value: x.soft, field: 'D_SOFT' as const },
-    { label: 'Property tax during hold', value: holding('tax'), field: 'tax' as const },
-    { label: 'Insurance during hold', value: holding('insurance'), field: 'insurance' as const },
-    { label: 'Utilities during hold', value: holding('utilities'), field: 'utilities' as const },
-    { label: 'Maintenance during hold', value: holding('maintenance'), field: 'maintenance' as const },
+    { label: softLoan ? 'Soft costs, cash share' : 'Soft costs', value: x.soft - softLoan, field: 'D_SOFT' as const },
+    ...(ownerHolds ? [
+      { label: 'Property tax during hold', value: holding('tax'), field: 'tax' as const },
+      { label: 'Insurance during hold', value: holding('insurance'), field: 'insurance' as const },
+      { label: 'Utilities during hold', value: holding('utilities'), field: 'utilities' as const },
+      { label: 'Maintenance during hold', value: holding('maintenance'), field: 'maintenance' as const },
+    ] : []),
     ...(buyLoan ? [
       // fees and principal are not an assumption anyone sets; the rate is
       { label: 'Purchase loan fees', value: purchaseFees },
@@ -225,10 +232,9 @@ export function dealRow(S: number, p: Params, a: Assumptions = {}, job?: Job): E
  */
 export function dealScenarios(p: Params, a: Assumptions = {}): Scenarios {
   const q = withOverrides(p, a);
-  // Breezy port: a vacant lot (no house today) has nothing to remodel or to put an ADU beside.
-  const jobs = q.Ex > 0 ? JOBS : [];
   return scenariosOf(sweep(q).map((r) => dealRow(r.S, p, a)), p, {
-    options: jobs.map((job) => dealRow(q.Ex, p, a, job)),
+    // Breezy port: a vacant lot (no house today) has nothing to remodel or to put an ADU beside.
+    options: (q.Ex > 0 ? jobsOf(q) : []).map((job) => dealRow(q.Ex, p, a, job)),
     grid: sizeGrid(q).map((S) => dealRow(S, p, a)),
     rank: (r) => ledger(p, r, a).coc,
   });

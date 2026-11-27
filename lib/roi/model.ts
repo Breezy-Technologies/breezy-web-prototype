@@ -34,6 +34,8 @@ export function routeType(S: number, p: Params): TypeId {
   if (added > 1200 && t < 2) t = 2;
   if (added < 400) return 1;
   if (p.Yr < 1960 && t === 1) t = 2;
+  // the house must stay: past half its size the job is still a major remodel
+  if (p.noTeardown && t === 3) t = 2;
 
   return t;
 }
@@ -56,6 +58,14 @@ export const JOBS: Job[] = [
   { kind: 'remodel', t: 2 },
   ...ADU_SIZES.map((sf): Job => ({ kind: 'adu', sf })),
 ];
+
+/**
+ * This lot's jobs: the two remodels, then an ADU at each size the lot
+ * allows (Params.adus, from the zoning layer), none where none is allowed.
+ * Without zoning, JOBS.
+ */
+export const jobsOf = (p: Params): Job[] =>
+  p.adus === undefined ? JOBS : [JOBS[0], JOBS[1], ...p.adus.map((sf): Job => ({ kind: 'adu', sf }))];
 
 /** A job's own name and wording over the project type whose rates it uses. */
 function jobType(job: Job, p: Params): ResolvedType {
@@ -82,7 +92,14 @@ export function evaluate(S: number, p: Params, opt: EvalOpts = {}): EvalRow {
   if (job) S = p.Ex + (job.kind === 'adu' ? job.sf : 0);
   const added = Math.max(S - p.Ex, 0);
   const t: TypeId = job ? (job.kind === 'remodel' ? job.t : 1) : routeType(S, p);
-  const T = job ? jobType(job, p) : typeOf(t, p);
+  /* An approval the zoning asks for adds its months and its cost: an
+     addition or rebuild pays the main one, an ADU its own, a remodel inside
+     the walls neither. */
+  const approval = job?.kind === 'remodel' ? { m: 0, cost: 0 }
+    : job?.kind === 'adu' ? { m: p.mAdu ?? 0, cost: p.aduApprovalCost ?? 0 }
+      : { m: p.mApproval ?? 0, cost: p.approvalCost ?? 0 };
+  const T0 = job ? jobType(job, p) : typeOf(t, p);
+  const T = approval.m ? { ...T0, m: T0.m + approval.m } : T0;
 
   /* An addition or teardown builds new space and reworks what stays at the
      type's rate. A remodel only reworks the house; an ADU only builds itself. */
@@ -90,8 +107,10 @@ export function evaluate(S: number, p: Params, opt: EvalOpts = {}): EvalRow {
   const remodSf = job?.kind === 'adu' ? 0 : t === 3 ? 0 : p.Ex;
   const demo = !job && t === 3 && p.Ex > 0 ? p.Demo * p.Ex : 0;
 
-  const build = newSf * p.Hc + remodSf * p.Hc * T.rate + demo;
-  const soft = build * p.D_SOFT;
+  // a new home in a very high fire hazard zone carries sprinklers (lib/zoning)
+  const rebuildExtra = !job && t === 3 ? (p.rebuildPsf ?? 0) * S : 0;
+  const build = newSf * p.Hc + remodSf * p.Hc * T.rate + demo + rebuildExtra;
+  const soft = build * p.D_SOFT + approval.cost;
   const buyCost = p.Aq * p.D_ACQ;
 
   // ft² past the biggest home nearby
@@ -118,7 +137,7 @@ export function evaluate(S: number, p: Params, opt: EvalOpts = {}): EvalRow {
     total = pre + carry;
     profit = net - p.Aq * (1 - p.D_DISP) - total;
   } else {
-    pre = p.Aq * (1 + p.D_ACQ) + build * (1 + p.D_SOFT);
+    pre = p.Aq * (1 + p.D_ACQ) + build + soft;
     carry = pre * p.D_CARRY * T.m / 12;
     total = pre + carry;
     profit = net - total;

@@ -1,0 +1,1082 @@
+/* ============================================================
+   REPORT v2 (ROI-V2.md). Only what v2 adds or changes on top of
+   -report/report.css, which it still loads. Prefixed v2-.
+   ============================================================ */
+
+/* inside .bz-up, at the same weight as report.css */
+.bz-up {
+  /* =============== hero, right side =============== */
+
+  /* Positive and Low profit: the gauge, then the confidence chip (Figma
+     6571:35844). The gauge keeps the 16px padding it carries; the column
+     spends it sideways against the hero's gap, as v1 does. */
+  .rp-hero .v2-score {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-inline: -16px;
+
+    & .ub-gauge {
+      margin-inline: 0
+    }
+
+    /* Figma roi/gauge Size=Mobile: the drawing at 162 × 93, no fixed width */
+    & .v2-gauge.mobile {
+      width: auto
+    }
+  }
+
+  /* Negative: the figure that makes it work (Figma roi/path-to-work 6633:46492) */
+  .rp-hero .v2-path {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: rgba(30, 27, 27, .7);
+    text-align: center;
+
+    & .lbl {
+      font-size: 15px;
+      line-height: 1.3
+    }
+
+    & .val {
+      font-size: 64px;
+      font-weight: 300;
+      line-height: 1.1;
+      color: #1E1B1B;
+      white-space: nowrap
+    }
+
+    & .sub {
+      font-size: 14px;
+      line-height: 1.3
+    }
+
+    /* Figma's 6px spacer, on top of the 6px gap either side of it */
+    & .v2-conf {
+      margin-top: 12px
+    }
+  }
+
+  /* =============== confidence chip (Figma 6768:53357, option D) =============== */
+  .v2-conf {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border: 1px solid #E6DDDA;
+    border-radius: 100px;
+    background: #F6F1EF;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #1E1B1B;
+    white-space: nowrap;
+    transition: border-color .15s, background-color .15s;
+
+    & .pills {
+      display: flex;
+      gap: 3px
+    }
+
+    & .pills i {
+      width: 14px;
+      height: 6px;
+      border-radius: 3px;
+      background: #D3C7C3
+    }
+
+    & .pills i.on {
+      background: #6B4436
+    }
+
+    & svg {
+      flex: none
+    }
+  }
+
+  button.v2-conf:hover {
+    border-color: #D3C7C3;
+    background: #F1EAE7
+  }
+
+  /* "Based on your numbers": no pills, nothing to open */
+  .v2-conf.yours {
+    background: #E6DDDA;
+    color: #6B4436
+  }
+
+  /* =============== confidence details (Figma 6714:48385) =============== */
+  .v2-confd {
+    width: min(520px, calc(100vw - 32px));
+    max-width: none;
+    margin: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 24px;
+    background: #FDFCFC;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, .18);
+    color: #121212;
+
+    &::backdrop {
+      background: rgba(0, 0, 0, .4)
+    }
+
+    & .in {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 28px
+    }
+
+    & .top {
+      display: flex;
+      align-items: center;
+      gap: 12px
+    }
+
+    & h2 {
+      flex: 1;
+      font-size: 32px;
+      font-weight: 300;
+      line-height: normal
+    }
+
+    & .close {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 4px
+    }
+
+    & .close:hover {
+      background: #F5F0EE
+    }
+
+    /* Figma sets these at "normal" leading, about 1.3 in Akkurat */
+    & :is(.lede, .foot, li b, li small, li em) {
+      line-height: 1.3
+    }
+
+    & .lede {
+      font-size: 16px;
+      color: #625A59
+    }
+
+    & ul {
+      list-style: none;
+      margin: 0;
+      padding: 0
+    }
+
+    & li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-block: 14px;
+      border-top: 1px solid #E6DDDA
+    }
+
+    & li > span {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px
+    }
+
+    & li b {
+      font-size: 16px;
+      font-weight: 700
+    }
+
+    & li small {
+      font-size: 14px;
+      color: #625A59
+    }
+
+    & li em {
+      flex: none;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #E6DDDA;
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 700;
+      color: #6B4436
+    }
+
+    & li em.strong {
+      background: #EEF4EF;
+      color: #2E7D4F
+    }
+
+    & .foot {
+      font-size: 14px;
+      color: #625A59
+    }
+
+    & .actions {
+      display: flex;
+      align-items: center;
+      gap: 24px
+    }
+
+    & .ok {
+      padding: 14px 28px;
+      border-radius: 999px;
+      background: #121212;
+      font-size: 16px;
+      font-weight: 700;
+      color: #FFFFFF
+    }
+
+    & .ok:hover {
+      background: #3A3533
+    }
+
+    & .own {
+      font-size: 16px;
+      font-weight: 700;
+      color: #AE6A5B
+    }
+
+    & .own:hover {
+      color: #93594B
+    }
+  }
+
+  /* =============== compare build sizes (phase 4) =============== */
+
+  /* "Best option": the Negative badge, Dark Fill (Figma Tag, Variant=Dark Fill) */
+  .rp-tile .tag.v2-dark {
+    background: #4A2E27;
+    color: #FDFCFC
+  }
+
+  /* Negative: the selected tile reads dark, not green, like its badge */
+  .v2-neg .rp-tile.on {
+    border-color: #121212;
+    background: linear-gradient(180deg, rgba(245, 240, 238, .8), rgba(245, 240, 238, 0))
+  }
+
+  .v2-neg .rp-tile.on .name {
+    color: #121212
+  }
+
+  /* a size with no comps: not a choice, so no hover, and a link instead */
+  .rp-tile.v2-nocomps {
+    gap: 0;
+
+    &:hover {
+      border-color: rgba(0, 0, 0, .1)
+    }
+  }
+
+  .v2-addprice {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #AE6A5B;
+    text-decoration: underline;
+    text-underline-position: from-font
+  }
+
+  .v2-addprice:hover {
+    color: #93594B
+  }
+
+  /* a bar with no value: an empty dashed outline */
+  .rp-chart .bar.stub {
+    background: none;
+    border: 1.5px dashed #C7B4AE;
+    border-radius: 8px
+  }
+
+  /* Negative: every bar hangs from the break-even line */
+  .rp-chart.v2-be .bar.down {
+    border-radius: 0 0 8px 8px
+  }
+
+  .rp-chart .rule.be {
+    border-top: 1px dashed #A33A30
+  }
+
+  .rp-chart .be-tag {
+    position: absolute;
+    right: 0;
+    font-size: 10px;
+    line-height: 1.6;
+    color: #A33A30
+  }
+
+  .v2-caption {
+    margin-top: -16px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #605B57
+  }
+
+  /* ---------- No comparable sales (Figma 6582:37649, 6631:44940, 6631:46204) ---------- */
+
+  /* the black pill: "Add a sale price" in the hero and the build sizes card */
+  .v2-cta {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 9999px;
+    background: #111010;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 20px;
+    color: #F9F9F9;
+    white-space: nowrap;
+    transition: background-color .15s
+  }
+
+  .v2-cta:hover {
+    background: #2A2726
+  }
+
+  /* the empty gauge's "—" (Figma: 28px, not the number's 40px) */
+  .ub-gauge .val.none {
+    font-size: 28px
+  }
+
+  .rp-sum small .v2-link {
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px
+  }
+
+  /* in place of the chart until there is a price (Figma 6582:38453) */
+  .v2-addnote {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 20px 24px;
+    border-radius: 16px;
+    background: #F6F1EF;
+
+    & div {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px
+    }
+
+    & b {
+      font-size: 16px;
+      font-weight: 700;
+      color: #000
+    }
+
+    & p {
+      font-size: 15px;
+      line-height: 1.4;
+      color: rgba(30, 27, 27, .75)
+    }
+  }
+
+  /* the assumptions' "Your estimate" box (Figma 6631:45509) */
+  .rp-adj .v2-est {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px 0 8px;
+    padding: 20px;
+    border-radius: 16px;
+    background: #F6F1EF;
+
+    & .top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #121212;
+      white-space: nowrap
+    }
+
+    & .v2-chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #E6DDDA;
+      font-size: 12px;
+      color: #6B4436
+    }
+
+    & .val {
+      font-size: 32px;
+      font-weight: 300;
+      line-height: 1.2;
+      color: #121212
+    }
+
+    & .val span {
+      font-size: 18px;
+      color: rgba(18, 18, 18, .4)
+    }
+
+    & .val.empty {
+      color: #99908E
+    }
+
+    & .sub {
+      font-size: 14px;
+      color: #625A59
+    }
+  }
+
+  .rp-adj .fld.blank input::placeholder {
+    color: #99908E
+  }
+
+  /* an empty price shows its placeholder whole, without the unit */
+  .rp-adj .fld.blank .suf {
+    display: none
+  }
+
+  /* no price: the selected size is just a selection, not a recommendation (Figma 6582:37649) */
+  .v2-noprice .rp-tile.on {
+    border-color: #605B57;
+    background: linear-gradient(180deg, rgba(245, 240, 238, .8), rgba(245, 240, 238, 0))
+  }
+
+  .v2-noprice .rp-tile.on .name {
+    color: #8B857B
+  }
+
+  /* "Add your expected sale price →" reads as a line, from the left */
+  .rp-steps .x button {
+    text-align: left
+  }
+
+  /* "Save to report" closes the panel back onto the result (Figma 6631:45517) */
+  .rp-adj .v2-save {
+    flex: none;
+    height: 47px;
+    margin-bottom: 24px;
+    border-radius: 9999px;
+    background: #111010;
+    font-size: 15px;
+    font-weight: 700;
+    color: #F9F9F9
+  }
+
+  /* ---------- size ladder (Figma 6571:35852) ---------- */
+  .v2-ladder {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid rgba(18, 18, 18, .24);
+    border-radius: 16px;
+
+    & > div {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px
+    }
+
+    & .k {
+      margin-bottom: 8px;
+      font-size: 24px;
+      font-weight: 300;
+      line-height: 1.26;
+      letter-spacing: -.5px;
+      color: #121212;
+      white-space: nowrap
+    }
+
+    & .l {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.26;
+      color: #494341
+    }
+
+    & .d {
+      font-size: 12px;
+      line-height: 1.48;
+      letter-spacing: .25px;
+      color: #625A59
+    }
+  }
+}
+
+.bz-up {
+  /* Neighborhood insights, v2 (Figma 03 desktop): four figures 2 × 2 on the
+     left, the comps card down the right */
+  & .v2-hood .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr))
+  }
+
+  & .v2-hood .comps {
+    grid-column: 3;
+    grid-row: 1 / span 2
+  }
+
+  /* Build guidelines footer: the current Underbuilt page's disclaimer, plain
+     text instead of the Please note card */
+  & .rp-disclaimer {
+    padding-block: 64px
+  }
+
+  & .rp-disclaimer .rp-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 20px
+  }
+
+  & .rp-disclaimer p {
+    font-size: 14px;
+    line-height: 1.55;
+    letter-spacing: -.25px;
+    color: #5E5652
+  }
+}
+
+@media (max-width: 599px) {
+  .bz-up .rp-disclaimer {
+    padding-block: 28px
+  }
+}
+
+/* =============== mobile web, phase 8 (below 600px) ===============
+   Not the iOS frames: the same content in the same order, made for a phone
+   browser. Inspired by them where it helps: the gauge above the title, a
+   compact size ladder, the four steps as a 2 × 2 grid of cards. Below 600px
+   the sidebar is already a drawer, so the viewport is the column. */
+@media (max-width: 599px) {
+  .bz-up {
+    --wrap-pad: 16px;
+    --card-pad: 20px;
+
+    /* tabs (Figma 7141:973): two rows. The property across the top (back,
+       the address centred, the photo at the right), then the three tabs
+       filling the width, without their icons, in the desktop style. Both
+       rows sit in one white block with the shadow. */
+    & .rp-tabs {
+      padding: 12px 12px 0
+    }
+
+    & .rp-tabs.has-lead {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0
+    }
+
+    /* the two rows share one white block, which carries the shadow */
+    & .rp-tabs.has-lead::before {
+      content: '';
+      position: absolute;
+      inset: 12px 12px 0;
+      border-radius: 23px;
+      background: #FFFFFF;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, .08), 0 0 4px rgba(0, 0, 0, .04)
+    }
+
+    & .rp-tabs.has-lead :is(.rp-lead, .pill) {
+      position: relative;
+      filter: none
+    }
+
+    & .rp-lead {
+      flex: none;
+      padding: 4px
+    }
+
+    & .rp-lead .prop {
+      flex: 1;
+      padding: 0
+    }
+
+    & .rp-lead .prop img {
+      order: 2
+    }
+
+    & .rp-lead .prop span {
+      flex: 1;
+      align-items: center;
+      text-align: center
+    }
+
+    & .rp-tabs .pill {
+      gap: 2px;
+      padding: 4px
+    }
+
+    & .rp-tabs.has-lead .pill {
+      flex: none
+    }
+
+    & .rp-tabs .pill button {
+      flex: 1;
+      justify-content: center;
+      padding: 8px 10px;
+      font-size: 13px
+    }
+
+    & .rp-tabs .pill .ic {
+      display: none
+    }
+
+    /* hero: the score first, then the words, centred */
+    & .rp-sec-hero {
+      padding-block: 24px 16px
+    }
+
+    & .rp-hero {
+      flex-direction: column-reverse;
+      align-items: stretch;
+      gap: 12px;
+      text-align: center
+    }
+
+    & .rp-hero .left {
+      gap: 12px
+    }
+
+    & .rp-hero h1 {
+      font-size: 32px;
+      letter-spacing: -.32px;
+      text-wrap: balance
+    }
+
+    & .rp-hero .left p {
+      font-size: 15px
+    }
+
+    & .rp-hero .v2-score,
+    & .rp-hero .v2-path {
+      margin-inline: 0;
+      align-self: center
+    }
+
+    & .ub-gauge .val {
+      font-size: 32px
+    }
+
+    & .rp-hero .v2-path .val {
+      font-size: 48px
+    }
+
+    /* the size ladder: three narrow columns */
+    & .v2-ladder {
+      gap: 0;
+      padding: 8px;
+
+      & > div {
+        padding: 8px
+      }
+
+      & .k {
+        margin-bottom: 2px;
+        font-size: 16px;
+        letter-spacing: -.2px
+      }
+
+      & .l {
+        font-size: 12px
+      }
+
+      & .d {
+        font-size: 11px;
+        letter-spacing: 0
+      }
+    }
+
+    /* the steps: Buy and Improve side by side, then the sale and profit card */
+    & .rp-steps {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding-block: 16px 32px;
+
+      & > .step,
+      & > .step + .step,
+      & > .step:first-child {
+        margin: 0;
+        padding: 16px;
+        border: 1px solid #F1E7E4;
+        border-radius: 16px;
+        background: #FDFCFC
+      }
+
+      & .step {
+        gap: 8px
+      }
+
+      & .arrow {
+        display: none
+      }
+
+      & .k {
+        font-size: 24px;
+        letter-spacing: -.5px
+      }
+
+      & .out {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 16px;
+        margin: 0;
+        padding: 16px;
+        min-height: 0
+      }
+
+      & .out .adjust {
+        position: static;
+        grid-column: 1 / -1;
+        justify-self: start
+      }
+    }
+  }
+}
+
+/* =============== mobile web, phase 8, part 2: the cards =============== */
+@media (max-width: 599px) {
+  .bz-up {
+    & .rp-card {
+      gap: 24px
+    }
+
+    & .rp-card h2 {
+      font-size: 28px;
+      line-height: 1.2
+    }
+
+    & .rp-cardhead {
+      flex-wrap: wrap;
+      gap: 12px
+    }
+
+    /* Compare build sizes: the four options as a carousel, bleeding to the
+       card's edges, each tile snapping into place */
+    & .rp-tiles {
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scroll-padding-inline: var(--card-pad);
+      margin-inline: calc(-1 * var(--card-pad));
+      padding: 14px var(--card-pad) 4px;
+      scrollbar-width: none
+    }
+
+    & .rp-tiles::-webkit-scrollbar {
+      display: none
+    }
+
+    & .rp-tile {
+      flex: 0 0 160px;
+      scroll-snap-align: start
+    }
+
+    & .rp-sum {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      padding: 20px 0 0;
+
+      & > div {
+        min-width: 0
+      }
+    }
+
+    & .rp-slider .ends {
+      font-size: 11px
+    }
+
+    & .rp-slider .legend {
+      gap: 4px 12px
+    }
+
+    & .rp-notes {
+      grid-template-columns: minmax(0, 1fr);
+      padding: 16px
+    }
+
+    & .v2-addnote {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px
+    }
+
+    /* Where every dollar goes: the investment, then the return */
+    & .rp-led {
+      flex-direction: column;
+      gap: 24px;
+
+      & > div {
+        width: 100%
+      }
+    }
+
+    & .rp-hood {
+      padding: 24px var(--card-pad)
+    }
+
+    & .rp-hood .head {
+      flex-wrap: wrap;
+      gap: 8px
+    }
+
+    & .rp-hood .head h2 {
+      font-size: 24px;
+      line-height: 1.3
+    }
+
+    /* as on iOS: the figures 2 × 2, then a plain "See comps →" under them */
+    & .v2-hood .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    /* a label on two lines must not leave its neighbour shorter */
+    & .v2-hood .stats > div {
+      align-self: stretch
+    }
+
+    & .v2-hood .comps {
+      grid-column: 1 / -1;
+      grid-row: auto;
+      padding: 12px;
+      box-shadow: none;
+      font-weight: 700;
+      color: #121212
+    }
+
+    /* the art goes; the words stay (they are the button's own text) */
+    & .v2-hood .comps > * {
+      display: none
+    }
+  }
+}
+
+/* ============================================================
+   ROI edge cases and system states (Figma 6754:48556, states.ts)
+   ============================================================ */
+.bz-up {
+  /* a value still to come: the report skeleton's bone (rp-skel) */
+  .v2-bone {
+    display: block;
+    height: 1em;
+    min-width: 40px;
+    border-radius: 12px;
+    background:
+      linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%) -150% 0 / 60% 100% no-repeat,
+      #EDE6E3;
+    animation: rp-shimmer 1.6s ease-in-out infinite
+  }
+
+  .rp-steps .k .v2-bone {
+    height: 30px;
+    margin-block: 5px
+  }
+
+  .rp-steps :is(.d, .x) .v2-bone {
+    height: 14px;
+    margin-block: 4px
+  }
+
+  .rp-steps .x.note .v2-bone {
+    height: 12px
+  }
+
+  /* the hero's title and paragraph as bones (Figma 6594:41155) */
+  .rp-hero .v2-bones {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    & > .v2-bone {
+      height: 44px
+    }
+
+    & p {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 18px
+    }
+
+    & p .v2-bone {
+      height: 15px
+    }
+  }
+
+  /* Valuation updating: the status pill over the hero */
+  .rp-sec-hero.v2-waiting {
+    position: relative;
+    padding-top: 72px
+  }
+
+  .v2-pill {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: 9999px;
+    background: #111010;
+    font-size: 14px;
+    line-height: 20px;
+    color: #F9F9F9;
+    white-space: nowrap;
+
+    & button {
+      font: inherit;
+      font-weight: 700;
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px
+    }
+
+    & .spin {
+      animation: v2-spin 1s linear infinite
+    }
+  }
+
+  /* Unsupported and Zoning: the gauge is there, but has nothing to say */
+  .rp-hero .v2-faded {
+    opacity: .4
+  }
+
+  /* the opt-in in the hero's place (Figma 6594:42519, 6594:43925) */
+  .rp-hero .v2-optin {
+    align-items: flex-start;
+
+    & .acts {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      margin-top: 16px
+    }
+
+    & .v2-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #111010
+    }
+  }
+
+  /* No build scenarios: room to grow, then "Price a project" (Figma 6598:41292) */
+  .rp-hero .v2-room {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+
+    & .lbl {
+      font-size: 14px;
+      color: #605B57
+    }
+
+    & .val {
+      font-size: 52px;
+      font-weight: 300;
+      line-height: 1.1;
+      letter-spacing: -1px;
+      color: #070606;
+      white-space: nowrap
+    }
+
+    & .sub {
+      font-size: 12px;
+      color: #605B57
+    }
+
+    & .v2-cta {
+      height: 40px;
+      margin-top: 12px;
+      padding-inline: 20px
+    }
+  }
+
+  /* the panel's estimate when the person's numbers lose (Figma 6617:43064) */
+  .rp-adj .v2-est .val.be {
+    font-size: 26px;
+    line-height: 1.2;
+    letter-spacing: -.3px
+  }
+
+  .rp-adj .v2-est .v2-use {
+    align-self: flex-start;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #B0614F
+  }
+
+  /* No build has no steps: the cards keep their distance from the ladder */
+  .rp-sec.v2-after-ladder {
+    padding-top: 32px
+  }
+
+  /* the ladder's greyed cells: over the limit, or waiting for the zoning */
+  .v2-ladder > .off {
+    opacity: .4
+  }
+
+  /* No build: each tile asks for numbers */
+  .rp-tile.v2-yours .v2-addyours {
+    color: #494341
+  }
+
+  /* No capacity: "View build guidelines →" beside the note */
+  .v2-addnote > .v2-link {
+    flex: none;
+    font-size: 14px;
+    color: #B0614F;
+    text-decoration: underline;
+    text-underline-offset: 2px
+  }
+}
+
+@keyframes v2-spin {
+  to { transform: rotate(360deg) }
+}
+
+@media (max-width: 599px) {
+  .bz-up {
+    .rp-sec-hero.v2-waiting {
+      padding-top: 64px
+    }
+
+    .rp-hero .v2-room .val {
+      font-size: 40px
+    }
+
+    .v2-addnote > .v2-link {
+      align-self: flex-start
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bz-up :is(.v2-bone, .v2-pill .spin) {
+    animation: none
+  }
+}

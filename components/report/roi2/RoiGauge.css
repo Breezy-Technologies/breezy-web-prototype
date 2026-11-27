@@ -1,0 +1,45 @@
+/* RoiGauge — Figma 441:33533. The arc, then the caption, then the number. */
+
+.bz-up .ub-gauge {
+  width: 269.559px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.bz-up .ub-gauge svg {
+  flex: none;
+  display: block;
+}
+
+.bz-up .ub-gauge .txt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.bz-up .ub-gauge .cap {
+  font-size: 14px;
+  line-height: 1.48;
+  letter-spacing: .25px;
+  color: #494341;
+}
+
+.bz-up .ub-gauge .val {
+  /* the design nudges the number right of centre, off the "%" beside it */
+  padding-left: 8px;
+  font-size: 40px;
+  line-height: 20px;
+  color: #111010;
+}
+
+.bz-up .ub-gauge .val span {
+  font-size: 20px;
+  line-height: 20px;
+  color: rgba(18, 18, 18, .4);
+}

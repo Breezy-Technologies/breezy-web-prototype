@@ -87,6 +87,17 @@ export function BuildGuidelines({ l, onComps, write, onToast }: {
                 house={b.kase !== "vacant"} slope={b.kase === "slope"} satellite={b.kase === "satellite" || b.kase === "vacant"} setbacks={b.zone.yards} />
             </div>
             {!sonar && <Guidelines b={b} onDetail={setDetail} />}
+            {/* Please note, as on the other tabs, with the map credit (Pedro's feedback, 26 Nov) */}
+            <section className="rp-card rp-notice rc-notice">
+              <h2>Please note</h2>
+              <p>
+                Development potential estimates are derived from zoning data and automated analysis. They may not
+                reflect all regulations, restrictions, or site-specific conditions. This information is provided for
+                informational purposes only and should not be relied upon as legal, architectural, or development
+                advice. Always verify zoning and development potential with local authorities or licensed professionals.
+                <br /><br />Map data © Mapbox, OpenStreetMap contributors.
+              </p>
+            </section>
           </div>
         </div>
         <ScenarioBar id={scenId} onChange={choose} list={BG_SCENARIOS} title="Build guidelines scenarios" matrix="7872-5910" />
@@ -146,15 +157,11 @@ function Ring({ v }: { v: number }) {
 function Callouts({ b }: { b: Bg }) {
   return (
     <div className="bg-callouts">
-      {b.tier === 1 ? (
+      {/* No AI Score banner on Tier 2 (Pedro's feedback, 26 Nov: Jimsy and Shannon's decision). */}
+      {b.tier === 1 && (
         <div className="bg-verified">
           <span className="k"><img src="/ub2/verified.svg" alt="" width={14} height={14} />Verified</span>
           <span>Our team of architects have reviewed and verified this data</span>
-        </div>
-      ) : (
-        <div className="bg-ai">
-          <span className="k"><img src="/ub2/ai.svg" alt="" width={14} height={14} />AI Score</span>
-          <span>Our architects have guided the AI, but AI can make mistakes. Always verify with a zoning expert or architect.</span>
         </div>
       )}
       {b.kase === "slope" && (

@@ -18,8 +18,10 @@ import { hashStr, rng } from "@/lib/geo";
 import { lotOfId, type Lot } from "@/lib/silverlake";
 import { compsFor, largestNearby } from "@/lib/comps";
 import { DEFAULTS } from "./defaults";
-import { ledger, dealScenarios } from "./ledger";
-import type { Params, Scenarios } from "./types";
+import { outcome, v2Params, type Outcome } from "./outcome";
+import { dealScenarios, ledger } from "./ledger";
+import { best } from "./model";
+import type { EvalRow, Params, Scenarios } from "./types";
 
 export type Site = {
   addr: string; street: string; hood: string; city: string; zone: string; zip: string; apn: string;
@@ -88,7 +90,9 @@ export function siteOf(l: Listing): Site {
 /** The model's inputs for a property, before tuning the sale price. */
 function rawParams(l: Listing): Params {
   const s = siteOf(l);
-  return {
+  // v2 (27 Nov): priced as Pedro's v2 report prices a parcel (the calculator spreadsheet's
+  // price drop on bigger homes, the production API's owner and financing rules).
+  return v2Params({
     ...DEFAULTS,
     addr: s.addr, hood: s.hood, apn: s.apn, zone: s.zone, city: s.city, zip: s.zip,
     bed: l.beds, bath: l.baths, garage: 2, lot: s.lot,
@@ -97,13 +101,15 @@ function rawParams(l: Listing): Params {
     lat: l.lat, lon: l.lng, ring: null, bldg: null,
     Ex: s.Ex, Aq: l.price, Smax: s.Smax, Sbonus: s.Sbonus, Snbhd: s.Snbhd, Yr: s.year,
     C_RB: s.Ex > 0 ? l.price / s.Ex : 900,
-  };
+  });
 }
 
-/** The recommendation's cash-on-cash return, %, at a given sale price per ft². */
+/** The v2 pick's cash-on-cash return, %, at a given sale price per ft² (what the gauge prints):
+ *  outcome()'s best return, without its break-even work (10× cheaper; the calibration runs
+ *  it ~20 times per property, for every ROI pin). Positive tiers only, which l.roi always is. */
 const cocAt = (p: Params, C_RB: number) => {
-  const q = { ...p, C_RB };
-  return ledger(q, dealScenarios(q).rec).coc * 100;
+  const q = { ...p, C_RB }, sc = dealScenarios(q), fits = (r: EvalRow) => r.S <= q.Smax + 0.5;
+  return ledger(q, best([...sc.options, ...sc.rows.filter(fits), ...sc.grid.filter(fits)], r => r.roi)).coc * 100;
 };
 
 /**
@@ -116,7 +122,7 @@ function calibrate(p: Params, target: number): Params {
   let lo = 60, hi = 8000;
   if (cocAt(p, hi) < target) return { ...p, C_RB: hi };
   if (cocAt(p, lo) > target) return { ...p, C_RB: lo };
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < 16; i++) {
     const mid = (lo + hi) / 2;
     if (cocAt(p, mid) < target) lo = mid; else hi = mid;
   }
@@ -132,8 +138,14 @@ export function paramsOf(l: Listing): Params {
   return out;
 }
 
-/** The standard deal's recommendation for a property (what the loading title and the gauge quote). */
-export function upsideOf(l: Listing): { p: Params; sc: Scenarios } {
-  const p = paramsOf(l);
-  return { p, sc: dealScenarios(p) };
+/** The standard deal's recommendation for a property (what the loading title and the gauge
+ *  quote): v2's outcome, with `sc.rec` set to the option the report puts forward (o.pick). */
+const upCache = new Map<string, { p: Params; sc: Scenarios; o: Outcome }>();
+export function upsideOf(l: Listing): { p: Params; sc: Scenarios; o: Outcome } {
+  const key = keyOf(l), hit = upCache.get(key);
+  if (hit) return hit;
+  const p = paramsOf(l), o = outcome(p);
+  const out = { p, sc: { ...o.sc, rec: o.pick }, o };
+  upCache.set(key, out);
+  return out;
 }

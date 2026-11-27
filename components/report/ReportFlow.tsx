@@ -20,7 +20,7 @@ import { CompsReport } from "./CompsReport";
 import { BuildGuidelines } from "./build/BuildGuidelines";
 import { RenovationComps } from "./reno/RenovationComps";
 import { compsFor } from "@/lib/comps";
-import { UpsideReport } from "./upside/UpsideReport";
+import { UpsideReportV2 } from "./roi2/UpsideReportV2";
 import { upsideOf } from "@/lib/roi";
 import { reportKey, useEntitlements } from "@/lib/billing";
 import { PRICING } from "@/lib/pricing.config";
@@ -208,7 +208,8 @@ export function ReportFlow({ l, kind: kind0, navW, cached, onClose, onDone, onSh
       {kind === "comps" && <CompsReport l={l} reveal={reveal} />}
       {kind === "ub" && <BuildGuidelines l={l} write={write} onComps={toComps} onToast={onToast} />}
       {kind === "reno" && <RenovationComps l={l} write={write} onComps={toComps} />}
-      {kind === "roi" && <UpsideReport l={l} write={write} onComps={toComps} onGuidelines={() => pick("ub")} />}
+      {kind === "roi" && <UpsideReportV2 l={l} write={write} onComps={() => pick("reno")} onGuidelines={() => pick("ub")}
+        over={dock ? { left: navW + 12, top: dock.top, width: dock.left - 24, bottom: 12 } : null} />}
       {locked && <LockVeil key={kind} access={acc} feature={feat ?? "comps"} clear={ent.s.lockStyle === "blur" ? 0 : "42%"} onUnlock={unlock} onToast={onToast} />}
     </div>
   );

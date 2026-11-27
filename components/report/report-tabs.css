@@ -4,7 +4,8 @@
    upside.css + upside-scenarios.css load with them. */
 
 .bz-bg, .bz-rc {
-  background: linear-gradient(180deg, #F6F1EF 0%, #FBF9F8 38%, #FDFCFC 100%);
+  /* one background on every tab: surface-lighter (Pedro's feedback, 26 Nov) */
+  background: #FDFCFC;
   & h1, & h2, & h3, & h4, & p { margin: 0 }
   & button { font-family: inherit }
 }
@@ -12,7 +13,7 @@
 /* ======================= Build guidelines ======================= */
 .bz-bg .bg-page {
   width: 100%;
-  max-width: 960px;
+  max-width: 1080px; /* the three tabs share one container (Pedro's feedback, 26 Nov) */
   margin: 0 auto;
   padding: 72px var(--wrap-pad) 120px;
   display: flex;
@@ -264,7 +265,7 @@
 
 /* ======================= Renovation comps ======================= */
 .bz-rc .rc-page {
-  width: 100%; max-width: 940px; margin: 0 auto; padding: 72px var(--wrap-pad) 120px;
+  width: 100%; max-width: 1080px; margin: 0 auto; padding: 72px var(--wrap-pad) 120px;
   display: flex; flex-direction: column; gap: 48px; box-sizing: border-box
 }
 .bz-rc .rc-hero {
@@ -361,3 +362,9 @@
 .rp-docked .bz-up-left[aria-label="Property"] { display: none }
 .rp-docked .bz-up { --wrap-pad: 48px; --card-pad: 40px }
 @media (max-width: 1399px) { .rp-docked .bz-up { --wrap-pad: 32px; --card-pad: 32px } }
+
+/* Adjust assumptions over the docked report's property panel (Pedro's feedback, 26 Nov) */
+.rp-adj-over .rp-adj { border-radius: 24px; background: #FDFCFC; box-shadow: 0 14px 36px rgba(40,26,20,.16); animation: bz-up-in .3s cubic-bezier(.2,.8,.2,1) both }
+
+/* Upside analysis: the same 1080px container as Build guidelines and Post-renovation comps */
+.bz-up.bz-v2 .rp-wrap { max-width: 1080px; margin-inline: auto }

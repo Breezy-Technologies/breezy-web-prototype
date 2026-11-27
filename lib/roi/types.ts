@@ -45,6 +45,8 @@ export interface Params {
   zone: string;
   city: string;
   zip: string;
+  /** Two-letter state. California unless given (the round 2 sample properties are in NJ and TX). */
+  state?: string;
   bed: number;
   bath: number;
   garage: number;
@@ -97,6 +99,33 @@ export interface Params {
   m1: number;
   m2: number;
   m3: number;
+  /**
+   * The production API's rules where the calculator spreadsheet has none
+   * (public/assets/docs/ROI_Cheap_Demo.docx): the project loan covers soft
+   * costs as well as construction, and an owner pays no holding costs (they
+   * would pay them anyway). Unset in v1. The v2 report sets it
+   * (lib/roi/outcome.ts, v2Params).
+   */
+  apiRules?: boolean;
+  /*
+   * What the zoning layer says about this lot (lib/zoning), as v2 prices it
+   * (outcome.ts, v2Params). All unset in v1, so v1 prices every lot as
+   * before.
+   */
+  /** ADU sizes to price. Unset: ADU_SIZES. Empty: no ADU allowed. */
+  adus?: readonly number[];
+  /** Months the approval adds to an addition or a rebuild (a Planning Board hearing). */
+  mApproval?: number;
+  /** What that approval costs: applications, notices, professional fees. PLACEHOLDER. */
+  approvalCost?: number;
+  /** Months an ADU's own approval adds. */
+  mAdu?: number;
+  /** What the ADU's approval costs. PLACEHOLDER. */
+  aduApprovalCost?: number;
+  /** The existing house may not come down (a contributing historic home): big additions stay a major remodel. */
+  noTeardown?: boolean;
+  /** What building new adds per ft² on a rebuild: sprinklers in a very high fire hazard zone. PLACEHOLDER. */
+  rebuildPsf?: number;
   /** Smallest profit worth doing. PLACEHOLDER. */
   profitGate: number;
   /** Sweep step, ft². */
