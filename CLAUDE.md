@@ -9,7 +9,8 @@ Breezy is a property-intelligence app for real-estate agents. It surfaces opport
 This repo is a standalone Next.js 15 + React 19 + TypeScript app. It shows two things:
 
 - the **V5 onboarding and activation flow** (`/onboarding`, also the `/` redirect);
-- the **Home Web** core experience it hands off to (`/home`).
+- the **Home Web** core experience it hands off to (`/home`);
+- the **log in with the iPhone** screen (`/login`, scan a QR; Dev menu → Log in (QR)).
 
 Both routes share **one Mapbox GL map** that lives in the root layout (`components/map/MapProvider.tsx`). Camera, layers and the chosen area carry over with no reload. `window.__bzMap` exposes the map in the browser console. A ResizeObserver keeps the canvas the size of its container (any change, not only window resizes).
 
@@ -49,6 +50,14 @@ Env keys are listed in `.env.example`, set locally in `.env.local`, and stored f
    - Pins keep pulsing.
 
 The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
+
+## Log in with the iPhone (`/login`, `/link`; on main 27 Nov, from the `Agent-feedback` branch)
+
+Breezy users sign up on the iPhone (Meta ads, Apple or phone sign-in, no password), so the phone is the trusted device and the web never asks for a password (WhatsApp / Telegram Web pattern). Open it from **Dev menu → Log in (QR)**: the log in screen, the iPhone's 6-digit code screen, or Log out (clears the session, then the log in screen). Onboarding's sign-up modal also links to it ("Already use Breezy on your iPhone? Log in").
+- **`/login`** (`app/login/page.tsx`), the onboarding's layout: **the live shared Mapbox map full bleed** (`useLiveBackdrop`, ROI heat, Los Angeles). **Left, the floating panel** (480 px, 32 px from the edges, rounded 32): the logo lockup, "Welcome back to Breezy", one line, the QR card (outline and soft shadow, a countdown ring: it renews every minute) and "Scan with your iPhone"; the email / code forms replace the QR; a pinned footer: "No phone nearby?" over two soft pills (Email me a link / Use a 6-digit code), "New to Breezy? Get the iPhone app". The session is always kept. **Right, over the map, the scan card** (380 px, `useScan`): the onboarding's location step (`Where` in `components/onboarding/Scan.tsx`, shared with `/onboarding`) asks "Where do you mainly work?"; picking frames the area with its inner-glow outline and plays **the radar once** (`RadarOnce`), the area's signal pins pop in as the beam passes while the card turns into the read-out (`RadarSummary`), with "Log in to open them on the big map". Approved: "Welcome back, James", the QR turns to a pulsing check, then `/home`. Under 1100 px the scan card hides; under 900 px the panel takes the width. Offline, the static Silver Lake image and fixed pins stand in.
+- **`/link`** (`app/link/page.tsx`): the simulated iPhone screen (390 px): "Log in on your computer?", the device line ("Chrome on macOS · just now"), Confirm (fake Face ID, ~0.9 s) / Not me; expired codes say so. `/link?mode=code` shows a 6-digit code to type on the computer.
+- **Mock layer, one module to swap:** `lib/auth/handoff.ts` (client) over `app/api/handoff/route.ts` + `lib/auth/store.ts` (in-memory tokens `pending → approved / declined → consumed`, expiry; the computer polls every 1.5 s). Two transports at once: the server store (a **real iPhone on the same Wi-Fi as `next dev`**: the QR encodes the LAN origin, shown bottom-right; `allowedDevOrigins` in `next.config.ts`) and BroadcastChannel / localStorage (the **"Simulate phone"** button bottom-right, an iframe of `/link`). On Vercel the serverless instances don't share memory, so the deployed prototype relies on Simulate phone.
+- **Not on main yet** (on `Agent-feedback`): the `/start` phone nudges and the handoff's first web screen (walkthrough, trial-dismissed gates, the App Store billing state). On main, approving lands on the usual `/home`.
 
 ## Home Web (`/home`)
 
@@ -208,7 +217,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - **Guided version (Coach):** the page dims, the next thing to press is ringed (white ring + soft halo), and a 300 px callout card with a pointer sits beside it (right of targets in the left half, else below / above / left): the task's icon and name with "+10", a bold title, one line, Exit guide (or Escape) and Next / Done when the step needs one. Only the target takes clicks; the callout hides while its target is covered (filter panel, sheets, modals, paywall). The create tasks **start from Create** ("Start from Create" → "Pick Buyer search / Comps report / Underbuilt search"; picking an unearned item there also starts its guide), then guide the search step (the field, then the suggestions once typed). Buyer: Create → Buyer search opens the buyer wizard, which is its own guide (stage `wizard`, coach marks paused); saving the search earns the task. Underbuilt: area → "Pick a lot with room to build" on the first result → "See its Max build" (Done). **Comps (18 Nov review): address → "Select the property" on the suggestions → the property opens (not straight into comps) → "Get comps" on the quick estimate → review → "Let AI pick the comps" on the choice → the guide ends when the comps are in.** Contact an owner (mobile flow): "Open this expired listing…" on a feed / results card → "Contact the owner" on Contact owner.
 - After each task a dark toast: "+10 contact credits · 1 of 4 done · Up next: …" with **Next step** (starts the next guide).
 
-**Developer menu** (side nav), to preview states on demand. **Grouped by category (18 Nov review):** the popover lists the categories (Onboarding & activation, Snackbars, Search states, Saved data, Property, Plan & billing, Paywall, Side nav) with a count; hovering or clicking one opens its actions in a submenu beside it (`DevAction.group`).
+**Developer menu** (side nav), to preview states on demand. **Grouped by category (18 Nov review):** the popover lists the categories (Onboarding & activation, Snackbars, Search states, Saved data, Property, Plan & billing, Paywall, Log in (QR), Side nav) with a count; hovering or clicking one opens its actions in a submenu beside it (`DevAction.group`).
 - **Reset prototype (first visit)**: clears every session and local `bz-` key and reloads on `/onboarding` (Create flyout, onboarding, then the checklist nudge)
 - Make Breezy yours: reset (clears progress and opens the wizard)
 - Restart onboarding (also resets Make Breezy yours, so the nudge shows again)
@@ -218,6 +227,7 @@ The picks are saved in `AppState` (sessionStorage) and seed Home's For you feed.
 - Saved data: nothing saved / failed to load / back to normal
 - Plan state… and Unlimited (internal) (paywall, see above)
 - Paywall: View Web / Mobile / Holiday (previews); Use in the journey: Web / Mobile / Holiday
+- Log in (QR): the log in screen, the iPhone's 6-digit code screen, Log out
 
 ## Heat palette (decided 17 Nov: the defaults)
 
@@ -278,6 +288,8 @@ app/layout.tsx              root layout → AppStateProvider → SavedProvider �
 app/page.tsx                redirects to /onboarding
 app/onboarding/page.tsx     V5 flow (8 steps), OppCard swipe cards, FreebieArt, signup modal
 app/home/page.tsx           Home Web: layout, views (home / results), search this area, detail zoom, Dev menu
+app/login, app/link         scan-to-link login: computer login (QR / email link / code), simulated iPhone
+app/api/handoff/route.ts    login token API (lib/auth/store.ts in memory); client: lib/auth/handoff.ts
 app/api/boundary/route.ts   Census TIGERweb lookup (winding + holes)
 components/AppState.tsx     place / areas, outline rings, listings, picks, onboarded (sessionStorage)
 components/SavedState.tsx   saved searches + properties, alert definitions

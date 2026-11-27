@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { PAYWALL_VERSIONS, billing, paywall, useEntitlements } from "@/lib/billing";
+import { handoff } from "@/lib/auth/handoff";
 import { AllowanceRing, BillingDevPanel, TrialCard } from "../billing/Paywall";
 import { CreateButton, CreateStyle } from "./CreateMenu";
 import { Ring } from "./GetStarted";
@@ -83,6 +84,11 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
     // version every real paywall moment opens (locked reports, Contact owner, Get comps, upgrades…).
     ...PAYWALL_VERSIONS.map(([k, label, icon]) => ({ group: "Paywall", label: `View: ${label}`, icon, run: () => paywall.open({ kind: "offer", preview: true, version: k }) })),
     ...PAYWALL_VERSIONS.map(([k, label]) => ({ group: "Paywall", label: `Use in the journey: ${label}${(bill.paywallStyle ?? "web") === k ? " ✓" : ""}`, icon: "ph-signpost", run: () => billing.set({ paywallStyle: k }) })),
+    // Log in with the iPhone (27 Nov, William): the scan-to-link login (QR, email link, 6-digit
+    // code) and the simulated iPhone. "Simulate phone" on the login screen approves the QR here.
+    { group: "Log in (QR)", label: "Log in screen (scan the QR)", icon: "ph-qr-code", run: () => location.assign("/login") },
+    { group: "Log in (QR)", label: "iPhone: 6-digit code screen", icon: "ph-device-mobile", run: () => location.assign("/link?mode=code") },
+    { group: "Log in (QR)", label: "Log out, then the log in screen", icon: "ph-sign-out", run: () => { handoff.signOut(); location.assign("/login"); } },
     { group: "Plan & billing", label: `Unlimited (internal): ${bill.unlimited ? "on" : "off"}`, icon: "ph-infinity", run: () => billing.set({ unlimited: !bill.unlimited }) },
     ...NAV_STYLES.map(([k, label, icon]) => ({ group: "Side nav", label: `${label}${k === navStyle ? " ✓" : ""}`, icon, run: () => setNavStyle(k) }))];
   return (
