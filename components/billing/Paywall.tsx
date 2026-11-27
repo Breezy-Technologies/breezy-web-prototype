@@ -11,7 +11,7 @@
 //  - TrialCard (side nav) and BillingDevPanel (Dev menu).
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { type Access, type BillingState, PRESETS, billing, paywall, trialLength, useBilling, useEntitlements, usePaywallReq } from "@/lib/billing";
+import { type Access, type BillingState, PAYWALL_VERSIONS, type PaywallVersion, PRESETS, billing, paywall, trialLength, useBilling, useEntitlements, usePaywallReq } from "@/lib/billing";
 import { SettingsDialog } from "./SettingsDialog";
 import { HolidayPaywall, MobilePaywall } from "./MobilePaywall";
 import { type Feature, type Metered, PRICING, type Segment, money, saving, sku } from "@/lib/pricing.config";
@@ -454,11 +454,12 @@ export function BillingHost({ onToast }: { onToast: Toast }) {
     // (Dev menu → Plan & billing → Paywall in the journey) decides.
     const version = r.version ?? s.paywallStyle ?? "web";
     // The holiday paywall (26 Nov): Essential / Unlimited; the 50% only on the iPhone (QR).
-    if (version === "holiday") return <HolidayPaywall trial days={s.trialVariant} preview={r.preview} onClose={close} onDone={pv} />;
-    // Dev menu → Paywall: Mobile (the iPhone's paywall, adapted to web).
+    // A trial is on offer for previews, win-back and new users; otherwise the plan is bought now.
+    const win = s.status === "none" ? winOffer(s.segment) : null;
+    const trial = !!r.preview || !!win || (s.status === "none" && s.segment === "new2");
+    if (version === "holiday") return <HolidayPaywall trial={trial} days={win ? win.trialDays : s.trialVariant} preview={r.preview} onClose={close} onDone={pv} />;
+    // The iPhone's paywall, adapted to web.
     if (version === "mobile") {
-      const win = s.status === "none" ? winOffer(s.segment) : null;
-      const trial = r.preview || !!win || (s.status === "none" && s.segment === "new2");
       return <MobilePaywall feature={r.feature} kicker={r.kicker} trial={trial} days={win ? win.trialDays : s.trialVariant} preview={r.preview} holiday={r.version ? false : undefined} onClose={close}
         onDone={r.preview ? () => { onToast("Preview: nothing was started", "neutral"); close(); } : onDone} />;
     }
@@ -573,7 +574,7 @@ export function BillingDevPanel({ left, onClose }: { left: number; onClose: () =
           );
         })}
       </div>
-      {seg("Paywall", s.paywallStyle ?? "web", [["web", "Web (two panels)"], ["mobile", "Mobile (plans)"]], v => billing.set({ paywallStyle: v }))}
+      {seg("Paywall", s.paywallStyle ?? "web", PAYWALL_VERSIONS.map(([k, l]) => [k, l.replace(/ \(.*/, "")] as [PaywallVersion, string]), v => billing.set({ paywallStyle: v }))}
       {seg("Lock style", s.lockStyle, [["partial", "Partial report"], ["blur", "Full blur"], ["tile", "Locked tile"]], v => billing.set({ lockStyle: v }))}
       {seg("New-user trial (A/B)", s.trialVariant, [[14, "14 days"], [30, "30 days"]], v => billing.set({ trialVariant: v, trialDay: Math.min(s.trialDay, v) }))}
       <span style={{ font: "400 12px/17px var(--font-sans)", color: MUTED }}>Mock billing, saved in this browser. Figures come from lib/pricing.config.ts.</span>

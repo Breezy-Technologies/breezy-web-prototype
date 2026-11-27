@@ -13,6 +13,8 @@ export type Status = "trial" | "active" | "expired" | "none";
 export type LockStyle = "partial" | "blur" | "tile";
 /** One use of a metered feature: what, on which property (`reportKey`), when, paid how. */
 export type UseLog = { f: Metered; key: string; at: number; via: "allowance" | "credit" };
+export type PaywallVersion = "web" | "mobile" | "holiday";
+export const PAYWALL_VERSIONS: [PaywallVersion, string, string][] = [["web", "Web (two panels)", "ph-browser"], ["mobile", "Mobile (imported)", "ph-device-mobile"], ["holiday", "Holiday (50% off on iPhone)", "ph-gift"]];
 export type BillingState = {
   unlimited: boolean;
   status: Status;
@@ -31,8 +33,9 @@ export type BillingState = {
   lockStyle: LockStyle;
   /** The holiday 50%-off offer is live (PRICING.holiday; Dev menu toggles it). */
   holiday?: boolean;
-  /** Which paywall the offer opens (Dev menu): the web two-panel sheet, or the mobile paywall adapted to web. */
-  paywallStyle?: "web" | "mobile";
+  /** Which paywall every offer in the journey opens (Dev menu → Paywall → Use in the journey):
+   *  the web two-panel sheet, the mobile paywall adapted to web, or the holiday paywall. */
+  paywallStyle?: PaywallVersion;
   /** State version: 2 = locked tiles open the paywall only (17 Nov review). */
   v?: number;
 };
@@ -153,7 +156,7 @@ export function useEntitlements() {
 export type PaywallReq =
   | { kind: "upsell"; feature: Metered; then?: () => void }
   | { kind: "offer"; feature?: Feature; kicker?: string; then?: () => void; /** Dev menu preview: the trial version, nothing starts. */ preview?: boolean;
-      /** Dev menu → View paywall: open this version directly, whatever the paywall setting. */ version?: "web" | "mobile" | "holiday" }
+      /** Dev menu → View paywall: open this version directly, whatever the paywall setting. */ version?: PaywallVersion }
   | { kind: "plan"; tab?: string }
   | { kind: "winback" }
   | { kind: "news" }

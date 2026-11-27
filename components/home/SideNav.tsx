@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { billing, paywall, useEntitlements } from "@/lib/billing";
+import { PAYWALL_VERSIONS, billing, paywall, useEntitlements } from "@/lib/billing";
 import { AllowanceRing, BillingDevPanel, TrialCard } from "../billing/Paywall";
 import { CreateButton, CreateStyle } from "./CreateMenu";
 import { Ring } from "./GetStarted";
@@ -78,11 +78,11 @@ export function SideNav({ expanded, onToggle, active = "Map", onPick, userName, 
   const devAll: DevAction[] = [
     ...dev,
     { group: "Plan & billing", label: "Plan state…", icon: "ph-credit-card", run: () => setPlanDev(true) },
-    // View each paywall directly (26 Nov, William: for the team to compare; nothing changes in the
-    // background and nothing is started). The default for real paywall moments stays in Plan state….
-    { group: "Plan & billing", label: "View paywall: Web (two panels)", icon: "ph-eye", run: () => paywall.open({ kind: "offer", preview: true, version: "web" }) },
-    { group: "Plan & billing", label: "View paywall: Mobile (imported)", icon: "ph-device-mobile", run: () => paywall.open({ kind: "offer", preview: true, version: "mobile" }) },
-    { group: "Plan & billing", label: "View paywall: Holiday 50% off", icon: "ph-gift", run: () => paywall.open({ kind: "offer", preview: true, version: "holiday" }) },
+    // Paywall (27 Nov, William): View opens one version straight away (a preview: nothing is
+    // started, no setting changes), so the team can compare them; Use in the journey picks the
+    // version every real paywall moment opens (locked reports, Contact owner, Get comps, upgrades…).
+    ...PAYWALL_VERSIONS.map(([k, label, icon]) => ({ group: "Paywall", label: `View: ${label}`, icon, run: () => paywall.open({ kind: "offer", preview: true, version: k }) })),
+    ...PAYWALL_VERSIONS.map(([k, label]) => ({ group: "Paywall", label: `Use in the journey: ${label}${(bill.paywallStyle ?? "web") === k ? " ✓" : ""}`, icon: "ph-signpost", run: () => billing.set({ paywallStyle: k }) })),
     { group: "Plan & billing", label: `Unlimited (internal): ${bill.unlimited ? "on" : "off"}`, icon: "ph-infinity", run: () => billing.set({ unlimited: !bill.unlimited }) },
     ...NAV_STYLES.map(([k, label, icon]) => ({ group: "Side nav", label: `${label}${k === navStyle ? " ✓" : ""}`, icon, run: () => setNavStyle(k) }))];
   return (
