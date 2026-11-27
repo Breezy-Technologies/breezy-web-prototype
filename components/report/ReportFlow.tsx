@@ -43,7 +43,7 @@ const THEME: Record<FlowKind, { bar: string; glow: string; dot: string }> = {
 // No Comps tab (review, 13 Nov): comps live in the split view (comps interaction 2.0). A saved
 // comps report still opens here on its own, with these tabs to move on. Renovation comps
 // (24 Nov, Figma 7888:56954): the comps behind the ROI; its Get comps opens the split view.
-const TABS: [FlowKind, string, string][] = [["roi", "Upside analysis", "act-chart"], ["ub", "Build guidelines", "act-target"], ["reno", "Renovation comps", "act-files"]];
+const TABS: [FlowKind, string, string][] = [["roi", "Upside analysis", "act-chart"], ["ub", "Build guidelines", "act-target"], ["reno", "Post-renovation comps", "act-files"]];
 const EASE = "cubic-bezier(.2,.8,.2,1)";
 const STEP_MS = 700, AUTO_MS = 6700;
 
