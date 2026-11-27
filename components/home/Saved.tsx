@@ -91,7 +91,7 @@ export function useSearchSheet({ F, place, results, toast }: { F: Filters; place
     clearTimeout(outT.current);
     outT.current = setTimeout(() => { setOut(false); setSt(null); }, 190);
   };
-  const openNew = () => { clearTimeout(outT.current); setOut(false); setSt({ edit: null, name: "", clients: [], notify: true, snap: "" }); };
+  const openNew = (clients: string[] = [], name = "") => { clearTimeout(outT.current); setOut(false); setSt({ edit: null, name, clients, notify: true, snap: "" }); };
   // `onManageSearch` / `onFooterSearch` with an active search.
   const openManage = (s: SavedSearch) => {
     clearTimeout(outT.current); setOut(false);

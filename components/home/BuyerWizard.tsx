@@ -7,7 +7,11 @@
 //   3 Criteria budget, beds, baths, home type, must-haves
 //   4 Alerts   search name, alerts on / frequency, send matches to the buyer
 // Saving commits the areas and filters, saves the search for that buyer and shows the matches
-// (app/home/page.tsx `finishBuyer`). Opened from Create → Buyer search and New buyer search.
+// (app/home/page.tsx `finishBuyer`).
+// 27 Nov (team: "the highlight and tooltip version"): Create → Buyer search opens only step 1
+// (`contactOnly`): once the buyer is picked the modal closes and the guided overlay takes over
+// on the map (search field → area → All filters → Save search, app/home/page.tsx). The full
+// four-step wizard stays here, unused on main.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CONTACTS, CLIENT_PHOTOS, initials, useSaved } from "../SavedState";
 import { Area, Place, searchPlaces } from "@/lib/places";
@@ -27,7 +31,10 @@ const money = (v: number) => v >= 1e6 ? `$${(v / 1e6).toFixed(2).replace(/\.?0+$
 const QUICK_AREAS = ["Silver Lake", "Echo Park", "Los Feliz"];
 const FREQ = ["Instant", "Daily digest", "Weekly"];
 
-export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: (r: BuyerResult) => void }) {
+export type BuyerPick = BuyerResult["buyer"];
+
+export function BuyerWizard({ onClose, onDone, contactOnly, onBuyer }: { onClose: () => void; onDone?: (r: BuyerResult) => void;
+  /** Only the contact step; Continue hands the buyer to `onBuyer`. */ contactOnly?: boolean; onBuyer?: (b: BuyerPick) => void }) {
   const sv = useSaved();
   const [step, setStep] = useState(0);
   // 1 · buyer
@@ -80,10 +87,11 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
   ][step];
   const next = () => {
     if (!ok) return;
+    if (contactOnly) { onBuyer?.({ name: adding ? nb.name.trim() : buyer!, email: adding ? nb.email.trim() : undefined, phone: adding ? nb.phone.trim() : undefined, isNew: adding }); return; }
     if (step < 3) { if (step === 0 && adding) setBuyer(null); setStep(step + 1); return; }
     const bName = adding ? nb.name.trim() : buyer!;
     const pick = (m: Record<string, boolean>) => Object.fromEntries(Object.entries(m).filter(([, v]) => v));
-    onDone({
+    onDone?.({
       buyer: { name: bName, email: adding ? nb.email.trim() : undefined, phone: adding ? nb.phone.trim() : undefined, isNew: adding },
       areas,
       f: { st: { Active: true }, tg: {}, pLo: lo ? BUDGET[lo] / 50000 : 0, pHi: hi ? BUDGET[hi] / 50000 : 100, bedMin: beds, bathMin: baths, types: pick(types), feats: pick(feats) },
@@ -102,7 +110,7 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
     ...Object.keys(types).filter(k => types[k]), ...Object.keys(feats).filter(k => feats[k]),
   ].filter(Boolean);
   const titles = [
-    ["Who's this search for?", "Start with your buyer. Their search, alerts and matches stay together."],
+    ["Who's this search for?", contactOnly ? "Start with your buyer. Then we'll show you where to set their area, criteria and alerts on the map." : "Start with your buyer. Their search, alerts and matches stay together."],
     [`Where is ${first} looking?`, "Add one or more areas."],
     [`What does ${first} need?`, "Everything is optional. You can fine-tune the filters later."],
     ["How should we keep you posted?", `We'll watch for new listings that match ${first}'s criteria.`],
@@ -115,18 +123,18 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
         <div style={{ flex: "none", padding: "20px 24px 0", display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ font: "700 15px/20px var(--font-sans)", color: INK }}>New buyer search</span>
-            <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>Step {step + 1} of 4</span>
+            {!contactOnly && <span style={{ font: "400 13px/18px var(--font-sans)", color: MUTED }}>Step {step + 1} of 4</span>}
             <span style={{ flex: 1 }} />
             <button onClick={onClose} title="Close" className="sv-grey" style={{ width: 32, height: 32, border: "none", borderRadius: 9999, background: "rgba(13,12,12,.05)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ph ph-x" style={{ fontSize: 16, color: INK }} /></button>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
+          {!contactOnly && <div style={{ display: "flex", gap: 6 }}>
             {STEPS.map((s, i) => (
               <button key={s} onClick={() => i < step && setStep(i)} disabled={i >= step} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, padding: 0, border: "none", background: "none", cursor: i < step ? "pointer" : "default", textAlign: "left" }}>
                 <span style={{ height: 4, borderRadius: 9999, background: i <= step ? INK : "rgba(18,18,18,.1)", transition: "background .3s" }} />
                 <span style={{ font: `${i === step ? 700 : 400} 12px/16px var(--font-sans)`, color: i <= step ? INK : MUTED }}>{s}</span>
               </button>
             ))}
-          </div>
+          </div>}
           {step > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, font: "400 12px/16px var(--font-sans)", color: MUTED }}>
               <Avatar name={adding ? nb.name : buyer || ""} size={20} />
@@ -264,7 +272,7 @@ export function BuyerWizard({ onClose, onDone }: { onClose: () => void; onDone: 
           <span style={{ flex: 1 }} />
           {step === 2 && <button onClick={() => setStep(3)} className="sv-ghost" style={{ ...btn(false), background: "none" }}>Skip</button>}
           <button onClick={next} disabled={!ok} className="fb-dark" style={{ ...btn(true), opacity: ok ? 1 : 0.35, cursor: ok ? "pointer" : "default" }}>
-            {step === 3 ? "Save & see matches" : step === 0 && adding ? "Add buyer & continue" : "Continue"}
+            {step === 3 ? "Save & see matches" : step === 0 && adding ? (contactOnly ? "Add buyer" : "Add buyer & continue") : "Continue"}
           </button>
         </div>
       </div>

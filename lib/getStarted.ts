@@ -60,8 +60,9 @@ export const getStarted = {
   get: snap,
   /** Open / close the checklist. */
   show(open = true) { set({ open }); },
-  /** Start (or move) the guided version of a task. */
-  go(task: Task, stage: Stage) { if (snap().done.includes(task)) return set({ tour: null }); set({ tour: { task, stage }, open: false }); },
+  /** Start (or move) the guided version of a task. `again`: run it even once earned (the
+   *  buyer search guide is how every buyer search is set up, 27 Nov). */
+  go(task: Task, stage: Stage, again = false) { if (!again && snap().done.includes(task)) return set({ tour: null }); set({ tour: { task, stage }, open: false }); },
   /** Move the tour on, only if it's on `task` (and, when given, at one of `from`). */
   step(task: Task, stage: Stage, from?: Stage[]) {
     const t = snap().tour;

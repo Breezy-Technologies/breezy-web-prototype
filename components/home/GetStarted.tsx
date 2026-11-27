@@ -222,6 +222,7 @@ export function Coach({ steps, task, paused, onExit }: { steps: CoachStep[] | nu
     ? { top: Math.max(14, Math.min(cardH - 26, b.y + b.h / 2 - pos.top - 6)), [side === "right" ? "left" : "right"]: -6 }
     : { left: Math.max(14, Math.min(CARD_W - 26, b.x + b.w / 2 - pos.left - 6)), [side === "below" ? "top" : "bottom"]: -6 };
   const meta = task ? taskMeta(task) : null;
+  const earned = !!task && getStarted.get().done.includes(task);
   const stop = (e: React.SyntheticEvent) => { e.stopPropagation(); };
   const shield = (s: React.CSSProperties) => <div onMouseDown={stop} onPointerDown={stop} onClick={stop} style={{ position: "fixed", pointerEvents: "auto", ...s }} />;
   return (
@@ -241,7 +242,7 @@ export function Coach({ steps, task, paused, onExit }: { steps: CoachStep[] | nu
           <span style={{ position: "relative", display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <TaskIcon t={meta} size={22} />
             <span style={{ flex: 1, minWidth: 0, font: "700 12px/16px var(--font-sans)", color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta.title}</span>
-            <EarnChip />
+            {!earned && <EarnChip />}
           </span>
         )}
         <span key={cur.s.title} style={{ position: "relative", display: "block", animation: "stepIn .3s cubic-bezier(.2,.8,.2,1) both" }}>
